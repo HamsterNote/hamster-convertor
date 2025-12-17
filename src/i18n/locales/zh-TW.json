@@ -1,0 +1,13 @@
+{
+  "appName": "倉鼠文件轉換",
+  "tagline": "免費的多語言文件格式轉換平台。",
+  "nav": { "home": "首頁" },
+  "language": "語言",
+  "languages": { "en": "英語", "zhCN": "簡體中文", "zhTW": "繁體中文" },
+  "upload": { "title": "上傳檔案", "drop": "將檔案拖到這裡", "or": "或", "browse": "選擇檔案" },
+  "formats": { "from": "來源格式", "to": "目標格式", "supported": "支援的格式" },
+  "actions": { "addFiles": "新增檔案", "convertAll": "全部轉換", "clearAll": "清空" },
+  "table": { "fileName": "檔名", "source": "來源", "target": "目標", "status": "狀態", "action": "操作" },
+  "status": { "ready": "就緒", "queued": "排隊中", "converting": "轉換中...", "done": "完成", "failed": "失敗" },
+  "footer": { "copyright": "© {{year}} 倉鼠文件轉換" }
+}

@@ -1,0 +1,13 @@
+{
+  "appName": "Hamster Document Converter",
+  "tagline": "Free, easy document conversion with multilingual support.",
+  "nav": { "home": "Home" },
+  "language": "Language",
+  "languages": { "en": "English", "zhCN": "Simplified Chinese", "zhTW": "Traditional Chinese" },
+  "upload": { "title": "Upload files", "drop": "Drag & drop files here", "or": "or", "browse": "browse" },
+  "formats": { "from": "From", "to": "To", "supported": "Supported formats" },
+  "actions": { "addFiles": "Add files", "convertAll": "Convert all", "clearAll": "Clear all" },
+  "table": { "fileName": "File name", "source": "Source", "target": "Target", "status": "Status", "action": "Action" },
+  "status": { "ready": "Ready", "queued": "Queued", "converting": "Converting...", "done": "Done", "failed": "Failed" },
+  "footer": { "copyright": "© {{year}} Hamster Document Converter" }
+}
