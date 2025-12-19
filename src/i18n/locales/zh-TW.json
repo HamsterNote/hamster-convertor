@@ -1,13 +1,21 @@
 {
   "appName": "倉鼠文件轉換",
-  "tagline": "免費的多語言文件格式轉換平台。",
+  "tagline": "本站轉換功能開源且永久免費，遵循 GPL v3 開源許可。未經允許不得用於商業用途。",
   "nav": { "home": "首頁" },
-  "language": "語言",
-  "languages": { "en": "英語", "zhCN": "簡體中文", "zhTW": "繁體中文" },
+  "language": "Language",
+  "languages": { "en": "English", "zhCN": "简体中文", "zhTW": "繁體中文" },
   "upload": { "title": "上傳檔案", "drop": "將檔案拖到這裡", "or": "或", "browse": "選擇檔案" },
   "formats": { "from": "來源格式", "to": "目標格式", "supported": "支援的格式" },
   "actions": { "addFiles": "新增檔案", "convertAll": "全部轉換", "clearAll": "清空" },
   "table": { "fileName": "檔名", "source": "來源", "target": "目標", "status": "狀態", "action": "操作" },
   "status": { "ready": "就緒", "queued": "排隊中", "converting": "轉換中...", "done": "完成", "failed": "失敗" },
-  "footer": { "copyright": "© {{year}} 倉鼠文件轉換" }
+  "footer": {
+    "copyright": "© {{year}} 倉鼠文件轉換",
+    "openSource": "GitHub 開源地址",
+    "openSourceUrl": "https://github.com/HamsterNote/hamster-convertor",
+    "githubIssues": "GitHub Issues",
+    "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
+    "feedback": " 問題反饋",
+    "feedbackUrl": "https://github.com/HamsterNote/hamster-convertor/issues"
+  }
 }

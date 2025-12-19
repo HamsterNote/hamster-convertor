@@ -80,7 +80,9 @@ function App() {
 
       <main className="container">
         <section className="hero">
-          <div className="hero__brand">🐹</div>
+          <div className="hero__brand">
+            <img src="/logos/hamster_logo.png" alt="Hamster" className="hero__brand__logo" />
+          </div>
           <h1 className="hero__title">{t('appName')}</h1>
           <p className="hero__subtitle">{t('tagline')}</p>
         </section>
@@ -135,6 +137,7 @@ function App() {
                               prev.map(x => (x.id === it.id ? { ...x, target: e.target.value as SupportedFormat } : x))
                             )
                           }
+                          aria-label="Target format"
                         >
                           {SUPPORTED_FORMATS.filter(f => f !== it.source).map(f => (
                             <option key={f} value={f}>

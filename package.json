@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "仓鼠文档转换 - 免费文档转换平台（前端）",
-  "license": "MIT",
+  "license": "GPL v3.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

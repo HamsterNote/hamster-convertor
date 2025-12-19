@@ -1,13 +1,13 @@
 {
   "appName": "Hamster Document Converter",
-  "tagline": "Free, easy document conversion with multilingual support.",
+  "tagline": "Open source and free document conversion platform, following GPL v3 open source license. Commercial use is prohibited without permission.",
   "nav": { "home": "Home" },
-  "language": "Language",
-  "languages": { "en": "English", "zhCN": "Simplified Chinese", "zhTW": "Traditional Chinese" },
+  "language": "语言",
+  "languages": { "en": "English", "zhCN": "简体中文", "zhTW": "繁體中文" },
   "upload": { "title": "Upload files", "drop": "Drag & drop files here", "or": "or", "browse": "browse" },
   "formats": { "from": "From", "to": "To", "supported": "Supported formats" },
   "actions": { "addFiles": "Add files", "convertAll": "Convert all", "clearAll": "Clear all" },
   "table": { "fileName": "File name", "source": "Source", "target": "Target", "status": "Status", "action": "Action" },
   "status": { "ready": "Ready", "queued": "Queued", "converting": "Converting...", "done": "Done", "failed": "Failed" },
-  "footer": { "copyright": "© {{year}} Hamster Document Converter" }
+  "footer": { "copyright": "© {{year}} Hamster Document Converter", "openSource": "GitHub Open Source", "openSourceUrl": "https://github.com/HamsterNote/hamster-convertor", "githubIssues": "GitHub Issues", "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues", "feedback": "Feedback", "feedbackUrl": "https://github.com/HamsterNote/hamster-convertor/issues" }
 }

@@ -1,13 +1,21 @@
 {
   "appName": "仓鼠文档转换",
-  "tagline": "免费的多语言文档格式转换平台。",
+  "tagline": "本站转换功能开源且永久免费，遵循 GPL v3 开源许可。未经允许不得用于商业用途。",
   "nav": { "home": "首页" },
-  "language": "语言",
-  "languages": { "en": "英语", "zhCN": "简体中文", "zhTW": "繁體中文" },
+  "language": "Language",
+  "languages": { "en": "English", "zhCN": "简体中文", "zhTW": "繁體中文" },
   "upload": { "title": "上传文件", "drop": "将文件拖到这里", "or": "或", "browse": "选择文件" },
   "formats": { "from": "源格式", "to": "目标格式", "supported": "支持的格式" },
   "actions": { "addFiles": "添加文件", "convertAll": "全部转换", "clearAll": "清空" },
   "table": { "fileName": "文件名", "source": "源格式", "target": "目标格式", "status": "状态", "action": "操作" },
   "status": { "ready": "就绪", "queued": "排队中", "converting": "转换中...", "done": "完成", "failed": "失败" },
-  "footer": { "copyright": "© {{year}} 仓鼠文档转换" }
+  "footer": {
+    "copyright": "© {{year}} 仓鼠文档转换",
+    "openSource": "GitHub 开源地址",
+    "openSourceUrl": "https://github.com/HamsterNote/hamster-convertor",
+    "githubIssues": "GitHub Issues",
+    "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
+    "feedback": " 问题反馈",
+    "feedbackUrl": "mailto:convertor@hamster-note.com"
+  }
 }

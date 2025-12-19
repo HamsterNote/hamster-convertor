@@ -14,7 +14,7 @@ function Header() {
       <div className="container header__inner">
         <a className="brand" href="#" aria-label={t('appName')}>
           <span className="brand__logo" aria-hidden>
-            🐹
+            <img src="/logos/hamster_logo.png" alt="Hamster" className="hero__brand__logo" />
           </span>
           <span className="brand__title">{t('appName')}</span>
         </a>
@@ -25,6 +25,7 @@ function Header() {
             className="nav__select"
             value={i18n.language}
             onChange={e => i18n.changeLanguage(e.target.value)}
+            aria-label={t('language')}
           >
             {LANGS.map(l => (
               <option key={l.code} value={l.code}>
