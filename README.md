@@ -10,12 +10,12 @@
 - 已支持文件类型（界面）：pdf、doc、docx、txt、html、epub、md
 
 本地开发：
-- 安装依赖：pnpm install
-- 启动开发：pnpm dev（默认 http://localhost:5073）
+- 安装依赖：yarn install
+- 启动开发：yarn dev（默认 http://localhost:5073）
 
 构建与预览：
-- 构建：pnpm build
-- 预览：pnpm preview
+- 构建：yarn build
+- 预览：yarn preview
 
 目录结构：
 - public/favicon.svg：暖色调的小仓鼠图标
@@ -37,7 +37,7 @@
 支持的格式（界面）：pdf、doc、docx、txt、html、epub、md。
 
 代码规范：
-- Lint：pnpm lint
-- 格式化：pnpm format
+- Lint：yarn lint
+- 格式化：yarn format
 
 许可证：MIT（见 LICENSE）。
