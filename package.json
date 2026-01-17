@@ -9,8 +9,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 5073",
-    "lint": "eslint --ext .ts,.tsx src",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,css,md,json}\""
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "i18next": "^23.10.1",
@@ -20,16 +21,23 @@
     "react-i18next": "^15.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@system-ui-js/development-base": "^0.1.1",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^8.11.0",
-    "@typescript-eslint/parser": "^8.11.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
     "@vitejs/plugin-react": "^4.3.3",
-    "eslint": "^9.14.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-react": "^7.37.2",
-    "eslint-plugin-react-hooks": "^5.0.0-canary-7118f5dd7-20230705",
-    "prettier": "^3.3.3",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "prettier": "^3.7.4",
+    "prettier-config-standard": "^7.0.0",
+    "typescript-eslint": "^8.50.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.8"
   },
