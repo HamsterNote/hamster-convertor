@@ -12,7 +12,7 @@ export default defineConfig({
     trace: 'on-first-retry'
   },
   webServer: {
-    command: 'yarn build && yarn preview --port 5073',
+    command: 'yarn preview:build',
     url: 'http://localhost:5073',
     reuseExistingServer: !process.env.CI,
     timeout: 120000

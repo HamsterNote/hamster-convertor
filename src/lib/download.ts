@@ -15,8 +15,14 @@ const triggerBlobDownload = (blob: Blob, name: string) => {
   const url = URL.createObjectURL(blob)
   try {
     ensureDownloadAnchor(url, name)
-  } finally {
+    // 延迟释放 URL，确保下载已启动
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 100)
+  } catch (error) {
+    // 确保 URL 被释放
     URL.revokeObjectURL(url)
+    throw error
   }
 }
 

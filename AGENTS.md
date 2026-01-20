@@ -8,7 +8,8 @@
 Vite + React + TypeScript 多语言文档转换前端。使用 @system-ui-js/development-base 统一配置，支持 i18next 三语言（zh-CN/zh-TW/en）和浅/暗色模式。
 
 ## STRUCTURE
-```
+
+```text
 ./
 ├── src/
 │   ├── components/     # Header, FileDropzone, Footer
@@ -23,10 +24,12 @@ Vite + React + TypeScript 多语言文档转换前端。使用 @system-ui-js/dev
 ## WHERE TO LOOK
 | Task | Location | Notes |
 |------|----------|-------|
-| 核心逻辑 | `src/App.tsx` | `convertAll()` 待接入转换库 |
+| 核心逻辑 | `src/App.tsx` | `convertAll()` 已集成 PDF 到 HTML 转换 |
 | i18n | `src/i18n/index.ts` | 语言检测顺序: qs → ls → nav → html |
 | 主题 | `src/styles/theme.css` | 暖色系 #f6a700，支持 prefers-color-scheme |
-| CI 部署 | `.github/workflows/deploy.yml` | **问题**: `yarn build:demo` 不存在 |
+| CI 部署 | `.github/workflows/deploy.yml` | 修复路径问题：`dist` 而不是 `dist-demo` |
+
+## CONVENTIONS (THIS PROJECT)
 
 ## CONVENTIONS (THIS PROJECT)
 - **配置来源**: ESLint/Prettier/TSConfig 复用 `@system-ui-js/development-base`
@@ -38,7 +41,7 @@ Vite + React + TypeScript 多语言文档转换前端。使用 @system-ui-js/dev
 ## ANTI-PATTERNS (THIS PROJECT)
 - ~~CI 失败~~: `deploy.yml` 调用 `yarn build:demo`，package.json 只有 `build` → **已修复**
 - ~~README 不一致~~: 文档写 `pnpm`，项目用 `yarn` → **已修复**
-- **缺失**: 无测试、无 CHANGELOG
+- ~~缺失: 无测试、无 CHANGELOG~~ → **已添加测试和 CHANGELOG**
 
 ## COMMANDS
 ```bash
