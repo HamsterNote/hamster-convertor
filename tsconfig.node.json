@@ -1,4 +1,7 @@
 {
   "extends": "@system-ui-js/development-base/tsconfig.node.json",
-  "include": ["vite.config.ts"]
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "playwright.config.ts"]
 }

@@ -4,8 +4,13 @@
     "jsx": "react-jsx",
     "types": ["react/experimental", "react-dom/experimental"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@system-ui-js/pdf-parser": ["../PdfParser/src/index.ts"],
+      "@system-ui-js/html-parser": ["../HtmlParser/dist/index.d.ts"],
+      "@hamster-note/document-parser": ["../DocumentParser/dist/index.d.ts"],
+      "@hamster-note/types": ["../types/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "e2e"],
+  "files": ["src/types/pdf-parser-deps.d.ts"]
 }

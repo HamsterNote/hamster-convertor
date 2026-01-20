@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pdf to html integration > converts fixture pdf into stable html 1`] = `".hamster-note-document { position: relative; display: block; contain: layout style size; } .hamster-note-document .hamster-note-page { position: relative; overflow: hidden; background-repeat: no-repeat; background-position: top center; background-size: contain; } .hamster-note-document .hamster-note-text { position: absolute; white-space: pre; transform-origin: 0 0; } Hamster PDF Sample"`;
