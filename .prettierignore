@@ -17,11 +17,6 @@ public/**/*.min.*
 .gitmodules
 .prettierignore
 LICENSE
-*.json
-*.cjs
-*.md
-*.js
-*.cjs
-dist
-build
-coverage
+package-lock.json
+yarn.lock
+*.min.cjs

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import log from 'loglevel'
 import Header from './components/Header'
 import FileDropzone from './components/FileDropzone'
@@ -42,9 +42,9 @@ const extToFormat = (name: string): SupportedFormat => {
     case 'epub':
     case 'md':
     case 'markdown':
-      return ext
-        .replace('htm', 'html')
-        .replace('markdown', 'md') as SupportedFormat
+      const normalizedExt =
+        ext === 'htm' ? 'html' : ext === 'markdown' ? 'md' : ext
+      return normalizedExt as SupportedFormat
     default:
       return 'pdf'
   }
@@ -53,7 +53,13 @@ const extToFormat = (name: string): SupportedFormat => {
 function App() {
   const { t, i18n } = useTranslation()
   const [items, setItems] = useState<FileItem[]>([])
+  const itemsRef = useRef<FileItem[]>(items)
   const [defaultTarget, setDefaultTarget] = useState<SupportedFormat>('pdf')
+
+  // 同步 itemsRef 到最新状态
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
 
   const hasPending = items.some((it) =>
     ['ready', 'queued', 'converting'].includes(it.status)
@@ -82,12 +88,12 @@ function App() {
   const clearAll = () => setItems([])
 
   const convertAll = async () => {
-    const isRunning = items.some((it) =>
+    const isRunning = itemsRef.current.some((it) =>
       ['queued', 'converting'].includes(it.status)
     )
     if (isRunning) return
 
-    const idsToConvert = items
+    const idsToConvert = itemsRef.current
       .filter((it) => it.status === 'ready' || it.status === 'failed')
       .map((i) => i.id)
     if (idsToConvert.length === 0) return
@@ -101,7 +107,7 @@ function App() {
     )
 
     for (const id of idsToConvert) {
-      const current = items.find((it) => it.id === id)
+      const current = itemsRef.current.find((it) => it.id === id)
       if (!current) continue
       if (current.source !== 'pdf') {
         setItems((prev) =>
