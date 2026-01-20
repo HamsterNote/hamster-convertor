@@ -30,10 +30,18 @@ Thumbs.db
 coverage/
 .nyc_output/
 
+# Playwright 产物
+playwright-report/
+test-results/
+
 # IDE和编辑器配置（可选）
 .vscode/
 .idea/
 .history/
+
+# OpenCode 配置（工具本地配置）
+.opencode/
+.specify/
 
 # ts 增量编译
 *.tsbuildinfo

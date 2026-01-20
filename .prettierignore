@@ -22,3 +22,6 @@ LICENSE
 *.md
 *.js
 *.cjs
+dist
+build
+coverage

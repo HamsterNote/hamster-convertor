@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: PDF to HTML Conversion
+  version: 0.1.0
+paths:
+  /convert/pdf-to-html:
+    post:
+      summary: Convert a PDF to HTML
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: HTML conversion result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [html, warnings]
+                properties:
+                  html:
+                    type: string
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          description: Unsupported input format
+        "500":
+          description: Conversion failed

@@ -1,8 +1,7 @@
 import path from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -26,11 +25,10 @@ export default defineConfig({
       )
     }
   },
-  server: {
-    port: 5073,
-    host: '0.0.0.0'
-  },
-  preview: {
-    port: 5073
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    testTimeout: 30000,
+    hookTimeout: 10000
   }
 })
