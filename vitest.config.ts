@@ -21,7 +21,10 @@ export default defineConfig({
         __dirname,
         '../DocumentParser/dist/index.js'
       ),
-      '@hamster-note/types': path.resolve(__dirname, '../types/src/index.ts'),
+      '@hamster-note/types': path.resolve(
+        __dirname,
+        './src/types/hamster-note-types.d.ts'
+      ),
       'pdfjs-dist': path.resolve(
         __dirname,
         '../PdfParser/node_modules/pdfjs-dist/legacy/build/pdf.mjs'

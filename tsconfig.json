@@ -8,7 +8,7 @@
       "@system-ui-js/pdf-parser": ["../PdfParser/dist/index.js"],
       "@system-ui-js/html-parser": ["../HtmlParser/dist/index.js"],
       "@hamster-note/document-parser": ["../DocumentParser/dist/index.js"],
-      "@hamster-note/types": ["../types/src/index.ts"]
+      "@hamster-note/types": ["./src/types/hamster-note-types.d.ts"]
     }
   },
   "include": ["src", "e2e"],
