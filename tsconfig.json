@@ -6,8 +6,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@system-ui-js/pdf-parser": ["../PdfParser/src/index.ts"],
-      "@system-ui-js/html-parser": ["../HtmlParser/dist/index"],
-      "@hamster-note/document-parser": ["../DocumentParser/dist/index"],
+      "@system-ui-js/html-parser": ["../HtmlParser/dist"],
+      "@hamster-note/document-parser": ["../DocumentParser/dist"],
       "@hamster-note/types": ["../types/src/index.ts"]
     }
   },
