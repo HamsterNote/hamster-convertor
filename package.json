@@ -22,8 +22,6 @@
     "test:e2e:install": "npx playwright install --with-deps"
   },
   "dependencies": {
-    "@system-ui-js/html-parser": "^0.1.0",
-    "@system-ui-js/pdf-parser": "^0.1.0",
     "i18next": "^23.10.1",
     "i18next-browser-languagedetector": "^8.0.0",
     "loglevel": "^1.9.1",

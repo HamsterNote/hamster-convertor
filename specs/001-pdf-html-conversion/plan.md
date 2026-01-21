@@ -1,6 +1,6 @@
 # Implementation Plan: PDF 转 HTML 转换
 
-**Branch**: `001-pdf-html-conversion` | **Date**: 2026-01-19 | **Spec**: /home/zhangxiao/frontend/HamsterNote/hamster-convertor/specs/001-pdf-html-conversion/spec.md
+**Branch**: `001-pdf-html-conversion` | **Date**: 2026-01-19 | **Spec**: specs/001-pdf-html-conversion/spec.md
 **Input**: Feature specification from `/specs/001-pdf-html-conversion/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.

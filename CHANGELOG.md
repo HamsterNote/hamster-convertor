@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - 修复转换失败时不显示错误信息的问题
+- 修复 CI 报错：将本地开发依赖（@system-ui-js/html-parser、@system-ui-js/pdf-parser）从 package.json 移除，改为通过 Vite 路径别名引用
 
 ### Configuration
 
