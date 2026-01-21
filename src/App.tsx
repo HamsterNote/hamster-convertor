@@ -8,12 +8,13 @@ import { convertPdfToHtml } from './lib/converter'
 import { downloadHtmlArchive, downloadHtmlFile } from './lib/download'
 
 type SupportedFormat = 'pdf' | 'doc' | 'docx' | 'txt' | 'html' | 'epub' | 'md'
+type TargetFormat = 'html'
 
 type FileItem = {
   id: string
   file: File
   source: SupportedFormat
-  target: SupportedFormat
+  target: TargetFormat
   status: 'ready' | 'queued' | 'converting' | 'done' | 'failed'
   html?: string
   warnings?: string[]
@@ -32,29 +33,28 @@ const SUPPORTED_FORMATS: SupportedFormat[] = [
 
 const extToFormat = (name: string): SupportedFormat => {
   const ext = name.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'pdf':
-    case 'doc':
-    case 'docx':
-    case 'txt':
-    case 'html':
-    case 'htm':
-    case 'epub':
-    case 'md':
-    case 'markdown':
-      const normalizedExt =
-        ext === 'htm' ? 'html' : ext === 'markdown' ? 'md' : ext
-      return normalizedExt as SupportedFormat
-    default:
-      return 'pdf'
+  const extMap: Record<string, SupportedFormat> = {
+    pdf: 'pdf',
+    doc: 'doc',
+    docx: 'docx',
+    txt: 'txt',
+    html: 'html',
+    htm: 'html',
+    epub: 'epub',
+    md: 'md',
+    markdown: 'md'
   }
+
+  if (ext && ext in extMap) {
+    return extMap[ext]
+  }
+  return 'pdf'
 }
 
 function App() {
   const { t, i18n } = useTranslation()
   const [items, setItems] = useState<FileItem[]>([])
   const itemsRef = useRef<FileItem[]>(items)
-  const [defaultTarget, setDefaultTarget] = useState<SupportedFormat>('pdf')
 
   // 同步 itemsRef 到最新状态
   useEffect(() => {
@@ -79,7 +79,7 @@ function App() {
       id: `${f.name}-${f.size}-${f.lastModified}-${Math.random().toString(36).slice(2)}`,
       file: f,
       source: extToFormat(f.name),
-      target: defaultTarget,
+      target: 'html' as TargetFormat,
       status: 'ready'
     }))
     setItems((prev) => [...prev, ...next])
@@ -193,19 +193,7 @@ function App() {
             <h2>{t('upload.title')}</h2>
             <div className='format-row'>
               <label>
-                {t('formats.to')}
-                <select
-                  value={defaultTarget}
-                  onChange={(e) =>
-                    setDefaultTarget(e.target.value as SupportedFormat)
-                  }
-                >
-                  {SUPPORTED_FORMATS.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
+                {t('formats.to')} <span className='format-target'>HTML</span>
               </label>
               <span className='supported'>
                 {t('formats.supported')}: {SUPPORTED_FORMATS.join(', ')}
@@ -232,32 +220,7 @@ function App() {
                     <tr key={it.id}>
                       <td>{it.file.name}</td>
                       <td>{it.source}</td>
-                      <td>
-                        <select
-                          value={it.target}
-                          onChange={(e) =>
-                            setItems((prev) =>
-                              prev.map((x) =>
-                                x.id === it.id
-                                  ? {
-                                      ...x,
-                                      target: e.target.value as SupportedFormat
-                                    }
-                                  : x
-                              )
-                            )
-                          }
-                          aria-label='Target format'
-                        >
-                          {SUPPORTED_FORMATS.filter((f) => f !== it.source).map(
-                            (f) => (
-                              <option key={f} value={f}>
-                                {f}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </td>
+                      <td>html</td>
                       <td className={`status status--${it.status}`}>
                         {t(`status.${it.status}` as const)}
                         {it.status === 'failed' && it.errorMessage && (

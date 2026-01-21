@@ -1,30 +1,43 @@
 import path from 'path'
+import { existsSync } from 'fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
+// 条件化别名：仅在本地开发时且路径存在时使用 sibling 目录
+const localDevAlias: Record<string, string> = {}
+const pdfParserPath = path.resolve(__dirname, '../PdfParser/src/index.ts')
+const htmlParserPath = path.resolve(__dirname, '../HtmlParser/dist/index.js')
+const documentParserPath = path.resolve(
+  __dirname,
+  '../DocumentParser/dist/index.js'
+)
+const typesPath = path.resolve(__dirname, '../types/src/index.ts')
+const pdfjsPath = path.resolve(
+  __dirname,
+  '../PdfParser/node_modules/pdfjs-dist/legacy/build/pdf.mjs'
+)
+
+if (existsSync(pdfParserPath)) {
+  localDevAlias['@system-ui-js/pdf-parser'] = pdfParserPath
+}
+if (existsSync(htmlParserPath)) {
+  localDevAlias['@system-ui-js/html-parser'] = htmlParserPath
+}
+if (existsSync(documentParserPath)) {
+  localDevAlias['@hamster-note/document-parser'] = documentParserPath
+}
+if (existsSync(typesPath)) {
+  localDevAlias['@hamster-note/types'] = typesPath
+}
+if (existsSync(pdfjsPath)) {
+  localDevAlias['pdfjs-dist'] = pdfjsPath
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      '@system-ui-js/pdf-parser': path.resolve(
-        __dirname,
-        '../PdfParser/src/index.ts'
-      ),
-      '@system-ui-js/html-parser': path.resolve(
-        __dirname,
-        '../HtmlParser/dist/index.js'
-      ),
-      '@hamster-note/document-parser': path.resolve(
-        __dirname,
-        '../DocumentParser/dist/index.js'
-      ),
-      '@hamster-note/types': path.resolve(__dirname, '../types/src/index.ts'),
-      'pdfjs-dist': path.resolve(
-        __dirname,
-        '../PdfParser/node_modules/pdfjs-dist/legacy/build/pdf.mjs'
-      )
-    }
+    alias: localDevAlias
   },
   server: {
     port: 5073,
