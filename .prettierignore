@@ -5,7 +5,6 @@ coverage
 .turbo
 .next
 *.log
-*.lock
 *.min.*
 public/**/*.min.*
 *.mjs
@@ -14,9 +13,5 @@ public/**/*.min.*
 .cursorignore
 .editorconfig
 .gitignore
-.gitmodules
-.prettierignore
-LICENSE
 package-lock.json
 yarn.lock
-*.min.cjs
