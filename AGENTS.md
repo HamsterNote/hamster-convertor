@@ -62,4 +62,4 @@ yarn format       # Prettier 格式化
 
 ## Recent Changes
 
-- 001-pdf-html-conversion: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+- 001-pdf-html-conversion: Added PDF-to-HTML conversion, Vitest and Playwright tests, and loglevel logging

@@ -12,7 +12,7 @@
 本地开发：
 
 - 安装依赖：yarn install
-- 启动开发：yarn dev（默认 http://localhost:5073）
+- 启动开发：yarn dev（默认 <http://localhost:5073>）
 
 构建与预览：
 
