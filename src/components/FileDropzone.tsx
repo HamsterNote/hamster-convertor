@@ -29,20 +29,20 @@ function FileDropzone({ accept, onFiles }: Props) {
   return (
     <div
       className={`dropzone ${isOver ? 'dropzone--over' : ''}`}
-      onDragOver={e => {
+      onDragOver={(e) => {
         e.preventDefault()
         setIsOver(true)
       }}
       onDragLeave={() => setIsOver(false)}
       onDrop={handleDrop}
     >
-      <div className="dropzone__content">
+      <div className='dropzone__content'>
         <p>{t('upload.drop')}</p>
-        <span className="muted">{t('upload.or')}</span>
-        <label className="btn btn--secondary">
+        <span className='muted'>{t('upload.or')}</span>
+        <label className='btn btn--secondary'>
           {t('upload.browse')}
           <input
-            type="file"
+            type='file'
             accept={accept}
             multiple
             style={{ display: 'none' }}

@@ -10,24 +10,28 @@ function Header() {
   const { t, i18n } = useTranslation()
 
   return (
-    <header className="header">
-      <div className="container header__inner">
-        <a className="brand" href="#" aria-label={t('appName')}>
-          <span className="brand__logo" aria-hidden>
-            <img src="/logos/hamster_logo.png" alt="Hamster" className="hero__brand__logo" />
+    <header className='header'>
+      <div className='container header__inner'>
+        <a className='brand' href='#' aria-label={t('appName')}>
+          <span className='brand__logo' aria-hidden>
+            <img
+              src='/logos/hamster_logo.png'
+              alt='Hamster'
+              className='hero__brand__logo'
+            />
           </span>
-          <span className="brand__title">{t('appName')}</span>
+          <span className='brand__title'>{t('appName')}</span>
         </a>
 
-        <nav className="nav">
-          <span className="nav__label">{t('language')}</span>
+        <nav className='nav'>
+          <span className='nav__label'>{t('language')}</span>
           <select
-            className="nav__select"
+            className='nav__select'
             value={i18n.language}
-            onChange={e => i18n.changeLanguage(e.target.value)}
+            onChange={(e) => i18n.changeLanguage(e.target.value)}
             aria-label={t('language')}
           >
-            {LANGS.map(l => (
+            {LANGS.map((l) => (
               <option key={l.code} value={l.code}>
                 {t(l.labelKey)}
               </option>

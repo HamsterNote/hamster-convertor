@@ -14,7 +14,7 @@ paths:
               type: string
               format: binary
       responses:
-        "200":
+        '200':
           description: HTML conversion result
           content:
             application/json:
@@ -28,7 +28,7 @@ paths:
                     type: array
                     items:
                       type: string
-        "400":
+        '400':
           description: Unsupported input format
-        "500":
+        '500':
           description: Conversion failed
