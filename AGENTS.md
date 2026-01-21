@@ -58,7 +58,7 @@ yarn format       # Prettier 格式化
 
 - `src/App.tsx:59-69` - Demo 模式转换（随机成功/失败）
 - `src/styles/theme.css` - CSS 变量主题系统
-- 依赖 `@system-ui-js/development-base@0.1.1` 提供共享配置
+- 依赖 `@system-ui-js/development-base@0.1.3` 提供共享配置
 
 ## Recent Changes
 
