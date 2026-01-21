@@ -49,6 +49,7 @@ declare module 'pdfjs-dist' {
   }
 
   export type PageViewport = {
+    width: number
     height: number
     transform: number[]
   }
