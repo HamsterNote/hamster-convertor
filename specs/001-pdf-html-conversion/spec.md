@@ -15,7 +15,7 @@
 - Q: 下载形式是单文件还是打包？ → A: 暂时输出为单个合并 HTML 文件（替代压缩包）。
 - Q: 重新发起“全部转换”的范围？ → A: 仅失败项重新进入队列，已成功项保持完成。
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - 一键完成 PDF 转 HTML (Priority: P1)
 
@@ -67,7 +67,7 @@
 - 当转换过程中出现解析错误时，系统标记为失败并保留文件以便重试。
 - 当下载被用户取消或失败时，系统允许重新下载。
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Constitution Alignment
 
@@ -85,12 +85,12 @@
 - **FR-005**: 系统必须展示每个文件的转换状态（待转换、转换中、完成、失败）。
 - **FR-006**: 系统必须允许对失败文件重新发起转换，已成功文件保持完成。
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **转换任务**: 代表单个文件的转换过程，包含文件信息、目标格式、当前状态、结果文件引用。
 - **转换结果**: 代表生成的 HTML 文件，关联来源文件与可下载标识。
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

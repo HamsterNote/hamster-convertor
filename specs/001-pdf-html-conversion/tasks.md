@@ -42,7 +42,7 @@
 
 ### Tests for User Story 1 (OPTIONAL - required by constitution or explicit request)
 
-- [ ] T010 [P] [US1] Integration test for convertPdfToHtml in src/__tests__/convert.integration.test.ts
+- [ ] T010 [P] [US1] Integration test for convertPdfToHtml in src/**tests**/convert.integration.test.ts
 
 ### Implementation for User Story 1
 
@@ -65,7 +65,7 @@
 
 ### Tests for User Story 2 (OPTIONAL - required by constitution or explicit request)
 
-- [ ] T017 [P] [US2] Integration test for status transitions in src/__tests__/convert.integration.test.ts
+- [ ] T017 [P] [US2] Integration test for status transitions in src/**tests**/convert.integration.test.ts
 
 ### Implementation for User Story 2
 
@@ -86,7 +86,7 @@
 
 ### Tests for User Story 3 (OPTIONAL - required by constitution or explicit request)
 
-- [ ] T022 [P] [US3] Integration test for retry behavior in src/__tests__/convert.integration.test.ts
+- [ ] T022 [P] [US3] Integration test for retry behavior in src/**tests**/convert.integration.test.ts
 
 ### Implementation for User Story 3
 

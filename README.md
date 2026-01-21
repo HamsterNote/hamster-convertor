@@ -10,14 +10,17 @@
 - 已支持文件类型（界面）：pdf、doc、docx、txt、html、epub、md
 
 本地开发：
+
 - 安装依赖：yarn install
 - 启动开发：yarn dev（默认 http://localhost:5073）
 
 构建与预览：
+
 - 构建：yarn build
 - 预览：yarn preview
 
 目录结构：
+
 - public/favicon.svg：暖色调的小仓鼠图标
 - src/components：Header、FileDropzone、Footer
 - src/i18n：i18next 初始化与多语言文案
@@ -25,18 +28,21 @@
 - src/App.tsx：主界面（文件列表、格式选择、按钮等）
 
 多语言（i18n）：
+
 - 默认根据浏览器语言自动检测，可在右上角手动切换。
-- 文案存放在 src/i18n/locales/*.json。
+- 文案存放在 src/i18n/locales/\*.json。
 
 如何接入核心转换库（后续）：
-1) 在 App.tsx 的 convertAll 中接入实际转换逻辑。
-2) 依据每个文件项的 source 与 target 格式，调用你的库 API。
-3) 将进度/结果回传到列表，更新 status 为 converting/done/failed。
-4) 如需全局任务队列/并发控制，可在此处扩展队列管理。
+
+1. 在 App.tsx 的 convertAll 中接入实际转换逻辑。
+2. 依据每个文件项的 source 与 target 格式，调用你的库 API。
+3. 将进度/结果回传到列表，更新 status 为 converting/done/failed。
+4. 如需全局任务队列/并发控制，可在此处扩展队列管理。
 
 支持的格式（界面）：pdf、doc、docx、txt、html、epub、md。
 
 代码规范：
+
 - Lint：yarn lint
 - 格式化：yarn format
 
