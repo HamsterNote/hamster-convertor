@@ -21,8 +21,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.yarn/cache
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps

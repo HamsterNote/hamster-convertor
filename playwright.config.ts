@@ -11,11 +11,18 @@ export default defineConfig({
     baseURL: 'http://localhost:5073',
     trace: 'on-first-retry'
   },
-  webServer: {
-    command: 'yarn preview:build',
-    url: 'http://localhost:5073',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000
-  },
+  webServer: process.env.CI
+    ? {
+        command: 'yarn preview',
+        url: 'http://localhost:5073',
+        reuseExistingServer: true,
+        timeout: 180000
+      }
+    : {
+        command: 'yarn dev',
+        url: 'http://localhost:5073',
+        reuseExistingServer: true,
+        timeout: 180000
+      },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
 })
