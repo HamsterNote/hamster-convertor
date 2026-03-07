@@ -21,15 +21,7 @@ type FileItem = {
   errorMessage?: string
 }
 
-const SUPPORTED_FORMATS: SupportedFormat[] = [
-  'pdf',
-  'doc',
-  'docx',
-  'txt',
-  'html',
-  'epub',
-  'md'
-]
+const SUPPORTED_FORMATS: SupportedFormat[] = ['pdf', 'doc', 'docx', 'txt', 'html', 'epub', 'md']
 
 const extToFormat = (name: string): SupportedFormat => {
   const ext = name.split('.').pop()?.toLowerCase()
@@ -61,45 +53,42 @@ function App() {
     itemsRef.current = items
   }, [items])
 
-  const hasPending = items.some((it) =>
-    ['ready', 'queued', 'converting'].includes(it.status)
-  )
-  const downloadableItems = items.filter(
-    (it) => it.status === 'done' && it.html
-  )
-  const canDownloadArchive =
-    items.length > 0 && !hasPending && downloadableItems.length > 0
+  const hasPending = items.some(it => ['ready', 'queued', 'converting'].includes(it.status))
+  const downloadableItems = items.filter(it => it.status === 'done' && it.html)
+  const canDownloadArchive = items.length > 0 && !hasPending && downloadableItems.length > 0
 
   useEffect(() => {
     document.title = `${t('appName')} | Hamster Document Converter`
   }, [i18n.language, t])
 
   const onFilesAdded = (files: File[]) => {
-    const next: FileItem[] = files.map((f) => ({
-      id: `${f.name}-${f.size}-${f.lastModified}-${Math.random().toString(36).slice(2)}`,
+    const next: FileItem[] = files.map(f => ({
+      id: `${f.name}-${f.size}-${f.lastModified}-${crypto.randomUUID()}`,
       file: f,
       source: extToFormat(f.name),
       target: 'html' as TargetFormat,
       status: 'ready'
     }))
-    setItems((prev) => [...prev, ...next])
+    setItems(prev => [...prev, ...next])
+  }
+
+  const removeItem = (id: string) => {
+    setItems(prev => prev.filter(x => x.id !== id))
   }
 
   const clearAll = () => setItems([])
 
   const convertAll = async () => {
-    const isRunning = itemsRef.current.some((it) =>
-      ['queued', 'converting'].includes(it.status)
-    )
+    const isRunning = itemsRef.current.some(it => ['queued', 'converting'].includes(it.status))
     if (isRunning) return
 
     const idsToConvert = itemsRef.current
-      .filter((it) => it.status === 'ready' || it.status === 'failed')
-      .map((i) => i.id)
+      .filter(it => it.status === 'ready' || it.status === 'failed')
+      .map(i => i.id)
     if (idsToConvert.length === 0) return
 
-    setItems((prev) =>
-      prev.map((it) => ({
+    setItems(prev =>
+      prev.map(it => ({
         ...it,
         status: it.status === 'done' ? 'done' : 'queued',
         errorMessage: undefined
@@ -107,11 +96,11 @@ function App() {
     )
 
     for (const id of idsToConvert) {
-      const current = itemsRef.current.find((it) => it.id === id)
+      const current = itemsRef.current.find(it => it.id === id)
       if (!current) continue
       if (current.source !== 'pdf') {
-        setItems((prev) =>
-          prev.map((it) =>
+        setItems(prev =>
+          prev.map(it =>
             it.id === id
               ? {
                   ...it,
@@ -124,17 +113,13 @@ function App() {
         continue
       }
 
-      setItems((prev) =>
-        prev.map((it) => (it.id === id ? { ...it, status: 'converting' } : it))
-      )
+      setItems(prev => prev.map(it => (it.id === id ? { ...it, status: 'converting' } : it)))
 
       try {
         const buffer = await current.file.arrayBuffer()
-        const { html, warnings } = await convertPdfToHtml(
-          new Uint8Array(buffer)
-        )
-        setItems((prev) =>
-          prev.map((it) =>
+        const { html, warnings } = await convertPdfToHtml(new Uint8Array(buffer))
+        setItems(prev =>
+          prev.map(it =>
             it.id === id
               ? {
                   ...it,
@@ -151,8 +136,8 @@ function App() {
           fileName: current.file.name,
           error
         })
-        setItems((prev) =>
-          prev.map((it) =>
+        setItems(prev =>
+          prev.map(it =>
             it.id === id
               ? {
                   ...it,
@@ -166,36 +151,29 @@ function App() {
     }
   }
 
-  const acceptAttr = useMemo(
-    () => '.pdf,.doc,.docx,.txt,.html,.htm,.epub,.md,.markdown',
-    []
-  )
+  const acceptAttr = useMemo(() => '.pdf,.doc,.docx,.txt,.html,.htm,.epub,.md,.markdown', [])
 
   return (
-    <div className='app'>
+    <div className="app">
       <Header />
 
-      <main className='container'>
-        <section className='hero'>
-          <div className='hero__brand'>
-            <img
-              src='/logos/hamster_logo.png'
-              alt='Hamster'
-              className='hero__brand__logo'
-            />
+      <main className="container">
+        <section className="hero">
+          <div className="hero__brand">
+            <img src="/logos/hamster_logo.png" alt="Hamster" className="hero__brand__logo" />
           </div>
-          <h1 className='hero__title'>{t('appName')}</h1>
-          <p className='hero__subtitle'>{t('tagline')}</p>
+          <h1 className="hero__title">{t('appName')}</h1>
+          <p className="hero__subtitle">{t('tagline')}</p>
         </section>
 
-        <section className='panel'>
-          <div className='panel__header'>
+        <section className="panel">
+          <div className="panel__header">
             <h2>{t('upload.title')}</h2>
-            <div className='format-row'>
+            <div className="format-row">
               <label>
-                {t('formats.to')} <span className='format-target'>HTML</span>
+                {t('formats.to')} <span className="format-target">HTML</span>
               </label>
-              <span className='supported'>
+              <span className="supported">
                 {t('formats.supported')}: {SUPPORTED_FORMATS.join(', ')}
               </span>
             </div>
@@ -204,8 +182,8 @@ function App() {
           <FileDropzone accept={acceptAttr} onFiles={onFilesAdded} />
 
           {items.length > 0 && (
-            <div className='table-wrap'>
-              <table className='file-table'>
+            <div className="table-wrap">
+              <table className="file-table">
                 <thead>
                   <tr>
                     <th>{t('table.fileName')}</th>
@@ -216,7 +194,7 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it) => (
+                  {items.map(it => (
                     <tr key={it.id}>
                       <td>{it.file.name}</td>
                       <td>{it.source}</td>
@@ -224,9 +202,7 @@ function App() {
                       <td className={`status status--${it.status}`}>
                         {t(`status.${it.status}` as const)}
                         {it.status === 'failed' && it.errorMessage && (
-                          <div
-                            style={{ fontSize: '0.85em', marginTop: '0.25rem' }}
-                          >
+                          <div style={{ fontSize: '0.85em', marginTop: '0.25rem' }}>
                             {it.errorMessage}
                           </div>
                         )}
@@ -247,13 +223,10 @@ function App() {
                       <td>
                         {it.status === 'done' ? (
                           <button
-                            className='btn btn--ghost'
+                            className="btn btn--ghost"
                             onClick={() => {
                               if (!it.html) return
-                              const htmlName = it.file.name.replace(
-                                /\.[^/.]+$/,
-                                ''
-                              )
+                              const htmlName = it.file.name.replace(/\.[^/.]+$/, '')
                               downloadHtmlFile({
                                 name: `${htmlName}.html`,
                                 content: it.html
@@ -265,12 +238,8 @@ function App() {
                           </button>
                         ) : (
                           <button
-                            className='btn btn--ghost'
-                            onClick={() =>
-                              setItems((prev) =>
-                                prev.filter((x) => x.id !== it.id)
-                              )
-                            }
+                            className="btn btn--ghost"
+                            onClick={() => removeItem(it.id)}
                             aria-label={t('actions.remove')}
                           >
                             ×
@@ -284,34 +253,30 @@ function App() {
             </div>
           )}
 
-          <div className='actions'>
-            <label className='btn btn--secondary'>
+          <div className="actions">
+            <label className="btn btn--secondary">
               {t('actions.addFiles')}
               <input
-                type='file'
+                type="file"
                 style={{ display: 'none' }}
                 multiple
                 accept={acceptAttr}
-                onChange={(e) => {
+                onChange={e => {
                   const files = e.target.files ? Array.from(e.target.files) : []
                   if (files.length) onFilesAdded(files)
                   e.currentTarget.value = ''
                 }}
               />
             </label>
-            <button
-              className='btn btn--primary'
-              disabled={items.length === 0}
-              onClick={convertAll}
-            >
+            <button className="btn btn--primary" disabled={items.length === 0} onClick={convertAll}>
               {t('actions.convertAll')}
             </button>
             <button
-              className='btn btn--ghost'
+              className="btn btn--ghost"
               disabled={!canDownloadArchive}
               onClick={() =>
                 downloadHtmlArchive(
-                  downloadableItems.map((item) => ({
+                  downloadableItems.map(item => ({
                     name: `${item.file.name.replace(/\.[^/.]+$/, '')}.html`,
                     content: item.html ?? ''
                   })),
@@ -321,11 +286,7 @@ function App() {
             >
               {t('actions.download')}
             </button>
-            <button
-              className='btn btn--ghost'
-              disabled={items.length === 0}
-              onClick={clearAll}
-            >
+            <button className="btn btn--ghost" disabled={items.length === 0} onClick={clearAll}>
               {t('actions.clearAll')}
             </button>
           </div>

@@ -1,0 +1,32 @@
+{
+  "name": "@hamster-note/document-parser",
+  "version": "0.3.0",
+  "description": "",
+  "scripts": {
+    "build:all": "rolldown --config rolldown.config.ts",
+    "prepublishOnly": "yarn build:all",
+    "test": "echo 'no-test'",
+    "lint": "echo 'no-lint'"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@hamster-note/types": "^0.5.1"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "yalcSig": "4631fe5d4ba15912b3210bf1be04b7ee"
+}
