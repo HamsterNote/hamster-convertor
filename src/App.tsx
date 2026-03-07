@@ -8,12 +8,13 @@ import { convertPdfToHtml } from './lib/converter'
 import { downloadHtmlArchive, downloadHtmlFile } from './lib/download'
 
 type SupportedFormat = 'pdf' | 'doc' | 'docx' | 'txt' | 'html' | 'epub' | 'md'
+type SourceFormat = SupportedFormat | 'unsupported'
 type TargetFormat = 'html'
 
 type FileItem = {
   id: string
   file: File
-  source: SupportedFormat
+  source: SourceFormat
   target: TargetFormat
   status: 'ready' | 'queued' | 'converting' | 'done' | 'failed'
   html?: string
@@ -23,7 +24,7 @@ type FileItem = {
 
 const SUPPORTED_FORMATS: SupportedFormat[] = ['pdf', 'doc', 'docx', 'txt', 'html', 'epub', 'md']
 
-const extToFormat = (name: string): SupportedFormat => {
+const extToFormat = (name: string): SourceFormat => {
   const ext = name.split('.').pop()?.toLowerCase()
   const extMap: Record<string, SupportedFormat> = {
     pdf: 'pdf',
@@ -40,7 +41,7 @@ const extToFormat = (name: string): SupportedFormat => {
   if (ext && ext in extMap) {
     return extMap[ext]
   }
-  return 'pdf'
+  return 'unsupported'
 }
 
 function App() {
