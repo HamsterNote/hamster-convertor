@@ -26,9 +26,13 @@ type HtmlParserModule = {
 
 const PDF_PARSER_MODULE = '@system-ui-js/pdf-parser'
 const HTML_PARSER_MODULE = '@system-ui-js/html-parser'
-const dynamicImport = new Function('modulePath', 'return import(modulePath)') as (
-  modulePath: string
-) => Promise<unknown>
+const loadParserModules = async (): Promise<[PdfParserModule, HtmlParserModule]> => {
+  const [pdfParserModule, htmlParserModule] = await Promise.all([
+    import(PDF_PARSER_MODULE),
+    import(HTML_PARSER_MODULE)
+  ])
+  return [pdfParserModule as PdfParserModule, htmlParserModule as HtmlParserModule]
+}
 
 const extractHtml = async ({
   HtmlParser,
@@ -42,29 +46,22 @@ const extractHtml = async ({
   return { html, warnings }
 }
 
-const decodeByParserModules = async (input: Uint8Array): Promise<PdfToHtmlResult | null> => {
-  try {
-    const [pdfParserModule, htmlParserModule] = await Promise.all([
-      dynamicImport(PDF_PARSER_MODULE),
-      dynamicImport(HTML_PARSER_MODULE)
-    ])
-    const { PdfParser } = pdfParserModule as PdfParserModule
-    const { HtmlParser } = htmlParserModule as HtmlParserModule
+const decodeByParserModules = async (input: Uint8Array): Promise<PdfToHtmlResult> => {
+  const [pdfParserModule, htmlParserModule] = await loadParserModules()
+  const { PdfParser } = pdfParserModule
+  const { HtmlParser } = htmlParserModule
 
-    const arrayBuffer = input.buffer.slice(
-      input.byteOffset,
-      input.byteOffset + input.byteLength
-    ) as ArrayBuffer
+  const arrayBuffer = input.buffer.slice(
+    input.byteOffset,
+    input.byteOffset + input.byteLength
+  ) as ArrayBuffer
 
-    const intermediate = await PdfParser.encode(arrayBuffer)
-    if (!intermediate) {
-      return null
-    }
-
-    return extractHtml({ HtmlParser, intermediateDocument: intermediate })
-  } catch {
-    return null
+  const intermediate = await PdfParser.encode(arrayBuffer)
+  if (!intermediate) {
+    throw new Error('PDF parser returned no intermediate document')
   }
+
+  return extractHtml({ HtmlParser, intermediateDocument: intermediate })
 }
 
 const fallbackHtml = `<!doctype html>
@@ -95,13 +92,5 @@ export const convertPdfToHtml: ConvertPdfToHtml = async input => {
     }
   }
 
-  const converted = await decodeByParserModules(input)
-  if (converted) {
-    return converted
-  }
-
-  return {
-    html: fallbackHtml,
-    warnings: []
-  }
+  return decodeByParserModules(input)
 }

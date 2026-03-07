@@ -1,23 +1,37 @@
 import path from 'path'
+import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const documentParserPath = path.resolve(__dirname, '../DocumentParser/dist/index.js')
+const typesPath = path.resolve(__dirname, './src/types/hamster-note-types.d.ts')
+const pdfjsPath = path.resolve(
+  __dirname,
+  '../PdfParser/node_modules/pdfjs-dist/legacy/build/pdf.mjs'
+)
+const mockPdfParserPath = path.resolve(__dirname, './src/test/mocks/pdf-parser.ts')
+const mockHtmlParserPath = path.resolve(__dirname, './src/test/mocks/html-parser.ts')
+
+const alias: Record<string, string> = {
+  '@system-ui-js/pdf-parser': mockPdfParserPath,
+  '@system-ui-js/html-parser': mockHtmlParserPath,
+  '@hamster-note/types': typesPath
+}
+
+if (existsSync(documentParserPath)) {
+  alias['@hamster-note/document-parser'] = documentParserPath
+}
+
+if (existsSync(pdfjsPath)) {
+  alias['pdfjs-dist'] = pdfjsPath
+}
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      '@system-ui-js/pdf-parser': path.resolve(__dirname, '../PdfParser/src/index.ts'),
-      '@system-ui-js/html-parser': path.resolve(__dirname, '../HtmlParser/dist/index.js'),
-      '@hamster-note/document-parser': path.resolve(__dirname, '../DocumentParser/dist/index.js'),
-      '@hamster-note/types': path.resolve(__dirname, './src/types/hamster-note-types.d.ts'),
-      'pdfjs-dist': path.resolve(
-        __dirname,
-        '../PdfParser/node_modules/pdfjs-dist/legacy/build/pdf.mjs'
-      )
-    }
+    alias
   },
   test: {
     environment: 'jsdom',
