@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "packages": {
+    "@hamster-note/document-parser": {
+      "signature": "4631fe5d4ba15912b3210bf1be04b7ee",
+      "file": true
+    },
+    "@hamster-note/types": {
+      "signature": "fa2b8b5ff0d9fa519831ed01ebaa4904",
+      "file": true
+    }
+  }
+}
