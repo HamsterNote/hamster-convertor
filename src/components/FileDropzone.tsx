@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 type Props = {
@@ -9,9 +9,10 @@ type Props = {
 function FileDropzone({ accept, onFiles }: Props) {
   const { t } = useTranslation()
   const [isOver, setIsOver] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    (e: React.DragEvent<HTMLButtonElement>) => {
       e.preventDefault()
       setIsOver(false)
       const files = Array.from(e.dataTransfer.files)
@@ -26,31 +27,41 @@ function FileDropzone({ accept, onFiles }: Props) {
     e.currentTarget.value = ''
   }
 
+  const openFilePicker = () => {
+    inputRef.current?.click()
+  }
+
   return (
-    <div
-      className={`dropzone ${isOver ? 'dropzone--over' : ''}`}
-      onDragOver={(e) => {
-        e.preventDefault()
-        setIsOver(true)
-      }}
-      onDragLeave={() => setIsOver(false)}
-      onDrop={handleDrop}
-    >
-      <div className='dropzone__content'>
-        <p>{t('upload.drop')}</p>
-        <span className='muted'>{t('upload.or')}</span>
-        <label className='btn btn--secondary'>
-          {t('upload.browse')}
-          <input
-            type='file'
-            accept={accept}
-            multiple
-            style={{ display: 'none' }}
-            onChange={handleBrowse}
-          />
-        </label>
-      </div>
-    </div>
+    <>
+      <button
+        aria-label={t('upload.drop')}
+        className={`dropzone ${isOver ? 'dropzone--over' : ''}`}
+        onClick={openFilePicker}
+        onDragOver={e => {
+          e.preventDefault()
+          setIsOver(true)
+        }}
+        onDragLeave={() => setIsOver(false)}
+        onDrop={handleDrop}
+        type="button"
+      >
+        <div className="dropzone__content">
+          <p>{t('upload.drop')}</p>
+          <span className="muted">{t('upload.or')}</span>
+          <span aria-hidden="true" className="btn btn--secondary">
+            {t('upload.browse')}
+          </span>
+        </div>
+      </button>
+      <input
+        accept={accept}
+        multiple
+        onChange={handleBrowse}
+        ref={inputRef}
+        style={{ display: 'none' }}
+        type="file"
+      />
+    </>
   )
 }
 

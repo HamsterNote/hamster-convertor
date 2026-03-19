@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- 集成 PDF 到 HTML 转换功能（使用 @system-ui-js/pdf-parser 和 @system-ui-js/html-parser）
+- 集成 PDF 到 HTML 转换功能（使用 @hamster-note/pdf-parser 和 @hamster-note/html-parser）
 - 支持下载转换后的单个 HTML 文件
 - 支持下载多个 HTML 文件的归档包
 - 添加单元测试框架（Vitest）
@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - 修复转换失败时不显示错误信息的问题
-- 修复 CI 报错：将本地开发依赖（@system-ui-js/html-parser、@system-ui-js/pdf-parser）从 package.json 移除，改为通过 Vite 路径别名引用
+- 修复 parser 包 scope 不一致问题：统一改为 `@hamster-note/*`，并补齐 package.json 依赖声明
 
 ### Configuration
 
@@ -36,8 +36,10 @@ All notable changes to this project will be documented in this file.
 ### Dependencies
 
 - 升级 @system-ui-js/development-base 至 0.1.3
-- 新增 @system-ui-js/html-parser@0.1.0
-- 新增 @system-ui-js/pdf-parser@0.1.0
+- 新增 @hamster-note/document-parser@0.3.1
+- 新增 @hamster-note/html-parser@0.5.0
+- 新增 @hamster-note/pdf-parser@0.3.0
+- 新增 @hamster-note/types@0.5.3
 - 新增 loglevel@1.9.1
 - 新增测试相关依赖：
   - @testing-library/dom, @testing-library/jest-dom, @testing-library/react

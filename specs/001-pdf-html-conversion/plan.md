@@ -12,7 +12,7 @@
 ## Technical Context
 
 **Language/Version**: TypeScript (Vite + React, ESM)  
-**Primary Dependencies**: React, i18next, loglevel, @system-ui-js/pdf-parser, @system-ui-js/html-parser  
+**Primary Dependencies**: React, i18next, loglevel, @hamster-note/pdf-parser, @hamster-note/html-parser  
 **Storage**: N/A (in-memory during session)  
 **Testing**: Vitest, Testing Library, Playwright  
 **Target Platform**: Web (modern browsers)  

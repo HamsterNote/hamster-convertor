@@ -1,16 +1,10 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
-const sampleFile = join(
-  currentDir,
-  '..',
-  'src',
-  'test',
-  'fixtures',
-  'sample.pdf'
-)
+const sampleFile = join(currentDir, '..', 'src', 'test', 'fixtures', 'sample.pdf')
+const dropzoneFileInput = '.dropzone + input[type="file"]'
 
 test.describe('converter app', () => {
   test.beforeEach(async ({ page }) => {
@@ -26,7 +20,7 @@ test.describe('converter app', () => {
     const convertButton = page.getByRole('button', { name: 'Convert all' })
     await expect(convertButton).toBeDisabled()
 
-    await page.locator('.dropzone input[type="file"]').setInputFiles(sampleFile)
+    await page.locator(dropzoneFileInput).setInputFiles(sampleFile)
 
     const table = page.locator('.file-table')
     await expect(table).toBeVisible()
@@ -54,7 +48,7 @@ test.describe('converter app', () => {
   })
 
   test('removes a file row', async ({ page }) => {
-    await page.locator('.dropzone input[type="file"]').setInputFiles(sampleFile)
+    await page.locator(dropzoneFileInput).setInputFiles(sampleFile)
 
     const rows = page.locator('.file-table tbody tr')
     await expect(rows).toHaveCount(1)

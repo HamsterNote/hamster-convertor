@@ -2,10 +2,7 @@ declare module 'pdfjs-dist' {
   export const Util: {
     transform: (m1: number[], m2: number[]) => number[]
   }
-  export const getDocument: (options: {
-    data: Uint8Array
-    disableWorker?: boolean
-  }) => {
+  export const getDocument: (options: { data: Uint8Array; disableWorker?: boolean }) => {
     promise: Promise<PDFDocumentProxy>
   }
 
@@ -36,9 +33,7 @@ declare module 'pdfjs-dist' {
       height: number
       transform: number[]
     }
-    getTextContent: (options: {
-      includeMarkedContent: boolean
-    }) => Promise<TextContent>
+    getTextContent: (options: { includeMarkedContent: boolean }) => Promise<TextContent>
     render: (options: {
       canvas: HTMLCanvasElement
       viewport: { width: number; height: number }

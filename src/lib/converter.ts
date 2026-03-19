@@ -24,8 +24,8 @@ type HtmlParserModule = {
   }
 }
 
-const PDF_PARSER_MODULE = '@system-ui-js/pdf-parser'
-const HTML_PARSER_MODULE = '@system-ui-js/html-parser'
+const PDF_PARSER_MODULE = '@hamster-note/pdf-parser'
+const HTML_PARSER_MODULE = '@hamster-note/html-parser'
 const loadParserModules = async (): Promise<[PdfParserModule, HtmlParserModule]> => {
   const [pdfParserModule, htmlParserModule] = await Promise.all([
     import(PDF_PARSER_MODULE),

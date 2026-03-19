@@ -8,8 +8,7 @@ export type NormalizedHtml = {
 const compactWhitespace = (value: string) =>
   value.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim()
 
-const stripDynamicAttributes = (value: string) =>
-  value.replace(/\s(?:data-)?id="[^"]*"/gi, '')
+const stripDynamicAttributes = (value: string) => value.replace(/\s(?:data-)?id="[^"]*"/gi, '')
 
 export const normalizeHtml = (html: string): NormalizedHtml => {
   const $ = load(html)

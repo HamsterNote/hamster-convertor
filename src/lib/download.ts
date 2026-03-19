@@ -31,13 +31,8 @@ export const downloadHtmlFile = (file: DownloadFile) => {
   triggerBlobDownload(blob, file.name)
 }
 
-export const downloadHtmlArchive = async (
-  files: DownloadFile[],
-  archiveName: string
-) => {
-  const html = files
-    .map((file) => `<!-- ${file.name} -->\n${file.content}\n\n`)
-    .join('')
+export const downloadHtmlArchive = async (files: DownloadFile[], archiveName: string) => {
+  const html = files.map(file => `<!-- ${file.name} -->\n${file.content}\n\n`).join('')
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   triggerBlobDownload(blob, archiveName.replace(/\.zip$/, '.html'))
 }

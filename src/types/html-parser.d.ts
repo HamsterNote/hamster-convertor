@@ -1,4 +1,4 @@
-declare module '@system-ui-js/html-parser' {
+declare module '@hamster-note/html-parser' {
   import { IntermediateDocument } from '@hamster-note/types'
 
   export interface RenderOptions {
@@ -31,19 +31,13 @@ declare module '@system-ui-js/html-parser' {
 
     static encode(fileOrBuffer: File | ArrayBuffer): Promise<HtmlDocument>
 
-    static decodeToHtml(
-      intermediateDocument: IntermediateDocument
-    ): Promise<string>
+    static decodeToHtml(intermediateDocument: IntermediateDocument): Promise<string>
 
-    static decode(
-      intermediateDocument: IntermediateDocument
-    ): Promise<File | ArrayBuffer>
+    static decode(intermediateDocument: IntermediateDocument): Promise<File | ArrayBuffer>
 
     encode(input: File | ArrayBuffer): Promise<IntermediateDocument>
 
-    decode(
-      intermediateDocument: IntermediateDocument
-    ): Promise<File | ArrayBuffer | undefined>
+    decode(intermediateDocument: IntermediateDocument): Promise<File | ArrayBuffer | undefined>
   }
 
   export { HtmlParser }
