@@ -20,15 +20,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.yarn/cache
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          cache: 'yarn'
+          cache-dependency-path: yarn.lock
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: |
+          for attempt in 1 2 3; do
+            echo "yarn install attempt ${attempt}/3"
+
+            if yarn install --frozen-lockfile --network-timeout 300000; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+
+            sleep 10
+          done
 
       - name: Build project
         run: yarn build

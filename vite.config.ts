@@ -7,10 +7,7 @@ import react from '@vitejs/plugin-react'
 const localDevAlias: Record<string, string> = {}
 const pdfParserPath = path.resolve(__dirname, '../PdfParser/src/index.ts')
 const htmlParserPath = path.resolve(__dirname, '../HtmlParser/dist/index.js')
-const documentParserPath = path.resolve(
-  __dirname,
-  '../DocumentParser/dist/index.js'
-)
+const documentParserPath = path.resolve(__dirname, '../DocumentParser/dist/index.js')
 const typesPath = path.resolve(__dirname, '../types/src/index.ts')
 const pdfjsPath = path.resolve(
   __dirname,
@@ -18,10 +15,10 @@ const pdfjsPath = path.resolve(
 )
 
 if (existsSync(pdfParserPath)) {
-  localDevAlias['@system-ui-js/pdf-parser'] = pdfParserPath
+  localDevAlias['@hamster-note/pdf-parser'] = pdfParserPath
 }
 if (existsSync(htmlParserPath)) {
-  localDevAlias['@system-ui-js/html-parser'] = htmlParserPath
+  localDevAlias['@hamster-note/html-parser'] = htmlParserPath
 }
 if (existsSync(documentParserPath)) {
   localDevAlias['@hamster-note/document-parser'] = documentParserPath

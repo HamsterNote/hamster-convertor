@@ -1,4 +1,4 @@
-declare module '@system-ui-js/pdf-parser' {
+declare module '@hamster-note/pdf-parser' {
   import { IntermediateDocument } from '@hamster-note/types'
 
   export type ParserInput = File | ArrayBuffer
@@ -6,9 +6,7 @@ declare module '@system-ui-js/pdf-parser' {
   export class PdfParser {
     static readonly exts: readonly ['pdf']
 
-    static encode(
-      fileOrBuffer: ParserInput
-    ): Promise<IntermediateDocument | undefined>
+    static encode(fileOrBuffer: ParserInput): Promise<IntermediateDocument | undefined>
 
     static toArrayBuffer(fileOrBuffer: ParserInput): Promise<ArrayBuffer>
 
@@ -18,9 +16,7 @@ declare module '@system-ui-js/pdf-parser' {
 
     encode(input: ParserInput): Promise<IntermediateDocument>
 
-    decode(
-      intermediateDocument: IntermediateDocument
-    ): Promise<File | ArrayBuffer | undefined>
+    decode(intermediateDocument: IntermediateDocument): Promise<File | ArrayBuffer | undefined>
   }
 
   export { PdfParser }

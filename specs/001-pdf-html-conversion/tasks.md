@@ -11,7 +11,7 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [x] T001 Validate current dependencies and add @system-ui-js/pdf-parser + @system-ui-js/html-parser in package.json
+- [x] T001 Validate current dependencies and add @hamster-note/pdf-parser + @hamster-note/html-parser in package.json
 - [x] T002 [P] Confirm i18n keys for new status/error strings in src/i18n/locales/zh-CN.json
 - [x] T003 [P] Confirm i18n keys for new status/error strings in src/i18n/locales/zh-TW.json
 - [x] T004 [P] Confirm i18n keys for new status/error strings in src/i18n/locales/en.json

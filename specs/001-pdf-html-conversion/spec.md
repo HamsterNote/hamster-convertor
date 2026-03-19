@@ -3,7 +3,7 @@
 **Feature Branch**: `001-pdf-html-conversion`  
 **Created**: 2026-01-19  
 **Status**: Draft  
-**Input**: User description: "ulw 实现 Pdf 到 Html 的转换能力，代码中 @system-ui-js/pdf-parser 使用的是 ../PdfParser 的代码，@system-ui-js/html-parser 使用的是 ../HtmlParser 的代码，现在要打通这个转换能力，并完成 界面上的转换交互，用户上传文件，点击全部转换，等待转换完成，点击下载，可以下载 Html 文件，期间可能会修改 PdfParser 和 HtmlParser 的代码，我授权你可以操作"
+**Input**: User description: "ulw 实现 Pdf 到 Html 的转换能力，代码中 @hamster-note/pdf-parser 使用的是 ../PdfParser 的代码，@hamster-note/html-parser 使用的是 ../HtmlParser 的代码，现在要打通这个转换能力，并完成 界面上的转换交互，用户上传文件，点击全部转换，等待转换完成，点击下载，可以下载 Html 文件，期间可能会修改 PdfParser 和 HtmlParser 的代码，我授权你可以操作"
 
 ## Clarifications
 

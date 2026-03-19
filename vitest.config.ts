@@ -15,8 +15,8 @@ const mockPdfParserPath = path.resolve(__dirname, './src/test/mocks/pdf-parser.t
 const mockHtmlParserPath = path.resolve(__dirname, './src/test/mocks/html-parser.ts')
 
 const alias: Record<string, string> = {
-  '@system-ui-js/pdf-parser': mockPdfParserPath,
-  '@system-ui-js/html-parser': mockHtmlParserPath,
+  '@hamster-note/pdf-parser': mockPdfParserPath,
+  '@hamster-note/html-parser': mockHtmlParserPath,
   '@hamster-note/types': typesPath
 }
 

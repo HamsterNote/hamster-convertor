@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@system-ui-js/pdf-parser', () => ({
+vi.mock('@hamster-note/pdf-parser', () => ({
   PdfParser: {
     encode: vi.fn().mockResolvedValue(undefined)
   }
 }))
 
-vi.mock('@system-ui-js/html-parser', () => ({
+vi.mock('@hamster-note/html-parser', () => ({
   HtmlParser: {
     decodeToHtml: vi.fn().mockResolvedValue('<html></html>')
   }
