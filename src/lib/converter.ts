@@ -12,26 +12,16 @@ type HtmlDecodeResult = {
   warnings: string[]
 }
 
-type PdfParserModule = {
-  PdfParser: {
-    encode: (input: ArrayBuffer) => Promise<IntermediateDocument | undefined>
-  }
-}
+type PdfParserModule = typeof import('@hamster-note/pdf-parser')
 
-type HtmlParserModule = {
-  HtmlParser: {
-    decodeToHtml: (intermediateDocument: IntermediateDocument) => Promise<string>
-  }
-}
+type HtmlParserModule = typeof import('@hamster-note/html-parser')
 
-const PDF_PARSER_MODULE = '@hamster-note/pdf-parser'
-const HTML_PARSER_MODULE = '@hamster-note/html-parser'
 const loadParserModules = async (): Promise<[PdfParserModule, HtmlParserModule]> => {
   const [pdfParserModule, htmlParserModule] = await Promise.all([
-    import(PDF_PARSER_MODULE),
-    import(HTML_PARSER_MODULE)
+    import('@hamster-note/pdf-parser'),
+    import('@hamster-note/html-parser')
   ])
-  return [pdfParserModule as PdfParserModule, htmlParserModule as HtmlParserModule]
+  return [pdfParserModule, htmlParserModule]
 }
 
 const extractHtml = async ({

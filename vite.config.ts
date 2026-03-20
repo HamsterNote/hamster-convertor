@@ -38,7 +38,7 @@ export default defineConfig({
   },
   server: {
     port: 5073,
-    host: process.env.CI ? '0.0.0.0' : '127.0.0.1'
+    host: '0.0.0.0'
   },
   preview: {
     port: 5073
