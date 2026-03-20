@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- 修复上传面板中的文件上传框未撑满容器宽度的问题
 - 修复转换失败时不显示错误信息的问题
 - 修复 parser 包 scope 不一致问题：统一改为 `@hamster-note/*`，并补齐 package.json 依赖声明
 
