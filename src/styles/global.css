@@ -23,16 +23,8 @@ body {
     'Noto Color Emoji',
     sans-serif;
   background:
-    radial-gradient(
-      1200px 600px at 20% -10%,
-      var(--color-primary-50),
-      transparent 40%
-    ),
-    radial-gradient(
-      1200px 600px at 120% 10%,
-      var(--color-primary-100),
-      transparent 40%
-    ),
+    radial-gradient(1200px 600px at 20% -10%, var(--color-primary-50), transparent 40%),
+    radial-gradient(1200px 600px at 120% 10%, var(--color-primary-100), transparent 40%),
     var(--color-bg);
   color: var(--color-text);
 }
@@ -142,6 +134,7 @@ a {
   border-radius: var(--radius-lg);
   margin: 20px 0 60px;
 }
+
 .panel__header {
   display: flex;
   align-items: center;
@@ -194,6 +187,11 @@ a {
     border-color 0.2s ease,
     background 0.2s ease;
 }
+
+.panel > .dropzone {
+  width: 100%;
+}
+
 .dropzone--over {
   border-color: var(--color-primary-400);
   background:
