@@ -21,6 +21,9 @@ const parserMocks = vi.hoisted(() => ({
 }))
 
 const pdfJsMocks = vi.hoisted(() => ({
+  GlobalWorkerOptions: {
+    workerSrc: ''
+  },
   getDocument: vi.fn()
 }))
 
@@ -31,6 +34,7 @@ vi.mock('@hamster-note/pdf-parser', () => ({
 }))
 
 vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: pdfJsMocks.GlobalWorkerOptions,
   getDocument: pdfJsMocks.getDocument
 }))
 
@@ -76,6 +80,7 @@ const mockPdfDocument = (pages: MockPdfPage[]): MockPdfDocument => {
 describe('PDF conversion adapters', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    pdfJsMocks.GlobalWorkerOptions.workerSrc = ''
     HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) =>
       contextId === '2d' ? ({} as CanvasRenderingContext2D) : null
     ) as HTMLCanvasElement['getContext']
@@ -113,6 +118,7 @@ describe('PDF conversion adapters', () => {
 
     const results = await convertPdfToImage({ ...createRequest('report.pdf'), target: 'image' })
 
+    expect(pdfJsMocks.GlobalWorkerOptions.workerSrc).toContain('pdf.worker.mjs')
     expect(pdfJsMocks.getDocument).toHaveBeenCalledOnce()
     expect(pages[0]?.render).toHaveBeenCalledOnce()
     expect(pages[1]?.render).toHaveBeenCalledOnce()

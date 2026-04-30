@@ -1,4 +1,5 @@
 import type { IntermediateDocument } from '@hamster-note/types'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import type { ConversionRequest, ConversionResult } from '../converter'
 
 type TextItem = {
@@ -31,6 +32,9 @@ type PdfLoadingTask = {
 }
 
 type PdfJsModule = {
+  GlobalWorkerOptions?: {
+    workerSrc?: string
+  }
   getDocument: (options: { data: Uint8Array }) => PdfLoadingTask
 }
 
@@ -102,8 +106,15 @@ const extractTextWithHamster = async (arrayBuffer: ArrayBuffer): Promise<string>
   return intermediateDocument ? extractIntermediateText(intermediateDocument) : ''
 }
 
+const configurePdfJsWorker = (pdfjs: PdfJsModule): void => {
+  if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+  }
+}
+
 const loadPdfDocument = async (arrayBuffer: ArrayBuffer): Promise<PdfDocument> => {
   const pdfjs = (await import('pdfjs-dist')) as unknown as PdfJsModule
+  configurePdfJsWorker(pdfjs)
   const loadingTask = pdfjs.getDocument({ data: arrayBufferToBytes(arrayBuffer) })
   return loadingTask.promise
 }

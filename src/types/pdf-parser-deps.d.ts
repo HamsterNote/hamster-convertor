@@ -1,4 +1,8 @@
 declare module 'pdfjs-dist' {
+  export const GlobalWorkerOptions: {
+    workerSrc?: string
+  }
+
   export const Util: {
     transform: (m1: number[], m2: number[]) => number[]
   }
@@ -79,6 +83,11 @@ declare module 'pdfjs-dist/types/src/display/api' {
   }
   export type TextItem = import('pdfjs-dist').TextItem
   export type TextStyle = import('pdfjs-dist').TextStyle
+}
+
+declare module 'pdfjs-dist/build/pdf.worker.mjs?url' {
+  const workerUrl: string
+  export default workerUrl
 }
 
 declare global {
