@@ -143,4 +143,65 @@ describe('PDF conversion adapters', () => {
       OcrRequiredError
     )
   })
+
+  it('renders only selected page when selectedImagePages is provided', async () => {
+    const pages = [createMockPage(), createMockPage(), createMockPage()]
+    mockPdfDocument(pages)
+
+    const results = await convertPdfToImage({
+      ...createRequest('report.pdf'),
+      target: 'image',
+      options: { pdf: { ocr: false, selectedImagePages: [2] } }
+    })
+
+    expect(results).toHaveLength(1)
+    expect(results[0].filename).toBe('report-page-002.png')
+    expect(pages[0]?.render).not.toHaveBeenCalled()
+    expect(pages[1]?.render).toHaveBeenCalledOnce()
+    expect(pages[2]?.render).not.toHaveBeenCalled()
+  })
+
+  it('renders multiple selected pages sorted and deduplicated', async () => {
+    const pages = [createMockPage(), createMockPage(), createMockPage()]
+    mockPdfDocument(pages)
+
+    const results = await convertPdfToImage({
+      ...createRequest('report.pdf'),
+      target: 'image',
+      options: { pdf: { ocr: false, selectedImagePages: [3, 1, 2, 2, 1] } }
+    })
+
+    expect(results).toHaveLength(3)
+    expect(results.map(r => r.filename)).toEqual([
+      'report-page-001.png',
+      'report-page-002.png',
+      'report-page-003.png'
+    ])
+  })
+
+  it('throws Error when selected pages is empty after filtering', async () => {
+    const pages = [createMockPage(), createMockPage()]
+    mockPdfDocument(pages)
+
+    await expect(
+      convertPdfToImage({
+        ...createRequest('report.pdf'),
+        target: 'image',
+        options: { pdf: { ocr: false, selectedImagePages: [5, 10] } }
+      })
+    ).rejects.toThrow('No pages selected')
+  })
+
+  it('renders all pages when selectedImagePages is undefined', async () => {
+    const pages = [createMockPage(), createMockPage()]
+    mockPdfDocument(pages)
+
+    const results = await convertPdfToImage({
+      ...createRequest('report.pdf'),
+      target: 'image'
+    })
+
+    expect(results).toHaveLength(2)
+    expect(results.map(r => r.filename)).toEqual(['report-page-001.png', 'report-page-002.png'])
+  })
 })

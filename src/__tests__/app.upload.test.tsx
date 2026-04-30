@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import i18n from '../i18n'
 import App from '../App'
+import i18n from '../i18n'
+import type { ConversionResult } from '../lib/converter'
 
 vi.mock('../lib/converter', () => ({
   convertFile: vi.fn(),
@@ -14,6 +15,27 @@ vi.mock('../lib/converter', () => ({
     return targets[source] ?? ['txt']
   })
 }))
+
+vi.mock('../lib/download', () => ({
+  downloadBlobFile: vi.fn(),
+  downloadResultArchive: vi.fn()
+}))
+
+vi.mock('../components/PdfPageSelectorModal', () => ({
+  default: ({ open, onConfirm }: { open: boolean; onConfirm: (pages: number[]) => void }) =>
+    open ? (
+      <div role="dialog" aria-label="Select Pages">
+        <button type="button" onClick={() => onConfirm([1, 3])}>
+          Confirm test pages
+        </button>
+      </div>
+    ) : null
+}))
+
+const getFileTargetSelects = () => {
+  const table = screen.getByRole('table')
+  return table.querySelectorAll('select.file-table.select')
+}
 
 describe('app upload feedback', () => {
   beforeEach(async () => {
@@ -308,5 +330,275 @@ describe('app upload feedback', () => {
     const tableSelects = table.querySelectorAll('select.file-table.select')
     expect(tableSelects[0]).toBeDisabled()
     expect(tableSelects[1]).toBeEnabled()
+  })
+
+  it('shows full-screen loading during convert-all and hides on completion', async () => {
+    const { convertFile } = await import('../lib/converter')
+    let resolveConversion: ((value: ConversionResult[]) => void) | undefined
+    const conversionPromise = new Promise<ConversionResult[]>(resolve => {
+      resolveConversion = resolve
+    })
+    vi.mocked(convertFile).mockReturnValue(conversionPromise)
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+
+    resolveConversion?.([
+      {
+        blob: new Blob(['fake'], { type: 'text/plain' }),
+        filename: 'result.txt',
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      }
+    ])
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows full-screen loading during convert-all and hides on failure', async () => {
+    const { convertFile } = await import('../lib/converter')
+    let rejectConversion: ((error: Error) => void) | undefined
+    const conversionPromise = new Promise<ConversionResult[]>((_, reject) => {
+      rejectConversion = reject
+    })
+    vi.mocked(convertFile).mockReturnValue(conversionPromise)
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+
+    rejectConversion?.(new Error('conversion failed'))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows page-select button for PDF source with image target only', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    expect(screen.queryByRole('button', { name: 'Select pages' })).not.toBeInTheDocument()
+
+    const tableSelects = getFileTargetSelects()
+    fireEvent.change(tableSelects[0], { target: { value: 'image' } })
+    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
+
+    fireEvent.change(tableSelects[0], { target: { value: 'txt' } })
+    expect(screen.queryByRole('button', { name: 'Select pages' })).not.toBeInTheDocument()
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.png/ })
+    const updatedTableSelects = getFileTargetSelects()
+    fireEvent.change(updatedTableSelects[1], { target: { value: 'pdf' } })
+    expect(screen.queryAllByRole('button', { name: 'Select pages' })).toHaveLength(0)
+  })
+
+  it('confirms selected PDF image pages and passes them to convertFile', async () => {
+    const { convertFile } = await import('../lib/converter')
+    vi.mocked(convertFile).mockResolvedValue([
+      {
+        blob: new Blob(['fake'], { type: 'image/png' }),
+        filename: 'page-001.png',
+        mimeType: 'image/png',
+        targetFormat: 'image'
+      }
+    ])
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'image' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Select pages' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm test pages' }))
+
+    expect(screen.getByText('2 pages selected')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(convertFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'pdf',
+          target: 'image',
+          options: expect.objectContaining({
+            pdf: expect.objectContaining({ selectedImagePages: [1, 3] })
+          })
+        })
+      )
+    })
+  })
+
+  it('shows delete button for completed rows', async () => {
+    const { convertFile } = await import('../lib/converter')
+    vi.mocked(convertFile).mockResolvedValue([
+      {
+        blob: new Blob(['fake'], { type: 'text/plain' }),
+        filename: 'result.txt',
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      }
+    ])
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    expect(screen.getAllByRole('button', { name: 'Download' })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
+  })
+
+  it('removes a completed row when delete is clicked', async () => {
+    const { convertFile } = await import('../lib/converter')
+    vi.mocked(convertFile).mockResolvedValue([
+      {
+        blob: new Blob(['fake'], { type: 'text/plain' }),
+        filename: 'result.txt',
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      }
+    ])
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('row', { name: /notes\.txt/ })).not.toBeInTheDocument()
+    })
+  })
+
+  it('disables delete button while converting', async () => {
+    const { convertFile } = await import('../lib/converter')
+    let resolveConversion: ((value: ConversionResult[]) => void) | undefined
+    const conversionPromise = new Promise<ConversionResult[]>(resolve => {
+      resolveConversion = resolve
+    })
+    vi.mocked(convertFile).mockReturnValue(conversionPromise)
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
+    })
+
+    resolveConversion?.([
+      {
+        blob: new Blob(['fake'], { type: 'text/plain' }),
+        filename: 'result.txt',
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      }
+    ])
+  })
+
+  it('shows full-screen loading during async download preparation', async () => {
+    const { convertFile } = await import('../lib/converter')
+    const { downloadResultArchive } = await import('../lib/download')
+    let resolveDownload: (() => void) | undefined
+    vi.mocked(convertFile).mockResolvedValue([
+      {
+        blob: new Blob(['first'], { type: 'text/plain' }),
+        filename: 'first.txt',
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      },
+      {
+        blob: new Blob(['second'], { type: 'text/plain' }),
+        filename: 'second.txt',
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      }
+    ])
+    vi.mocked(downloadResultArchive).mockReturnValue(
+      new Promise<void>(resolve => {
+        resolveDownload = resolve
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    const rowDownloadButton = screen.getAllByRole('button', { name: 'Download' })[0]
+    fireEvent.click(rowDownloadButton)
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Preparing download...')
+    })
+
+    resolveDownload?.()
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
   })
 })

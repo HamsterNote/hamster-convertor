@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
+import FullscreenLoading from './components/FullscreenLoading'
 import Header from './components/Header'
+import PdfPageSelectorModal from './components/PdfPageSelectorModal'
 import {
   type ConversionResult,
   type ConversionWarning,
@@ -17,6 +19,7 @@ import { downloadBlobFile, downloadResultArchive } from './lib/download'
 type ConversionOptions = {
   pdf: {
     ocr: boolean
+    selectedImagePages?: number[]
   }
 }
 
@@ -81,6 +84,11 @@ const isRunningStatus = (status: FileItem['status']) => ['queued', 'converting']
 const isConvertibleStatus = (status: FileItem['status']) =>
   status === 'ready' || status === 'failed'
 
+const hasExplicitlyEmptySelectedPages = (item: FileItem): boolean => {
+  const selected = item.conversionOptions.pdf.selectedImagePages
+  return selected !== undefined && selected.length === 0
+}
+
 const queueItem = (item: FileItem): FileItem => ({
   ...item,
   status: item.status === 'done' ? 'done' : 'queued',
@@ -108,6 +116,15 @@ function App() {
   const [rejectedFileNames, setRejectedFileNames] = useState<string[]>([])
   const itemsRef = useRef<FileItem[]>(items)
   const addFilesInputRef = useRef<HTMLInputElement>(null)
+  const [isConvertingAll, setIsConvertingAll] = useState(false)
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false)
+  const [activePdfPageSelectorItemId, setActivePdfPageSelectorItemId] = useState<string | null>(
+    null
+  )
+
+  const activePdfItem = activePdfPageSelectorItemId
+    ? items.find(it => it.id === activePdfPageSelectorItemId)
+    : undefined
 
   useEffect(() => {
     itemsRef.current = items
@@ -157,12 +174,49 @@ function App() {
   const clearAll = () => setItems([])
 
   const changeTarget = (id: string, target: TargetFormat) => {
-    setItems(prev => prev.map(it => (it.id === id ? { ...it, target } : it)))
+    setItems(prev =>
+      prev.map(it => {
+        if (it.id !== id) return it
+        const hadImageTarget = it.target === 'image'
+        const newItem = { ...it, target }
+        if (
+          hadImageTarget &&
+          target !== 'image' &&
+          (it.status === 'done' || it.status === 'failed')
+        ) {
+          return {
+            ...newItem,
+            status: 'ready' as const,
+            outputs: undefined,
+            warnings: undefined,
+            errorMessage: undefined
+          }
+        }
+        return newItem
+      })
+    )
   }
 
   const changeOcrOption = (id: string, ocr: boolean) => {
     setItems(prev =>
-      prev.map(it => (it.id === id ? { ...it, conversionOptions: { pdf: { ocr } } } : it))
+      prev.map(it =>
+        it.id === id
+          ? { ...it, conversionOptions: { pdf: { ...it.conversionOptions.pdf, ocr } } }
+          : it
+      )
+    )
+  }
+
+  const changeSelectedImagePages = (id: string, selectedImagePages: number[] | undefined) => {
+    setItems(prev =>
+      prev.map(it =>
+        it.id === id
+          ? {
+              ...it,
+              conversionOptions: { pdf: { ...it.conversionOptions.pdf, selectedImagePages } }
+            }
+          : it
+      )
     )
   }
 
@@ -201,61 +255,91 @@ function App() {
       .map(i => i.id)
     if (idsToConvert.length === 0) return
 
+    setIsConvertingAll(true)
     setItems(prev => prev.map(queueItem))
 
-    for (const id of idsToConvert) {
-      const current = itemsRef.current.find(it => it.id === id)
-      if (!current) continue
-      if (!getSupportedTargets(current.source).includes(current.target)) {
-        markFailed(id, t('errors.unsupportedConversion'))
-        continue
-      }
+    try {
+      for (const id of idsToConvert) {
+        const current = itemsRef.current.find(it => it.id === id)
+        if (!current) continue
+        if (!getSupportedTargets(current.source).includes(current.target)) {
+          markFailed(id, t('errors.unsupportedConversion'))
+          continue
+        }
 
-      markConverting(id)
+        if (
+          current.source === 'pdf' &&
+          current.target === 'image' &&
+          hasExplicitlyEmptySelectedPages(current)
+        ) {
+          markFailed(id, t('errors.noPagesSelected'))
+          continue
+        }
 
-      try {
-        const results = await convertFile({
-          file: current.file,
-          source: current.source,
-          target: current.target,
-          options: current.conversionOptions
-        })
-        markDone(id, results)
-      } catch (error) {
-        log.warn('Conversion failed', {
-          id,
-          fileName: current.file.name,
-          error
-        })
-        markFailed(id, t(`errors.${getConversionErrorKey(error)}` as const))
+        markConverting(id)
+
+        try {
+          const results = await convertFile({
+            file: current.file,
+            source: current.source,
+            target: current.target,
+            options: current.conversionOptions
+          })
+          markDone(id, results)
+        } catch (error) {
+          log.warn('Conversion failed', {
+            id,
+            fileName: current.file.name,
+            error
+          })
+          markFailed(id, t(`errors.${getConversionErrorKey(error)}` as const))
+        }
       }
+    } finally {
+      setIsConvertingAll(false)
     }
   }
 
   const acceptAttr = useMemo(() => '.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg', [])
 
-  const handleDownloadAll = () => {
+  const handleDownloadAll = async () => {
     const allOutputs = downloadableItems.flatMap(it => it.outputs ?? [])
     if (allOutputs.length === 0) return
-    if (allOutputs.length === 1 && allOutputs[0]) {
-      downloadBlobFile(allOutputs[0])
-    } else {
-      downloadResultArchive(allOutputs, 'hamster-conversions.zip')
+    setIsPreparingDownload(true)
+    try {
+      if (allOutputs.length === 1 && allOutputs[0]) {
+        downloadBlobFile(allOutputs[0])
+        await Promise.resolve()
+      } else {
+        await downloadResultArchive(allOutputs, 'hamster-conversions.zip')
+      }
+    } finally {
+      setIsPreparingDownload(false)
     }
   }
 
-  const handleRowDownload = (item: FileItem) => {
+  const handleRowDownload = async (item: FileItem) => {
     const outputs = item.outputs
     if (!outputs || outputs.length === 0) return
-    if (outputs.length === 1 && outputs[0]) {
-      downloadBlobFile(outputs[0])
-    } else {
-      downloadResultArchive(outputs, replaceExtension(item.file.name, 'zip'))
+    setIsPreparingDownload(true)
+    try {
+      if (outputs.length === 1 && outputs[0]) {
+        downloadBlobFile(outputs[0])
+        await Promise.resolve()
+      } else {
+        await downloadResultArchive(outputs, replaceExtension(item.file.name, 'zip'))
+      }
+    } finally {
+      setIsPreparingDownload(false)
     }
   }
 
   return (
     <div className="app">
+      <FullscreenLoading
+        visible={isConvertingAll || isPreparingDownload}
+        label={isPreparingDownload ? t('loading.preparingDownload') : t('loading.converting')}
+      />
       <Header />
 
       <main className="container">
@@ -314,7 +398,8 @@ function App() {
                             disabled={
                               it.status === 'converting' ||
                               it.status === 'queued' ||
-                              it.status === 'done'
+                              it.status === 'done' ||
+                              isPreparingDownload
                             }
                           >
                             {supportedTargets.map(target => (
@@ -332,11 +417,31 @@ function App() {
                                 disabled={
                                   it.status === 'queued' ||
                                   it.status === 'converting' ||
-                                  it.status === 'done'
+                                  it.status === 'done' ||
+                                  isPreparingDownload
                                 }
                               />
                               {t('options.ocr')}
                             </label>
+                          )}
+                          {it.source === 'pdf' && it.target === 'image' && it.status !== 'done' && (
+                            <div>
+                              <button
+                                type="button"
+                                className="btn btn--ghost page-selector-btn"
+                                onClick={() => setActivePdfPageSelectorItemId(it.id)}
+                                disabled={isPreparingDownload}
+                              >
+                                {t('actions.selectPages')}
+                              </button>
+                              {it.conversionOptions.pdf.selectedImagePages !== undefined && (
+                                <div className="selected-pages-summary">
+                                  {t('options.pdfPages.selectedCount', {
+                                    count: it.conversionOptions.pdf.selectedImagePages.length
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className={`status status--${it.status}`}>
@@ -362,25 +467,30 @@ function App() {
                           )}
                         </td>
                         <td>
-                          {it.status === 'done' ? (
-                            <button
-                              type="button"
-                              className="btn btn--ghost"
-                              onClick={() => handleRowDownload(it)}
-                              aria-label={t('actions.download')}
-                            >
-                              ↓
-                            </button>
-                          ) : (
+                          <div className="row-actions">
+                            {it.status === 'done' && (
+                              <button
+                                type="button"
+                                className="btn btn--ghost"
+                                onClick={() => handleRowDownload(it)}
+                                aria-label={t('actions.download')}
+                                disabled={isPreparingDownload}
+                              >
+                                ↓
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="btn btn--ghost"
                               onClick={() => removeItem(it.id)}
                               aria-label={t('actions.remove')}
+                              disabled={
+                                isConvertingAll || isRunningStatus(it.status) || isPreparingDownload
+                              }
                             >
                               ×
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -395,6 +505,7 @@ function App() {
               type="button"
               className="btn btn--secondary"
               onClick={() => addFilesInputRef.current?.click()}
+              disabled={isConvertingAll || isPreparingDownload}
             >
               {t('actions.addFiles')}
             </button>
@@ -413,7 +524,7 @@ function App() {
             <button
               type="button"
               className="btn btn--primary"
-              disabled={items.length === 0}
+              disabled={items.length === 0 || isConvertingAll || isPreparingDownload}
               onClick={convertAll}
             >
               {t('actions.convertAll')}
@@ -421,7 +532,7 @@ function App() {
             <button
               type="button"
               className="btn btn--ghost"
-              disabled={!canDownloadArchive}
+              disabled={!canDownloadArchive || isConvertingAll || isPreparingDownload}
               onClick={handleDownloadAll}
             >
               {t('actions.download')}
@@ -429,7 +540,7 @@ function App() {
             <button
               type="button"
               className="btn btn--ghost"
-              disabled={items.length === 0}
+              disabled={items.length === 0 || isConvertingAll || isPreparingDownload}
               onClick={clearAll}
             >
               {t('actions.clearAll')}
@@ -439,6 +550,18 @@ function App() {
       </main>
 
       <Footer />
+      {activePdfItem && (
+        <PdfPageSelectorModal
+          open
+          file={activePdfItem.file}
+          selectedPages={activePdfItem.conversionOptions.pdf.selectedImagePages}
+          onCancel={() => setActivePdfPageSelectorItemId(null)}
+          onConfirm={pages => {
+            changeSelectedImagePages(activePdfItem.id, pages)
+            setActivePdfPageSelectorItemId(null)
+          }}
+        />
+      )}
     </div>
   )
 }

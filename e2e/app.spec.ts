@@ -25,6 +25,8 @@ const optionValues = (select: Locator): Promise<string[]> =>
 const downloadNames = (page: Page): Promise<string[]> =>
   page.evaluate(() => (window as Window & { __downloadNames?: string[] }).__downloadNames ?? [])
 
+const loadingOverlay = (page: Page): Locator => page.locator('.fullscreen-loading')
+
 test.describe('converter app', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -206,6 +208,88 @@ test.describe('converter app', () => {
     await expect(pdfRow.locator('.status')).toContainText('2 outputs')
 
     await pdfRow.getByRole('button', { name: 'Download' }).click()
+
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
+  })
+
+  test('selects PDF pages and converts to exact output count in zh-CN', async ({ page }) => {
+    await page.locator('.nav__select').selectOption('zh-CN')
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+
+    await targetSelectForRow(page, 'sample.pdf').selectOption('image')
+
+    await page.getByRole('button', { name: '选择页数' }).click()
+    await expect(page.locator('.pdf-modal')).toBeVisible()
+
+    await page.getByRole('button', { name: '取消全选' }).click()
+
+    const pageCards = page.locator('.pdf-modal__card')
+    await expect(pageCards).toHaveCount(2)
+    await pageCards.nth(1).click()
+
+    await page.getByRole('button', { name: '完成' }).click()
+    await expect(page.locator('.pdf-modal')).toBeHidden()
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow).toContainText('已选择 1 页')
+
+    await page.getByRole('button', { name: '全部转换' }).click()
+
+    await expect(pdfRow.locator('.status')).toContainText('完成', { timeout: 15000 })
+    await expect(pdfRow.locator('.status')).toContainText('1 个输出')
+
+    await pdfRow.getByRole('button', { name: '下载' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
+  })
+
+  test('deletes completed row after global download', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles([samplePdf(), filePayload('notes.txt', 'text/plain', 'hello text')])
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    await expect(rowForFile(page, 'sample.pdf').locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+    await expect(rowForFile(page, 'notes.txt').locator('.status')).toContainText('Done')
+
+    await page.locator('.actions').getByRole('button', { name: 'Download' }).click()
+    await expect(loadingOverlay(page)).toBeVisible()
+    await expect(loadingOverlay(page)).toBeHidden({ timeout: 15000 })
+
+    await expect.poll(async () => downloadNames(page)).toEqual(['hamster-conversions.zip'])
+
+    const sampleRow = rowForFile(page, 'sample.pdf')
+    await sampleRow.getByRole('button', { name: 'Remove' }).click()
+
+    await expect(sampleRow).toHaveCount(0)
+    await expect(rowForFile(page, 'notes.txt')).toHaveCount(1)
+  })
+
+  test('shows full-screen loading during convert-all', async ({ page }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+    await targetSelectForRow(page, 'sample.pdf').selectOption('txt')
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    await expect(loadingOverlay(page)).toBeVisible()
+    await expect(loadingOverlay(page)).toBeHidden({ timeout: 15000 })
+    await expect(rowForFile(page, 'sample.pdf').locator('.status')).toContainText('Done')
+  })
+
+  test('shows loading during row download of multi-output PDF→image', async ({ page }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+    await targetSelectForRow(page, 'sample.pdf').selectOption('image')
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+
+    await pdfRow.getByRole('button', { name: 'Download' }).click()
+    await expect(loadingOverlay(page)).toBeVisible()
+    await expect(loadingOverlay(page)).toBeHidden({ timeout: 15000 })
 
     await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
   })

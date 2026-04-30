@@ -26,7 +26,12 @@
     "clearAll": "清空",
     "download": "下载",
     "downloadAll": "下载全部",
-    "remove": "删除"
+    "remove": "删除",
+    "selectPages": "选择页数",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "done": "完成",
+    "cancel": "取消"
   },
   "table": {
     "fileName": "文件名",
@@ -42,23 +47,45 @@
     "done": "完成",
     "failed": "失败"
   },
+  "loading": {
+    "converting": "转换中...",
+    "preparingDownload": "准备下载中..."
+  },
   "errors": {
     "unsupportedFormat": "不支持该文件类型。当前支持格式：{{formats}}。",
     "unsupportedConversion": "不支持的转换方向",
     "conversionFailed": "转换失败，请重试",
     "ocrRequired": "扫描版 PDF 需要 OCR；无法提取文本层",
-    "emptyOcr": "图片中未检测到文字"
+    "emptyOcr": "图片中未检测到文字",
+    "noPagesSelected": "未选择转换页面"
   },
   "warnings": {
     "conversionWarning": "转换已完成，但包含警告",
     "parserFallback": "使用了备用解析器；结果可能有所不同"
   },
   "options": {
-    "ocr": "是否进行 OCR"
+    "ocr": "是否进行 OCR",
+    "pdfPages": {
+      "title": "选择 PDF 页面",
+      "selectedCount": "已选择 {{count}} 页",
+      "previewLoading": "正在加载预览...",
+      "previewError": "无法加载 PDF 预览",
+      "noPagesSelected": "请至少选择一页"
+    }
   },
   "output": {
     "count": "{{count}} 个输出",
     "count_one": "1 个输出"
+  },
+  "pdfPageSelector": {
+    "title": "选择页面",
+    "loading": "正在加载预览...",
+    "loadError": "加载 PDF 失败",
+    "page": "第",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "cancel": "取消",
+    "done": "完成"
   },
   "footer": {
     "copyright": "© {{year}} 仓鼠文档转换",

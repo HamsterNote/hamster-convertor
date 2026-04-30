@@ -32,6 +32,7 @@ export type ConversionRequest = {
   options?: {
     pdf?: {
       ocr: boolean
+      selectedImagePages?: number[]
     }
   }
 }
@@ -125,6 +126,12 @@ const fallbackHtml = `<!doctype html>
 const isE2E = () =>
   typeof window !== 'undefined' && (window as Window & { __E2E__?: boolean }).__E2E__ === true
 
+const waitForE2EPaint = async (): Promise<void> => {
+  await new Promise<void>(resolve => {
+    globalThis.setTimeout(resolve, 50)
+  })
+}
+
 export const convertPdfToHtml: ConvertPdfToHtml = async input => {
   if (isE2E()) {
     return {
@@ -181,6 +188,8 @@ const convertPdfFileToHtml = async (file: File): Promise<ConversionResult[]> => 
 }
 
 const createE2EResult = async (request: ConversionRequest): Promise<ConversionResult[]> => {
+  await waitForE2EPaint()
+
   if (request.file.name.includes('fail')) {
     throw new Error('Fake E2E conversion failed')
   }
@@ -190,7 +199,8 @@ const createE2EResult = async (request: ConversionRequest): Promise<ConversionRe
   }
 
   if (request.source === 'pdf' && request.target === 'image') {
-    return [1, 2].map(pageNumber => ({
+    const selected = request.options?.pdf?.selectedImagePages ?? [1, 2]
+    return selected.map(pageNumber => ({
       blob: new Blob([`fake image ${pageNumber}`], { type: 'image/png' }),
       filename: `fake-page-${String(pageNumber).padStart(3, '0')}.png`,
       mimeType: 'image/png',

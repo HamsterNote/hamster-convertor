@@ -26,7 +26,12 @@
     "clearAll": "Clear all",
     "download": "Download",
     "downloadAll": "Download all",
-    "remove": "Remove"
+    "remove": "Remove",
+    "selectPages": "Select pages",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "done": "Done",
+    "cancel": "Cancel"
   },
   "table": {
     "fileName": "File name",
@@ -42,23 +47,45 @@
     "done": "Done",
     "failed": "Failed"
   },
+  "loading": {
+    "converting": "Converting...",
+    "preparingDownload": "Preparing download..."
+  },
   "errors": {
     "unsupportedFormat": "Unsupported file type. Supported formats: {{formats}}.",
     "unsupportedConversion": "Unsupported conversion direction",
     "conversionFailed": "Conversion failed, please retry",
     "ocrRequired": "Scanned PDF requires OCR; text-layer extraction not available",
-    "emptyOcr": "No text detected in image"
+    "emptyOcr": "No text detected in image",
+    "noPagesSelected": "No pages selected for conversion"
   },
   "warnings": {
     "conversionWarning": "Conversion completed with warnings",
     "parserFallback": "Used fallback parser; results may vary"
   },
   "options": {
-    "ocr": "OCR"
+    "ocr": "OCR",
+    "pdfPages": {
+      "title": "Select PDF pages",
+      "selectedCount": "{{count}} pages selected",
+      "previewLoading": "Loading previews...",
+      "previewError": "Failed to load PDF preview",
+      "noPagesSelected": "Please select at least one page"
+    }
   },
   "output": {
     "count": "{{count}} outputs",
     "count_one": "1 output"
+  },
+  "pdfPageSelector": {
+    "title": "Select Pages",
+    "loading": "Loading previews...",
+    "loadError": "Failed to load PDF",
+    "page": "Page",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "cancel": "Cancel",
+    "done": "Done"
   },
   "footer": {
     "copyright": "© {{year}} Hamster Document Converter",

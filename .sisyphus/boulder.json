@@ -1,0 +1,68 @@
+{
+  "active_plan": "/home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/.sisyphus/plans/conversion-ui-optimizations.md",
+  "started_at": "2026-04-30T12:17:10.226Z",
+  "session_ids": [
+    "ses_221adadcaffeymj3vbsbfchr3A"
+  ],
+  "session_origins": {
+    "ses_221adadcaffeymj3vbsbfchr3A": "direct"
+  },
+  "plan_name": "conversion-ui-optimizations",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Extend conversion options for selected PDF image pages",
+      "session_id": "ses_2219e9493ffe0sZfAim0GePzGN",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-30T12:47:09.659Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Integrate convert-all loading and PDF page selection into App",
+      "session_id": "ses_221551ec9ffe7sn1F3TWqxy9Su",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-30T13:56:05.768Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Add global download loading and always-available row delete",
+      "session_id": "ses_22151c7b4ffeRNNTENwrej67Pw",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-30T14:02:08.478Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Add automated Vitest coverage for state, converter, and UI behavior",
+      "session_id": "ses_2214bd9dcffeHJsouITOITYwPd",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-30T14:08:05.012Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Add Playwright E2E coverage and run final commands",
+      "session_id": "ses_221469c9affeJmQZ0YjMcla6y6",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-30T14:13:53.029Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_221372c0dffevf0PSrLUkUkVbx",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-30T14:29:11.657Z"
+    }
+  }
+}

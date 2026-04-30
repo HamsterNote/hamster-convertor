@@ -26,7 +26,12 @@
     "clearAll": "清空",
     "download": "下載",
     "downloadAll": "下載全部",
-    "remove": "刪除"
+    "remove": "刪除",
+    "selectPages": "選擇頁數",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "done": "完成",
+    "cancel": "取消"
   },
   "table": {
     "fileName": "檔名",
@@ -42,23 +47,45 @@
     "done": "完成",
     "failed": "失敗"
   },
+  "loading": {
+    "converting": "轉換中...",
+    "preparingDownload": "準備下載中..."
+  },
   "errors": {
     "unsupportedFormat": "不支援該檔案類型。目前支援格式：{{formats}}。",
     "unsupportedConversion": "不支援的轉換方向",
     "conversionFailed": "轉換失敗，請重試",
     "ocrRequired": "掃描版 PDF 需要 OCR；無法提取文字層",
-    "emptyOcr": "圖片中未偵測到文字"
+    "emptyOcr": "圖片中未偵測到文字",
+    "noPagesSelected": "未選擇轉換頁面"
   },
   "warnings": {
     "conversionWarning": "轉換完成，但包含警告",
     "parserFallback": "使用了備用解析器；結果可能有所不同"
   },
   "options": {
-    "ocr": "是否進行 OCR"
+    "ocr": "是否進行 OCR",
+    "pdfPages": {
+      "title": "選擇 PDF 頁面",
+      "selectedCount": "已選擇 {{count}} 頁",
+      "previewLoading": "正在載入預覽...",
+      "previewError": "無法載入 PDF 預覽",
+      "noPagesSelected": "請至少選擇一頁"
+    }
   },
   "output": {
     "count": "{{count}} 個輸出",
     "count_one": "1 個輸出"
+  },
+  "pdfPageSelector": {
+    "title": "選擇頁面",
+    "loading": "正在載入預覽...",
+    "loadError": "載入 PDF 失敗",
+    "page": "第",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "cancel": "取消",
+    "done": "完成"
   },
   "footer": {
     "copyright": "© {{year}} 倉鼠文件轉換",

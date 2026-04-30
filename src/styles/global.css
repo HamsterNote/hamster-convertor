@@ -343,6 +343,223 @@ a {
   gap: 2px;
 }
 
+.fullscreen-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-veil-70);
+  -webkit-backdrop-filter: saturate(140%) blur(8px);
+  backdrop-filter: saturate(140%) blur(8px);
+}
+
+.fullscreen-loading__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 40px;
+  background: var(--color-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.fullscreen-loading__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary-500);
+  border-radius: 50%;
+  animation: fullscreen-loading-spin 0.8s linear infinite;
+}
+
+.fullscreen-loading__label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+}
+
+@keyframes fullscreen-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pdf-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 16px;
+}
+
+.pdf-modal {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pdf-modal__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pdf-modal__header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.pdf-modal__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: var(--color-muted);
+}
+
+.pdf-modal__spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary-500);
+  border-radius: 50%;
+  animation: pdf-modal-spin 0.8s linear infinite;
+}
+
+@keyframes pdf-modal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pdf-modal__error {
+  margin: 16px 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(180, 35, 24, 0.08);
+  color: #b42318;
+  font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pdf-modal__error {
+    background: rgba(180, 35, 24, 0.15);
+    color: #ff8a80;
+  }
+}
+
+.pdf-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.pdf-modal__card {
+  appearance: none;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-input-bg);
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.05s ease;
+  text-align: center;
+}
+
+.pdf-modal__card:hover {
+  border-color: var(--color-primary-300);
+  background: var(--color-primary-50);
+}
+
+.pdf-modal__card:active {
+  transform: translateY(1px);
+}
+
+.pdf-modal__card--selected {
+  border-color: var(--color-primary-500);
+  background: var(--color-primary-50);
+  box-shadow: 0 0 0 2px var(--color-primary-200);
+}
+
+.pdf-modal__thumbnail {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  display: block;
+  background: var(--color-bg);
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+}
+
+.pdf-modal__page-number {
+  font-size: 13px;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.pdf-modal__card--selected .pdf-modal__page-number {
+  color: var(--color-primary-700);
+}
+
+.pdf-modal__actions {
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.pdf-modal__actions__spacer {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 640px) {
+  .pdf-modal-overlay {
+    padding: 8px;
+  }
+  .pdf-modal {
+    max-height: 95vh;
+    border-radius: var(--radius-md);
+  }
+  .pdf-modal__grid {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .pdf-modal__actions {
+    padding: 10px 16px 14px;
+  }
+  .pdf-modal__actions .btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
 @media (max-width: 640px) {
   .header__inner {
     height: 56px;

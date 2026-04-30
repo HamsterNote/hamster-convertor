@@ -218,15 +218,28 @@ export const convertPdfToTxt = async ({ file }: ConversionRequest): Promise<Conv
 }
 
 export const convertPdfToImage = async ({
-  file
+  file,
+  options
 }: ConversionRequest): Promise<ConversionResult[]> => {
   const arrayBuffer = await readFileAsArrayBuffer(file)
   const pdfDocument = await loadPdfDocument(arrayBuffer)
   const baseName = stripExtension(file.name)
 
+  let pageNumbers = Array.from({ length: pdfDocument.numPages }, (_, i) => i + 1)
+
+  const selected = options?.pdf?.selectedImagePages
+  if (selected !== undefined) {
+    pageNumbers = selected.filter(
+      (p): p is number => Number.isInteger(p) && p >= 1 && p <= pdfDocument.numPages
+    )
+    pageNumbers = [...new Set(pageNumbers)].sort((a, b) => a - b)
+    if (pageNumbers.length === 0) {
+      throw new Error('No pages selected')
+    }
+  }
+
   return Promise.all(
-    Array.from({ length: pdfDocument.numPages }, async (_, index) => {
-      const pageNumber = index + 1
+    pageNumbers.map(async pageNumber => {
       const page = await pdfDocument.getPage(pageNumber)
       const blob = await renderPageToBlob(page)
       return {
