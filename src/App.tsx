@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
 import log from 'loglevel'
-import Header from './components/Header'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
-import { useTranslation } from 'react-i18next'
+import Header from './components/Header'
 import {
-  type SourceFormat,
-  type TargetFormat,
   type ConversionResult,
   type ConversionWarning,
+  convertFile,
   getSupportedTargets,
-  convertFile
+  type SourceFormat,
+  type TargetFormat
 } from './lib/converter'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
 
@@ -53,6 +53,17 @@ const replaceExtension = (filename: string, extension: string): string => {
   return `${withoutExtension || filename}.${extension}`
 }
 
+let fallbackFileItemId = 0
+
+const createFileItemId = (file: File): string => {
+  fallbackFileItemId += 1
+
+  const randomId =
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${fallbackFileItemId}`
+
+  return `${file.name}-${file.size}-${file.lastModified}-${randomId}`
+}
+
 type ConversionErrorKey = 'conversionFailed' | 'emptyOcr' | 'ocrRequired'
 
 const isPendingStatus = (status: FileItem['status']) =>
@@ -85,10 +96,11 @@ const getConversionErrorKey = (error: unknown): ConversionErrorKey => {
 }
 
 function App() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const [items, setItems] = useState<FileItem[]>([])
   const [rejectedFileNames, setRejectedFileNames] = useState<string[]>([])
   const itemsRef = useRef<FileItem[]>(items)
+  const addFilesInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     itemsRef.current = items
@@ -102,7 +114,7 @@ function App() {
 
   useEffect(() => {
     document.title = `${t('appName')} | Hamster Document Converter`
-  }, [i18n.language, t])
+  }, [t])
 
   const onFilesAdded = (files: File[]) => {
     const next: FileItem[] = []
@@ -116,7 +128,7 @@ function App() {
       }
 
       next.push({
-        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        id: createFileItemId(file),
         file,
         source,
         target: getSupportedTargets(source)[0] ?? 'txt',
@@ -244,7 +256,7 @@ function App() {
           <div className="panel__header">
             <h2>{t('upload.title')}</h2>
             <div className="format-row">
-              <label>{t('formats.to')}</label>
+              <span>{t('formats.to')}</span>
               <span className="supported">
                 {t('formats.supported')}: {SUPPORTED_FORMATS.join(', ')}
               </span>
@@ -302,8 +314,8 @@ function App() {
                           )}
                           {it.warnings && it.warnings.length > 0 && (
                             <div className="status__detail status__detail--warning">
-                              {it.warnings.map((warning, idx) => (
-                                <div key={idx}>
+                              {it.warnings.map(warning => (
+                                <div key={typeof warning === 'string' ? warning : warning.message}>
                                   {typeof warning === 'string' ? warning : warning.message}
                                 </div>
                               ))}
@@ -318,6 +330,7 @@ function App() {
                         <td>
                           {it.status === 'done' ? (
                             <button
+                              type="button"
                               className="btn btn--ghost"
                               onClick={() => handleRowDownload(it)}
                               aria-label={t('actions.download')}
@@ -326,6 +339,7 @@ function App() {
                             </button>
                           ) : (
                             <button
+                              type="button"
                               className="btn btn--ghost"
                               onClick={() => removeItem(it.id)}
                               aria-label={t('actions.remove')}
@@ -343,31 +357,47 @@ function App() {
           )}
 
           <div className="actions">
-            <label className="btn btn--secondary">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => addFilesInputRef.current?.click()}
+            >
               {t('actions.addFiles')}
-              <input
-                type="file"
-                className="file-input--hidden"
-                multiple
-                accept={acceptAttr}
-                onChange={e => {
-                  const files = e.target.files ? Array.from(e.target.files) : []
-                  if (files.length) onFilesAdded(files)
-                  e.currentTarget.value = ''
-                }}
-              />
-            </label>
-            <button className="btn btn--primary" disabled={items.length === 0} onClick={convertAll}>
+            </button>
+            <input
+              type="file"
+              className="file-input--hidden"
+              multiple
+              accept={acceptAttr}
+              onChange={e => {
+                const files = e.target.files ? Array.from(e.target.files) : []
+                if (files.length) onFilesAdded(files)
+                e.currentTarget.value = ''
+              }}
+              ref={addFilesInputRef}
+            />
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={items.length === 0}
+              onClick={convertAll}
+            >
               {t('actions.convertAll')}
             </button>
             <button
+              type="button"
               className="btn btn--ghost"
               disabled={!canDownloadArchive}
               onClick={handleDownloadAll}
             >
               {t('actions.download')}
             </button>
-            <button className="btn btn--ghost" disabled={items.length === 0} onClick={clearAll}>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={items.length === 0}
+              onClick={clearAll}
+            >
               {t('actions.clearAll')}
             </button>
           </div>
