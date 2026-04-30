@@ -10,12 +10,22 @@
     "or": "or",
     "browse": "browse"
   },
-  "formats": { "from": "From", "to": "To", "supported": "Supported formats" },
+  "formats": {
+    "from": "From",
+    "to": "To",
+    "supported": "Supported formats",
+    "targets": {
+      "txt": "TXT",
+      "image": "Image",
+      "pdf": "PDF"
+    }
+  },
   "actions": {
     "addFiles": "Add files",
     "convertAll": "Convert all",
     "clearAll": "Clear all",
     "download": "Download",
+    "downloadAll": "Download all",
     "remove": "Remove"
   },
   "table": {
@@ -33,11 +43,19 @@
     "failed": "Failed"
   },
   "errors": {
-    "unsupportedFormat": "Only PDF files are supported",
-    "conversionFailed": "Conversion failed, please retry"
+    "unsupportedFormat": "Unsupported file type. Supported formats: {{formats}}.",
+    "unsupportedConversion": "Unsupported conversion direction",
+    "conversionFailed": "Conversion failed, please retry",
+    "ocrRequired": "Scanned PDF requires OCR; text-layer extraction not available",
+    "emptyOcr": "No text detected in image"
   },
   "warnings": {
-    "conversionWarning": "Conversion completed with warnings"
+    "conversionWarning": "Conversion completed with warnings",
+    "parserFallback": "Used fallback parser; results may vary"
+  },
+  "output": {
+    "count": "{{count}} outputs",
+    "count_one": "1 output"
   },
   "footer": {
     "copyright": "© {{year}} Hamster Document Converter",

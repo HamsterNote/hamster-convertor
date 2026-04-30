@@ -219,6 +219,22 @@ a {
   color: var(--color-muted);
 }
 
+.upload-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.upload-feedback--error {
+  border: 1px solid var(--color-border);
+  background: var(--surface-veil-70);
+  color: var(--color-text);
+}
+
 .table-wrap {
   overflow-x: auto;
   margin-top: 16px;
@@ -249,11 +265,32 @@ a {
   color: inherit;
 }
 
+.status__detail {
+  font-size: 0.85em;
+  margin-top: 0.25rem;
+}
+
+.status__detail--error {
+  color: inherit;
+}
+
+.status__detail--warning {
+  color: var(--color-primary-700);
+}
+
+.status__detail--count {
+  color: inherit;
+}
+
 .actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+.file-input--hidden {
+  display: none;
 }
 
 .footer {

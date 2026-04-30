@@ -13,13 +13,19 @@
   "formats": {
     "from": "來源格式",
     "to": "目標格式",
-    "supported": "支援的格式"
+    "supported": "支援的格式",
+    "targets": {
+      "txt": "TXT",
+      "image": "圖片",
+      "pdf": "PDF"
+    }
   },
   "actions": {
     "addFiles": "新增檔案",
     "convertAll": "全部轉換",
     "clearAll": "清空",
     "download": "下載",
+    "downloadAll": "下載全部",
     "remove": "刪除"
   },
   "table": {
@@ -37,11 +43,19 @@
     "failed": "失敗"
   },
   "errors": {
-    "unsupportedFormat": "僅支援 PDF 檔案",
-    "conversionFailed": "轉換失敗，請重試"
+    "unsupportedFormat": "不支援該檔案類型。目前支援格式：{{formats}}。",
+    "unsupportedConversion": "不支援的轉換方向",
+    "conversionFailed": "轉換失敗，請重試",
+    "ocrRequired": "掃描版 PDF 需要 OCR；無法提取文字層",
+    "emptyOcr": "圖片中未偵測到文字"
   },
   "warnings": {
-    "conversionWarning": "轉換完成，但包含警告"
+    "conversionWarning": "轉換完成，但包含警告",
+    "parserFallback": "使用了備用解析器；結果可能有所不同"
+  },
+  "output": {
+    "count": "{{count}} 個輸出",
+    "count_one": "1 個輸出"
   },
   "footer": {
     "copyright": "© {{year}} 倉鼠文件轉換",

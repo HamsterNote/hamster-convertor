@@ -10,12 +10,22 @@
     "or": "或",
     "browse": "选择文件"
   },
-  "formats": { "from": "源格式", "to": "目标格式", "supported": "支持的格式" },
+  "formats": {
+    "from": "源格式",
+    "to": "目标格式",
+    "supported": "支持的格式",
+    "targets": {
+      "txt": "TXT",
+      "image": "图片",
+      "pdf": "PDF"
+    }
+  },
   "actions": {
     "addFiles": "添加文件",
     "convertAll": "全部转换",
     "clearAll": "清空",
     "download": "下载",
+    "downloadAll": "下载全部",
     "remove": "删除"
   },
   "table": {
@@ -33,11 +43,19 @@
     "failed": "失败"
   },
   "errors": {
-    "unsupportedFormat": "仅支持 PDF 文件",
-    "conversionFailed": "转换失败，请重试"
+    "unsupportedFormat": "不支持该文件类型。当前支持格式：{{formats}}。",
+    "unsupportedConversion": "不支持的转换方向",
+    "conversionFailed": "转换失败，请重试",
+    "ocrRequired": "扫描版 PDF 需要 OCR；无法提取文本层",
+    "emptyOcr": "图片中未检测到文字"
   },
   "warnings": {
-    "conversionWarning": "转换已完成，但包含警告"
+    "conversionWarning": "转换已完成，但包含警告",
+    "parserFallback": "使用了备用解析器；结果可能有所不同"
+  },
+  "output": {
+    "count": "{{count}} 个输出",
+    "count_one": "1 个输出"
   },
   "footer": {
     "copyright": "© {{year}} 仓鼠文档转换",

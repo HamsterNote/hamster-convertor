@@ -4,12 +4,15 @@ import Header from './components/Header'
 import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
 import { useTranslation } from 'react-i18next'
-import { convertPdfToHtml } from './lib/converter'
-import { downloadHtmlArchive, downloadHtmlFile } from './lib/download'
-
-type SupportedFormat = 'pdf' | 'doc' | 'docx' | 'txt' | 'html' | 'epub' | 'md'
-type SourceFormat = SupportedFormat | 'unsupported'
-type TargetFormat = 'html'
+import {
+  type SourceFormat,
+  type TargetFormat,
+  type ConversionResult,
+  type ConversionWarning,
+  getSupportedTargets,
+  convertFile
+} from './lib/converter'
+import { downloadBlobFile, downloadResultArchive } from './lib/download'
 
 type FileItem = {
   id: string
@@ -17,25 +20,26 @@ type FileItem = {
   source: SourceFormat
   target: TargetFormat
   status: 'ready' | 'queued' | 'converting' | 'done' | 'failed'
-  html?: string
-  warnings?: string[]
+  outputs?: ConversionResult[]
+  warnings?: ConversionWarning[]
   errorMessage?: string
 }
 
-const SUPPORTED_FORMATS: SupportedFormat[] = ['pdf', 'doc', 'docx', 'txt', 'html', 'epub', 'md']
+const SUPPORTED_FORMATS = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
+const SUPPORTED_FORMAT_LIST = SUPPORTED_FORMATS.map(format => `.${format}`).join(', ')
 
-const extToFormat = (name: string): SourceFormat => {
+const extToFormat = (name: string): SourceFormat | 'unsupported' => {
   const ext = name.split('.').pop()?.toLowerCase()
-  const extMap: Record<string, SupportedFormat> = {
+  const extMap: Record<string, SourceFormat> = {
     pdf: 'pdf',
-    doc: 'doc',
-    docx: 'docx',
     txt: 'txt',
-    html: 'html',
-    htm: 'html',
-    epub: 'epub',
-    md: 'md',
-    markdown: 'md'
+    png: 'image',
+    jpg: 'image',
+    jpeg: 'image',
+    gif: 'image',
+    webp: 'image',
+    bmp: 'image',
+    svg: 'image'
   }
 
   if (ext && ext in extMap) {
@@ -44,18 +48,56 @@ const extToFormat = (name: string): SourceFormat => {
   return 'unsupported'
 }
 
+const replaceExtension = (filename: string, extension: string): string => {
+  const withoutExtension = filename.replace(/\.[^/.]+$/, '')
+  return `${withoutExtension || filename}.${extension}`
+}
+
+type ConversionErrorKey = 'conversionFailed' | 'emptyOcr' | 'ocrRequired'
+
+const isPendingStatus = (status: FileItem['status']) =>
+  ['ready', 'queued', 'converting'].includes(status)
+
+const isRunningStatus = (status: FileItem['status']) => ['queued', 'converting'].includes(status)
+
+const isConvertibleStatus = (status: FileItem['status']) =>
+  status === 'ready' || status === 'failed'
+
+const queueItem = (item: FileItem): FileItem => ({
+  ...item,
+  status: item.status === 'done' ? 'done' : 'queued',
+  errorMessage: undefined
+})
+
+const getConversionErrorKey = (error: unknown): ConversionErrorKey => {
+  if (!(error instanceof Error)) {
+    return 'conversionFailed'
+  }
+
+  const errorCode = (error as Error & { code?: string }).code
+  if (errorCode === 'OCR_REQUIRED') {
+    return 'ocrRequired'
+  }
+  if (errorCode === 'EMPTY_OCR') {
+    return 'emptyOcr'
+  }
+  return 'conversionFailed'
+}
+
 function App() {
   const { t, i18n } = useTranslation()
   const [items, setItems] = useState<FileItem[]>([])
+  const [rejectedFileNames, setRejectedFileNames] = useState<string[]>([])
   const itemsRef = useRef<FileItem[]>(items)
 
-  // 同步 itemsRef 到最新状态
   useEffect(() => {
     itemsRef.current = items
   }, [items])
 
-  const hasPending = items.some(it => ['ready', 'queued', 'converting'].includes(it.status))
-  const downloadableItems = items.filter(it => it.status === 'done' && it.html)
+  const hasPending = items.some(it => isPendingStatus(it.status))
+  const downloadableItems = items.filter(
+    it => it.status === 'done' && it.outputs && it.outputs.length > 0
+  )
   const canDownloadArchive = items.length > 0 && !hasPending && downloadableItems.length > 0
 
   useEffect(() => {
@@ -63,14 +105,29 @@ function App() {
   }, [i18n.language, t])
 
   const onFilesAdded = (files: File[]) => {
-    const next: FileItem[] = files.map(f => ({
-      id: `${f.name}-${f.size}-${f.lastModified}-${crypto.randomUUID()}`,
-      file: f,
-      source: extToFormat(f.name),
-      target: 'html' as TargetFormat,
-      status: 'ready'
-    }))
-    setItems(prev => [...prev, ...next])
+    const next: FileItem[] = []
+    const rejected: string[] = []
+
+    files.forEach(file => {
+      const source = extToFormat(file.name)
+      if (source === 'unsupported') {
+        rejected.push(file.name)
+        return
+      }
+
+      next.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        source,
+        target: getSupportedTargets(source)[0] ?? 'txt',
+        status: 'ready'
+      })
+    })
+
+    setRejectedFileNames(rejected)
+    if (next.length > 0) {
+      setItems(prev => [...prev, ...next])
+    }
   }
 
   const removeItem = (id: string) => {
@@ -79,80 +136,96 @@ function App() {
 
   const clearAll = () => setItems([])
 
+  const changeTarget = (id: string, target: TargetFormat) => {
+    setItems(prev => prev.map(it => (it.id === id ? { ...it, target } : it)))
+  }
+
+  const markFailed = (id: string, errorMessage: string) => {
+    setItems(prev =>
+      prev.map(it => (it.id === id ? { ...it, status: 'failed', errorMessage } : it))
+    )
+  }
+
+  const markConverting = (id: string) => {
+    setItems(prev => prev.map(it => (it.id === id ? { ...it, status: 'converting' } : it)))
+  }
+
+  const markDone = (id: string, results: ConversionResult[]) => {
+    const warnings = results.flatMap(result => result.warnings ?? [])
+    setItems(prev =>
+      prev.map(it =>
+        it.id === id
+          ? {
+              ...it,
+              status: 'done',
+              outputs: results,
+              warnings
+            }
+          : it
+      )
+    )
+  }
+
   const convertAll = async () => {
-    const isRunning = itemsRef.current.some(it => ['queued', 'converting'].includes(it.status))
+    const isRunning = itemsRef.current.some(it => isRunningStatus(it.status))
     if (isRunning) return
 
     const idsToConvert = itemsRef.current
-      .filter(it => it.status === 'ready' || it.status === 'failed')
+      .filter(it => isConvertibleStatus(it.status))
       .map(i => i.id)
     if (idsToConvert.length === 0) return
 
-    setItems(prev =>
-      prev.map(it => ({
-        ...it,
-        status: it.status === 'done' ? 'done' : 'queued',
-        errorMessage: undefined
-      }))
-    )
+    setItems(prev => prev.map(queueItem))
 
     for (const id of idsToConvert) {
       const current = itemsRef.current.find(it => it.id === id)
       if (!current) continue
-      if (current.source !== 'pdf') {
-        setItems(prev =>
-          prev.map(it =>
-            it.id === id
-              ? {
-                  ...it,
-                  status: 'failed',
-                  errorMessage: t('errors.unsupportedFormat')
-                }
-              : it
-          )
-        )
+      if (!getSupportedTargets(current.source).includes(current.target)) {
+        markFailed(id, t('errors.unsupportedConversion'))
         continue
       }
 
-      setItems(prev => prev.map(it => (it.id === id ? { ...it, status: 'converting' } : it)))
+      markConverting(id)
 
       try {
-        const buffer = await current.file.arrayBuffer()
-        const { html, warnings } = await convertPdfToHtml(new Uint8Array(buffer))
-        setItems(prev =>
-          prev.map(it =>
-            it.id === id
-              ? {
-                  ...it,
-                  status: 'done',
-                  html,
-                  warnings
-                }
-              : it
-          )
-        )
+        const results = await convertFile({
+          file: current.file,
+          source: current.source,
+          target: current.target
+        })
+        markDone(id, results)
       } catch (error) {
         log.warn('Conversion failed', {
           id,
           fileName: current.file.name,
           error
         })
-        setItems(prev =>
-          prev.map(it =>
-            it.id === id
-              ? {
-                  ...it,
-                  status: 'failed',
-                  errorMessage: t('errors.conversionFailed')
-                }
-              : it
-          )
-        )
+        markFailed(id, t(`errors.${getConversionErrorKey(error)}` as const))
       }
     }
   }
 
-  const acceptAttr = useMemo(() => '.pdf,.doc,.docx,.txt,.html,.htm,.epub,.md,.markdown', [])
+  const acceptAttr = useMemo(() => '.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg', [])
+
+  const handleDownloadAll = () => {
+    const allOutputs = downloadableItems.flatMap(it => it.outputs ?? [])
+    if (allOutputs.length === 0) return
+    if (allOutputs.length === 1 && allOutputs[0]) {
+      downloadBlobFile(allOutputs[0])
+    } else {
+      downloadResultArchive(allOutputs, 'hamster-conversions.zip')
+    }
+  }
+
+  const handleRowDownload = (item: FileItem) => {
+    const outputs = item.outputs
+    if (!outputs || outputs.length === 0) return
+    if (outputs.length === 1 && outputs[0]) {
+      downloadBlobFile(outputs[0])
+    } else {
+      downloadResultArchive(outputs, replaceExtension(item.file.name, 'zip'))
+    }
+  }
 
   return (
     <div className="app">
@@ -171,9 +244,7 @@ function App() {
           <div className="panel__header">
             <h2>{t('upload.title')}</h2>
             <div className="format-row">
-              <label>
-                {t('formats.to')} <span className="format-target">HTML</span>
-              </label>
+              <label>{t('formats.to')}</label>
               <span className="supported">
                 {t('formats.supported')}: {SUPPORTED_FORMATS.join(', ')}
               </span>
@@ -181,6 +252,13 @@ function App() {
           </div>
 
           <FileDropzone accept={acceptAttr} onFiles={onFilesAdded} />
+
+          {rejectedFileNames.length > 0 && (
+            <div className="upload-feedback upload-feedback--error" role="alert">
+              <strong>{t('errors.unsupportedFormat', { formats: SUPPORTED_FORMAT_LIST })}</strong>
+              <span>{rejectedFileNames.join(', ')}</span>
+            </div>
+          )}
 
           {items.length > 0 && (
             <div className="table-wrap">
@@ -195,60 +273,70 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map(it => (
-                    <tr key={it.id}>
-                      <td>{it.file.name}</td>
-                      <td>{it.source}</td>
-                      <td>html</td>
-                      <td className={`status status--${it.status}`}>
-                        {t(`status.${it.status}` as const)}
-                        {it.status === 'failed' && it.errorMessage && (
-                          <div style={{ fontSize: '0.85em', marginTop: '0.25rem' }}>
-                            {it.errorMessage}
-                          </div>
-                        )}
-                        {it.warnings && it.warnings.length > 0 && (
-                          <div
-                            style={{
-                              fontSize: '0.85em',
-                              marginTop: '0.25rem',
-                              color: 'var(--color-primary-700)'
-                            }}
+                  {items.map(it => {
+                    const supportedTargets = getSupportedTargets(it.source)
+                    return (
+                      <tr key={it.id}>
+                        <td>{it.file.name}</td>
+                        <td>{it.source}</td>
+                        <td>
+                          <select
+                            className="file-table select"
+                            value={it.target}
+                            onChange={e => changeTarget(it.id, e.target.value as TargetFormat)}
+                            disabled={it.status === 'converting' || it.status === 'queued'}
                           >
-                            {it.warnings.map((w, idx) => (
-                              <div key={idx}>{w}</div>
+                            {supportedTargets.map(target => (
+                              <option key={target} value={target}>
+                                {t(`formats.targets.${target}`)}
+                              </option>
                             ))}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {it.status === 'done' ? (
-                          <button
-                            className="btn btn--ghost"
-                            onClick={() => {
-                              if (!it.html) return
-                              const htmlName = it.file.name.replace(/\.[^/.]+$/, '')
-                              downloadHtmlFile({
-                                name: `${htmlName}.html`,
-                                content: it.html
-                              })
-                            }}
-                            aria-label={t('actions.download')}
-                          >
-                            ↓
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn--ghost"
-                            onClick={() => removeItem(it.id)}
-                            aria-label={t('actions.remove')}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          </select>
+                        </td>
+                        <td className={`status status--${it.status}`}>
+                          {t(`status.${it.status}` as const)}
+                          {it.status === 'failed' && it.errorMessage && (
+                            <div className="status__detail status__detail--error">
+                              {it.errorMessage}
+                            </div>
+                          )}
+                          {it.warnings && it.warnings.length > 0 && (
+                            <div className="status__detail status__detail--warning">
+                              {it.warnings.map((warning, idx) => (
+                                <div key={idx}>
+                                  {typeof warning === 'string' ? warning : warning.message}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {it.status === 'done' && it.outputs && (
+                            <div className="status__detail status__detail--count">
+                              {t('output.count', { count: it.outputs.length })}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {it.status === 'done' ? (
+                            <button
+                              className="btn btn--ghost"
+                              onClick={() => handleRowDownload(it)}
+                              aria-label={t('actions.download')}
+                            >
+                              ↓
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn--ghost"
+                              onClick={() => removeItem(it.id)}
+                              aria-label={t('actions.remove')}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -259,7 +347,7 @@ function App() {
               {t('actions.addFiles')}
               <input
                 type="file"
-                style={{ display: 'none' }}
+                className="file-input--hidden"
                 multiple
                 accept={acceptAttr}
                 onChange={e => {
@@ -275,15 +363,7 @@ function App() {
             <button
               className="btn btn--ghost"
               disabled={!canDownloadArchive}
-              onClick={() =>
-                downloadHtmlArchive(
-                  downloadableItems.map(item => ({
-                    name: `${item.file.name.replace(/\.[^/.]+$/, '')}.html`,
-                    content: item.html ?? ''
-                  })),
-                  'hamster-html.html'
-                )
-              }
+              onClick={handleDownloadAll}
             >
               {t('actions.download')}
             </button>
