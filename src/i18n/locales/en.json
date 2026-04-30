@@ -53,6 +53,9 @@
     "conversionWarning": "Conversion completed with warnings",
     "parserFallback": "Used fallback parser; results may vary"
   },
+  "options": {
+    "ocr": "OCR"
+  },
   "output": {
     "count": "{{count}} outputs",
     "count_one": "1 output"

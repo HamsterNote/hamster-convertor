@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 const dropzoneFileInput = '.dropzone + input[type="file"]'
 
@@ -89,8 +90,44 @@ test.describe('converter app', () => {
 
     const values = await optionValues(targetSelectForRow(page, 'sample.pdf'))
 
+    expect(values).toContain('pdf')
     expect(values).toContain('txt')
     expect(values).toContain('image')
+  })
+
+  test('converts PDF to PDF with OCR and keeps completed target locked', async ({ page }) => {
+    await page.locator('.nav__select').selectOption('zh-CN')
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+
+    const targetSelect = targetSelectForRow(page, 'sample.pdf')
+    await targetSelect.selectOption('pdf')
+
+    const ocrCheckbox = page.getByRole('checkbox', { name: '是否进行 OCR' })
+    await expect(ocrCheckbox).toBeVisible()
+    await expect(ocrCheckbox).not.toBeChecked()
+
+    await ocrCheckbox.check()
+    await expect(ocrCheckbox).toBeChecked()
+
+    await page.getByRole('button', { name: '全部转换' }).click()
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow.locator('.status')).toHaveClass(/status--done/, { timeout: 15000 })
+    await expect(targetSelect).toBeDisabled()
+
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+    await expect(rowForFile(page, 'sample.pdf')).toHaveCount(2)
+  })
+
+  test('hides OCR option when PDF target changes to TXT', async ({ page }) => {
+    await page.locator('.nav__select').selectOption('zh-CN')
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+
+    await targetSelectForRow(page, 'sample.pdf').selectOption('pdf')
+    await expect(page.getByRole('checkbox', { name: '是否进行 OCR' })).toBeVisible()
+
+    await targetSelectForRow(page, 'sample.pdf').selectOption('txt')
+    await expect(page.getByRole('checkbox', { name: '是否进行 OCR' })).toBeHidden()
   })
 
   test('shows feedback when selected files are unsupported', async ({ page }) => {

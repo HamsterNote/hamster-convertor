@@ -53,6 +53,9 @@
     "conversionWarning": "轉換完成，但包含警告",
     "parserFallback": "使用了備用解析器；結果可能有所不同"
   },
+  "options": {
+    "ocr": "是否進行 OCR"
+  },
   "output": {
     "count": "{{count}} 個輸出",
     "count_one": "1 個輸出"

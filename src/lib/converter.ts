@@ -1,7 +1,7 @@
 import type { IntermediateDocument } from '@hamster-note/types'
-import { convertPdfToTxt, convertPdfToImage } from './converter/pdf-adapters'
-import { convertTxtToImage } from './converter/txt-adapter'
 import { convertImageToPdf, convertImageToTxt } from './converter/image-adapters'
+import { convertPdfToImage, convertPdfToPdf, convertPdfToTxt } from './converter/pdf-adapters'
+import { convertTxtToImage } from './converter/txt-adapter'
 
 export type ConversionWarning = string | { message: string }
 
@@ -29,6 +29,11 @@ export type ConversionRequest = {
   file: File
   source: SourceFormat
   target: TargetFormat
+  options?: {
+    pdf?: {
+      ocr: boolean
+    }
+  }
 }
 
 export class UnsupportedConversionError extends Error {
@@ -44,7 +49,7 @@ export class UnsupportedConversionError extends Error {
 }
 
 const supportedTargets = {
-  pdf: ['txt', 'image'],
+  pdf: ['txt', 'image', 'pdf'],
   txt: ['image'],
   image: ['pdf', 'txt']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
@@ -223,7 +228,8 @@ type ConversionAdapterMap = Record<SourceFormat, Partial<Record<TargetFormat, Co
 const adapters: ConversionAdapterMap = {
   pdf: {
     txt: convertPdfToTxt,
-    image: convertPdfToImage
+    image: convertPdfToImage,
+    pdf: convertPdfToPdf
   },
   txt: {
     image: convertTxtToImage

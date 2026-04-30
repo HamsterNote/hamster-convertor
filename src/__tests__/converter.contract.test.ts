@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const adapterMocks = vi.hoisted(() => ({
   convertPdfToTxt: vi.fn(),
   convertPdfToImage: vi.fn(),
+  convertPdfToPdf: vi.fn(),
   convertTxtToImage: vi.fn(),
   convertImageToPdf: vi.fn(),
   convertImageToTxt: vi.fn()
@@ -22,7 +23,8 @@ vi.mock('@hamster-note/html-parser', () => ({
 
 vi.mock('../lib/converter/pdf-adapters', () => ({
   convertPdfToTxt: adapterMocks.convertPdfToTxt,
-  convertPdfToImage: adapterMocks.convertPdfToImage
+  convertPdfToImage: adapterMocks.convertPdfToImage,
+  convertPdfToPdf: adapterMocks.convertPdfToPdf
 }))
 
 vi.mock('../lib/converter/txt-adapter', () => ({
@@ -32,6 +34,13 @@ vi.mock('../lib/converter/txt-adapter', () => ({
 vi.mock('../lib/converter/image-adapters', () => ({
   convertImageToPdf: adapterMocks.convertImageToPdf,
   convertImageToTxt: adapterMocks.convertImageToTxt
+}))
+
+vi.mock('@hamster-note/image-parser', () => ({
+  ImageParser: {
+    exts: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'],
+    encode: vi.fn().mockResolvedValue({ outline: undefined, text: 'mock ocr text' })
+  }
 }))
 
 import {
@@ -60,13 +69,27 @@ const makeResult = (
   targetFormat
 })
 
+type ConversionRequestWithOptions = ConversionRequest & {
+  options?: { pdf?: { ocr?: boolean } }
+}
+
+const createRequestWithOptions = (
+  overrides: Partial<ConversionRequestWithOptions>
+): ConversionRequestWithOptions => ({
+  file: new File(['sample'], 'sample.pdf', { type: 'application/pdf' }),
+  source: 'pdf',
+  target: 'html',
+  options: overrides.options,
+  ...overrides
+})
+
 describe('converter contract', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('exposes supported targets for each source format', () => {
-    expect(getSupportedTargets('pdf')).toEqual(['txt', 'image'])
+    expect(getSupportedTargets('pdf')).toContain('pdf')
     expect(getSupportedTargets('txt')).toEqual(['image'])
     expect(getSupportedTargets('image')).toEqual(['pdf', 'txt'])
   })
@@ -183,5 +206,65 @@ describe('converter contract', () => {
 
     expect(adapterMocks.convertImageToTxt).toHaveBeenCalledOnce()
     expect(results[0]).toMatchObject({ filename: 'sample-ocr.txt', targetFormat: 'txt' })
+  })
+
+  describe('pdf to pdf conversion', () => {
+    it('returns one application/pdf result for pdf to pdf conversion', async () => {
+      adapterMocks.convertPdfToPdf.mockResolvedValue([
+        makeResult('sample.pdf', 'application/pdf', 'pdf')
+      ])
+
+      const results = await convertFile(
+        createRequest({
+          file: new File(['sample'], 'sample.pdf', { type: 'application/pdf' }),
+          source: 'pdf',
+          target: 'pdf'
+        })
+      )
+
+      expect(adapterMocks.convertPdfToPdf).toHaveBeenCalledOnce()
+      expect(results).toHaveLength(1)
+      expect(results[0]).toMatchObject({
+        filename: 'sample.pdf',
+        mimeType: 'application/pdf',
+        targetFormat: 'pdf'
+      })
+    })
+
+    it('passes ocr option to convertPdfToPdf adapter', async () => {
+      adapterMocks.convertPdfToPdf.mockResolvedValue([
+        makeResult('sample.pdf', 'application/pdf', 'pdf')
+      ])
+
+      await convertFile(
+        createRequestWithOptions({
+          file: new File(['sample'], 'sample.pdf', { type: 'application/pdf' }),
+          source: 'pdf',
+          target: 'pdf',
+          options: { pdf: { ocr: false } }
+        }) as ConversionRequest
+      )
+
+      expect(adapterMocks.convertPdfToPdf).toHaveBeenCalledOnce()
+      expect(adapterMocks.convertPdfToPdf).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: { pdf: { ocr: false } }
+        })
+      )
+    })
+  })
+
+  describe('guard: txt to pdf throws UnsupportedConversionError', () => {
+    it('throws UnsupportedConversionError for txt to pdf', async () => {
+      await expect(
+        convertFile(
+          createRequest({
+            file: new File(['sample'], 'sample.txt', { type: 'text/plain' }),
+            source: 'txt',
+            target: 'pdf'
+          })
+        )
+      ).rejects.toBeInstanceOf(UnsupportedConversionError)
+    })
   })
 })

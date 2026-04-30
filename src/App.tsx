@@ -14,6 +14,12 @@ import {
 } from './lib/converter'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
 
+type ConversionOptions = {
+  pdf: {
+    ocr: boolean
+  }
+}
+
 type FileItem = {
   id: string
   file: File
@@ -23,6 +29,7 @@ type FileItem = {
   outputs?: ConversionResult[]
   warnings?: ConversionWarning[]
   errorMessage?: string
+  conversionOptions: ConversionOptions
 }
 
 const SUPPORTED_FORMATS = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
@@ -132,7 +139,8 @@ function App() {
         file,
         source,
         target: getSupportedTargets(source)[0] ?? 'txt',
-        status: 'ready'
+        status: 'ready',
+        conversionOptions: { pdf: { ocr: false } }
       })
     })
 
@@ -150,6 +158,12 @@ function App() {
 
   const changeTarget = (id: string, target: TargetFormat) => {
     setItems(prev => prev.map(it => (it.id === id ? { ...it, target } : it)))
+  }
+
+  const changeOcrOption = (id: string, ocr: boolean) => {
+    setItems(prev =>
+      prev.map(it => (it.id === id ? { ...it, conversionOptions: { pdf: { ocr } } } : it))
+    )
   }
 
   const markFailed = (id: string, errorMessage: string) => {
@@ -203,7 +217,8 @@ function App() {
         const results = await convertFile({
           file: current.file,
           source: current.source,
-          target: current.target
+          target: current.target,
+          options: current.conversionOptions
         })
         markDone(id, results)
       } catch (error) {
@@ -296,7 +311,11 @@ function App() {
                             className="file-table select"
                             value={it.target}
                             onChange={e => changeTarget(it.id, e.target.value as TargetFormat)}
-                            disabled={it.status === 'converting' || it.status === 'queued'}
+                            disabled={
+                              it.status === 'converting' ||
+                              it.status === 'queued' ||
+                              it.status === 'done'
+                            }
                           >
                             {supportedTargets.map(target => (
                               <option key={target} value={target}>
@@ -304,6 +323,21 @@ function App() {
                               </option>
                             ))}
                           </select>
+                          {it.source === 'pdf' && it.target === 'pdf' && (
+                            <label className="file-table ocr-label">
+                              <input
+                                type="checkbox"
+                                checked={it.conversionOptions.pdf.ocr}
+                                onChange={e => changeOcrOption(it.id, e.target.checked)}
+                                disabled={
+                                  it.status === 'queued' ||
+                                  it.status === 'converting' ||
+                                  it.status === 'done'
+                                }
+                              />
+                              {t('options.ocr')}
+                            </label>
+                          )}
                         </td>
                         <td className={`status status--${it.status}`}>
                           {t(`status.${it.status}` as const)}

@@ -40,6 +40,12 @@ type PdfJsModule = {
 
 type PdfParserModule = typeof import('@hamster-note/pdf-parser')
 
+type ImageParserModule = typeof import('@hamster-note/image-parser')
+
+type JsPdfModule = typeof import('jspdf')
+
+type JsPdfDocument = InstanceType<JsPdfModule['jsPDF']>
+
 type TextNode = {
   text?: unknown
   children?: TextNode[]
@@ -51,6 +57,15 @@ export class OcrRequiredError extends Error {
   constructor(filename: string) {
     super(`OCR is required to extract text from ${filename}`)
     this.name = 'OcrRequiredError'
+  }
+}
+
+export class EmptyOcrError extends Error {
+  readonly code = 'EMPTY_OCR'
+
+  constructor() {
+    super('OCR returned no text')
+    this.name = 'EmptyOcrError'
   }
 }
 
@@ -99,6 +114,11 @@ const collectText = (value: unknown): string[] => {
 
 const extractIntermediateText = (intermediateDocument: IntermediateDocument): string =>
   collectText(intermediateDocument).join('\n').trim()
+
+const extractOcrText = (intermediateDocument: IntermediateDocument | undefined): string => {
+  const text = intermediateDocument?.text
+  return typeof text === 'string' ? text.trim() : ''
+}
 
 const extractTextWithHamster = async (arrayBuffer: ArrayBuffer): Promise<string> => {
   const { PdfParser }: PdfParserModule = await import('@hamster-note/pdf-parser')
@@ -155,6 +175,19 @@ const renderPageToBlob = async (page: PdfPage): Promise<Blob> => {
   })
 }
 
+const convertRenderedPageToOcrText = async (
+  blob: Blob,
+  ImageParser: ImageParserModule['ImageParser']
+): Promise<string> => {
+  try {
+    const arrayBuffer = await blob.arrayBuffer()
+    const intermediateDocument = await ImageParser.encode(arrayBuffer)
+    return extractOcrText(intermediateDocument)
+  } catch {
+    return ''
+  }
+}
+
 export const convertPdfToTxt = async ({ file }: ConversionRequest): Promise<ConversionResult[]> => {
   const arrayBuffer = await readFileAsArrayBuffer(file)
   let text = ''
@@ -204,4 +237,114 @@ export const convertPdfToImage = async ({
       }
     })
   )
+}
+
+const copyPdfWithoutOcr = (file: File, arrayBuffer: ArrayBuffer): ConversionResult[] => {
+  const mimeType = 'application/pdf'
+  return [
+    {
+      blob: new Blob([arrayBuffer], { type: mimeType }),
+      filename: file.name,
+      mimeType,
+      targetFormat: 'pdf'
+    }
+  ]
+}
+
+const processOcrPage = async (
+  page: PdfPage,
+  doc: JsPdfDocument,
+  ImageParser: ImageParserModule['ImageParser'],
+  arrayBuffer: ArrayBuffer,
+  pageNumber: number
+): Promise<boolean> => {
+  const viewport = page.getViewport({ scale: 2 })
+
+  if (pageNumber > 1) {
+    doc.addPage(
+      [viewport.width, viewport.height],
+      viewport.width > viewport.height ? 'landscape' : 'portrait'
+    )
+  }
+
+  let blob: Blob | undefined
+  try {
+    blob = await renderPageToBlob(page)
+  } catch {
+    blob = undefined
+  }
+
+  const objectUrl = blob ? URL.createObjectURL(blob) : undefined
+
+  try {
+    const text = blob
+      ? await convertRenderedPageToOcrText(blob, ImageParser)
+      : await extractTextWithPdfJs(arrayBuffer.slice(0))
+
+    if (objectUrl) {
+      doc.addImage(objectUrl, 0, 0, viewport.width, viewport.height)
+    }
+
+    if (text) {
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(1)
+      doc.text(text, 16, 16)
+      return true
+    }
+  } finally {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }
+
+  return false
+}
+
+const createOcrPdf = async (file: File, arrayBuffer: ArrayBuffer): Promise<ConversionResult[]> => {
+  const [{ ImageParser }, { jsPDF }, pdfDocument] = await Promise.all([
+    import('@hamster-note/image-parser') as Promise<ImageParserModule>,
+    import('jspdf') as Promise<JsPdfModule>,
+    loadPdfDocument(arrayBuffer.slice(0))
+  ])
+
+  const firstPage = await pdfDocument.getPage(1)
+  const firstViewport = firstPage.getViewport({ scale: 2 })
+  const doc = new jsPDF({ unit: 'px', format: [firstViewport.width, firstViewport.height] })
+
+  let hasText = false
+
+  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+    const page = pageNumber === 1 ? firstPage : await pdfDocument.getPage(pageNumber)
+    const pageHadText = await processOcrPage(page, doc, ImageParser, arrayBuffer, pageNumber)
+    if (pageHadText) {
+      hasText = true
+    }
+  }
+
+  if (!hasText) {
+    throw new EmptyOcrError()
+  }
+
+  const mimeType = 'application/pdf'
+  return [
+    {
+      blob: doc.output('blob'),
+      filename: replaceExtension(file.name, 'pdf'),
+      mimeType,
+      targetFormat: 'pdf'
+    }
+  ]
+}
+
+export const convertPdfToPdf = async ({
+  file,
+  options
+}: ConversionRequest): Promise<ConversionResult[]> => {
+  const arrayBuffer = await readFileAsArrayBuffer(file)
+
+  if (!options?.pdf?.ocr) {
+    return copyPdfWithoutOcr(file, arrayBuffer)
+  }
+
+  return createOcrPdf(file, arrayBuffer)
 }
