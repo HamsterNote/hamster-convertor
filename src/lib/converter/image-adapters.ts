@@ -1,6 +1,8 @@
 import type { IntermediateDocument } from '@hamster-note/types'
 
 import type { ConversionRequest, ConversionResult } from '../converter'
+import { encodeCanvasToImage } from './image-encoding'
+import type { ConcreteImageTarget } from './image-encoding'
 
 type JsPdfModule = typeof import('jspdf')
 
@@ -62,6 +64,19 @@ const loadImageDimensions = async (url: string): Promise<ImageDimensions> =>
     })
     image.addEventListener('error', () => {
       reject(new Error('Failed to load image dimensions'))
+    })
+    image.src = url
+  })
+
+const loadImage = (url: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image()
+
+    image.addEventListener('load', () => {
+      resolve(image)
+    })
+    image.addEventListener('error', () => {
+      reject(new Error('Failed to load image'))
     })
     image.src = url
   })
@@ -129,4 +144,52 @@ export const convertImageToTxt = async ({
       targetFormat: 'txt'
     }
   ]
+}
+
+const isUnsupportedImageFormat = (filename: string): boolean => {
+  const lower = filename.toLowerCase()
+  return lower.endsWith('.svg') || lower.endsWith('.gif')
+}
+
+export const convertImageToImage = async ({
+  file,
+  target
+}: ConversionRequest): Promise<ConversionResult[]> => {
+  if (isUnsupportedImageFormat(file.name)) {
+    throw new Error('Unsupported image format for conversion: svg/gif')
+  }
+
+  const objectUrl = URL.createObjectURL(file)
+
+  try {
+    const image = await loadImage(objectUrl)
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      throw new Error('Failed to get 2d context')
+    }
+
+    ctx.drawImage(image, 0, 0)
+
+    const targetFormat = target as ConcreteImageTarget
+    if (!['png', 'jpg', 'webp'].includes(targetFormat)) {
+      throw new Error(`Unsupported image conversion target: ${targetFormat}`)
+    }
+    const { blob, mimeType } = await encodeCanvasToImage(canvas, targetFormat)
+    const extension = targetFormat
+
+    return [
+      {
+        blob,
+        filename: replaceExtension(file.name, extension),
+        mimeType,
+        targetFormat: targetFormat
+      }
+    ]
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }

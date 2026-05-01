@@ -94,7 +94,9 @@ test.describe('converter app', () => {
 
     expect(values).toContain('pdf')
     expect(values).toContain('txt')
-    expect(values).toContain('image')
+    expect(values).toContain('png')
+    expect(values).toContain('jpg')
+    expect(values).toContain('webp')
   })
 
   test('converts PDF to PDF with OCR and keeps completed target locked', async ({ page }) => {
@@ -155,15 +157,21 @@ test.describe('converter app', () => {
       .locator(dropzoneFileInput)
       .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
 
-    await expect(await optionValues(targetSelectForRow(page, 'notes.txt'))).toEqual(['image'])
+    await expect(await optionValues(targetSelectForRow(page, 'notes.txt'))).toEqual(['png'])
   })
 
-  test('shows PDF and TXT as image target options', async ({ page }) => {
+  test('shows PDF, TXT, PNG, JPG, and WEBP as image target options', async ({ page }) => {
     await page
       .locator(dropzoneFileInput)
       .setInputFiles(filePayload('photo.png', 'image/png', 'fake image'))
 
-    await expect(await optionValues(targetSelectForRow(page, 'photo.png'))).toEqual(['pdf', 'txt'])
+    await expect(await optionValues(targetSelectForRow(page, 'photo.png'))).toEqual([
+      'pdf',
+      'txt',
+      'png',
+      'jpg',
+      'webp'
+    ])
   })
 
   test('converts a single file to Done status', async ({ page }) => {
@@ -199,7 +207,7 @@ test.describe('converter app', () => {
 
   test('downloads PDF to image multi-output result as a row ZIP', async ({ page }) => {
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
-    await targetSelectForRow(page, 'sample.pdf').selectOption('image')
+    await targetSelectForRow(page, 'sample.pdf').selectOption('png')
 
     await page.getByRole('button', { name: 'Convert all' }).click()
 
@@ -212,11 +220,26 @@ test.describe('converter app', () => {
     await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
   })
 
+  test('converts image to WEBP and downloads', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('photo.png', 'image/png', 'fake image'))
+    await targetSelectForRow(page, 'photo.png').selectOption('webp')
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const imageRow = rowForFile(page, 'photo.png')
+    await expect(imageRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+
+    await imageRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['photo.webp'])
+  })
+
   test('selects PDF pages and converts to exact output count in zh-CN', async ({ page }) => {
     await page.locator('.nav__select').selectOption('zh-CN')
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
 
-    await targetSelectForRow(page, 'sample.pdf').selectOption('image')
+    await targetSelectForRow(page, 'sample.pdf').selectOption('png')
 
     await page.getByRole('button', { name: '选择页数' }).click()
     await expect(page.locator('.pdf-modal')).toBeVisible()
@@ -280,7 +303,7 @@ test.describe('converter app', () => {
 
   test('shows loading during row download of multi-output PDF→image', async ({ page }) => {
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
-    await targetSelectForRow(page, 'sample.pdf').selectOption('image')
+    await targetSelectForRow(page, 'sample.pdf').selectOption('png')
 
     await page.getByRole('button', { name: 'Convert all' }).click()
 

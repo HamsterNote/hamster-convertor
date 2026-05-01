@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 
-type PdfPageInfo = {
+type PageShell = {
   pageNumber: number
-  thumbnailUrl: string
+  thumbnailUrl: string | null
+  status: 'idle' | 'loading' | 'loaded' | 'failed'
 }
 
 type PdfPageSelectorModalProps = {
@@ -102,7 +103,7 @@ const renderPageThumbnail = async (
 const isE2E = (): boolean =>
   typeof window !== 'undefined' && (window as Window & { __E2E__?: boolean }).__E2E__ === true
 
-const createFakeE2EThumbnails = (): PdfPageInfo[] => {
+const createFakeE2EThumbnails = (): PageShell[] => {
   const colors = ['#f6a700', '#e09100']
   return [1, 2].map((pageNumber, index) => {
     const canvas = document.createElement('canvas')
@@ -117,8 +118,8 @@ const createFakeE2EThumbnails = (): PdfPageInfo[] => {
       ctx.textAlign = 'center'
       ctx.fillText(`Page ${pageNumber}`, canvas.width / 2, canvas.height / 2)
     }
-    const dataUrl = canvas.toDataURL('image/png')
-    return { pageNumber, thumbnailUrl: dataUrl }
+    const thumbnailUrl = canvas.toDataURL('image/png')
+    return { pageNumber, thumbnailUrl, status: 'loaded' as const }
   })
 }
 
@@ -130,12 +131,28 @@ export default function PdfPageSelectorModal({
   onConfirm
 }: PdfPageSelectorModalProps) {
   const { t } = useTranslation()
-  const [pages, setPages] = useState<PdfPageInfo[]>([])
+  const [pageShells, setPageShells] = useState<PageShell[]>([])
+  const [pdfDocument, setPdfDocument] = useState<{
+    numPages: number
+    getPage: (pageNumber: number) => Promise<{
+      getViewport: (options: { scale: number }) => { width: number; height: number }
+      render: (options: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => {
+        promise: Promise<void>
+      }
+    }>
+  } | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const objectUrlsRef = useRef<string[]>([])
   const isMountedRef = useRef(true)
+  const isOpenRef = useRef(open)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+
+  useEffect(() => {
+    isOpenRef.current = open
+  }, [open])
 
   const revokeObjectUrls = useCallback(() => {
     objectUrlsRef.current.forEach(url => {
@@ -154,63 +171,11 @@ export default function PdfPageSelectorModal({
     }
   }, [revokeObjectUrls])
 
-  const handleE2EThumbnails = async (signal: AbortSignal) => {
-    if (signal.aborted) {
-      return { loadedPages: [] as PdfPageInfo[], initialSelected: new Set<number>() }
-    }
-
-    const fakePages = createFakeE2EThumbnails()
-    const initialSelected = new Set(fakePages.map(p => p.pageNumber))
-    return { loadedPages: fakePages, initialSelected }
-  }
-
-  const handleRealPdfThumbnails = async (
-    signal: AbortSignal,
-    pdfFile: File,
-    preselected?: number[]
-  ) => {
-    const arrayBuffer = await readFileAsArrayBuffer(pdfFile)
-    if (signal.aborted) {
-      return { loadedPages: [] as PdfPageInfo[], initialSelected: new Set<number>() }
-    }
-
-    const pdfDocument = await loadPdfDocument(arrayBuffer)
-    const numPages = pdfDocument.numPages
-
-    const initialSelected =
-      preselected !== undefined && preselected.length > 0
-        ? new Set(preselected.filter(p => p >= 1 && p <= numPages))
-        : new Set(Array.from({ length: numPages }, (_, i) => i + 1))
-
-    if (signal.aborted) {
-      return { loadedPages: [] as PdfPageInfo[], initialSelected: new Set<number>() }
-    }
-
-    setSelected(initialSelected)
-
-    const loadedPages: PdfPageInfo[] = []
-
-    for (let pageNumber = 1; pageNumber <= numPages; pageNumber += 1) {
-      if (signal.aborted) {
-        loadedPages.forEach(p => {
-          if (p.thumbnailUrl.startsWith('blob:')) URL.revokeObjectURL(p.thumbnailUrl)
-        })
-        return { loadedPages: [] as PdfPageInfo[], initialSelected: new Set<number>() }
-      }
-
-      const page = await pdfDocument.getPage(pageNumber)
-      const thumbnailUrl = await renderPageThumbnail(page, 0.4)
-      loadedPages.push({ pageNumber, thumbnailUrl })
-      setPages([...loadedPages])
-    }
-
-    objectUrlsRef.current = loadedPages.map(p => p.thumbnailUrl)
-    return { loadedPages, initialSelected }
-  }
-
   useEffect(() => {
     if (!open) {
       revokeObjectUrls()
+      observerRef.current?.disconnect()
+      observerRef.current = null
       return
     }
 
@@ -220,33 +185,50 @@ export default function PdfPageSelectorModal({
     const loadPdfPages = async () => {
       setLoading(true)
       setError(null)
-      setPages([])
+      setPageShells([])
       setSelected(new Set())
+      setPdfDocument(null)
       revokeObjectUrls()
-
-      if (signal.aborted) return
+      observerRef.current?.disconnect()
+      observerRef.current = null
 
       try {
         if (isE2E()) {
-          const { loadedPages, initialSelected } = await handleE2EThumbnails(signal)
-          if (!signal.aborted) {
-            setPages(loadedPages)
-            setSelected(initialSelected)
-            setLoading(false)
-          }
+          const fakePages = createFakeE2EThumbnails()
+          const initialSelected = new Set(fakePages.map(p => p.pageNumber))
+          setPageShells(
+            fakePages.map(p => ({
+              pageNumber: p.pageNumber,
+              thumbnailUrl: p.thumbnailUrl,
+              status: 'loaded'
+            }))
+          )
+          setSelected(initialSelected)
+          setLoading(false)
           return
         }
 
-        const { loadedPages, initialSelected } = await handleRealPdfThumbnails(
-          signal,
-          file,
-          selectedPages
+        const arrayBuffer = await readFileAsArrayBuffer(file)
+        if (signal.aborted) return
+        const doc = await loadPdfDocument(arrayBuffer)
+        if (signal.aborted) return
+
+        const numPages = doc.numPages
+        const initialSelected =
+          selectedPages !== undefined && selectedPages.length > 0
+            ? new Set(selectedPages.filter(p => p >= 1 && p <= numPages))
+            : new Set(Array.from({ length: numPages }, (_, i) => i + 1))
+
+        setPdfDocument(doc)
+        setPageShells(
+          Array.from({ length: numPages }, (_, i) => ({
+            pageNumber: i + 1,
+            thumbnailUrl: null,
+            status: 'idle'
+          }))
         )
-        if (!signal.aborted) {
-          setPages(loadedPages)
-          setSelected(initialSelected)
-          setLoading(false)
-        }
+        setSelected(initialSelected)
+        setLoading(false)
       } catch {
         if (!signal.aborted) {
           setError(t('pdfPageSelector.loadError'))
@@ -259,8 +241,69 @@ export default function PdfPageSelectorModal({
 
     return () => {
       controller.abort()
+      observerRef.current?.disconnect()
+      observerRef.current = null
     }
   }, [open, file, selectedPages, revokeObjectUrls, t])
+
+  useEffect(() => {
+    if (!pdfDocument || pageShells.length === 0 || isE2E()) return
+
+    const grid = gridRef.current
+    if (!grid) return
+
+    const markLoading = (prev: PageShell[], pageNum: number): PageShell[] => {
+      const shell = prev.find(s => s.pageNumber === pageNum)
+      if (!shell || shell.status !== 'idle') return prev
+      return prev.map(s => (s.pageNumber === pageNum ? { ...s, status: 'loading' } : s))
+    }
+
+    const markLoaded = (prev: PageShell[], pageNum: number, url: string): PageShell[] =>
+      prev.map(s => (s.pageNumber === pageNum ? { ...s, thumbnailUrl: url, status: 'loaded' } : s))
+
+    const markFailed = (prev: PageShell[], pageNum: number): PageShell[] =>
+      prev.map(s => (s.pageNumber === pageNum ? { ...s, status: 'failed' } : s))
+
+    const renderThumbnailForPage = async (pageNumber: number): Promise<void> => {
+      if (!isMountedRef.current || !isOpenRef.current) return
+      setPageShells(prev => markLoading(prev, pageNumber))
+
+      try {
+        const page = await pdfDocument.getPage(pageNumber)
+        const thumbnailUrl = await renderPageThumbnail(page, 0.4)
+        if (!isMountedRef.current || !isOpenRef.current) {
+          if (thumbnailUrl.startsWith('blob:')) URL.revokeObjectURL(thumbnailUrl)
+          return
+        }
+        objectUrlsRef.current.push(thumbnailUrl)
+        setPageShells(prev => markLoaded(prev, pageNumber, thumbnailUrl))
+      } catch {
+        if (isMountedRef.current && isOpenRef.current) {
+          setPageShells(prev => markFailed(prev, pageNumber))
+        }
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return
+          const pageNumber = Number(entry.target.getAttribute('data-page-number'))
+          if (!pageNumber) return
+          void renderThumbnailForPage(pageNumber)
+        })
+      },
+      { root: grid, rootMargin: '100px' }
+    )
+
+    const cards = grid.querySelectorAll('[data-page-number]')
+    cards.forEach(card => observer.observe(card))
+    observerRef.current = observer
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [pdfDocument, pageShells.length, t])
 
   const togglePage = (pageNumber: number) => {
     setSelected(prev => {
@@ -275,7 +318,7 @@ export default function PdfPageSelectorModal({
   }
 
   const selectAll = () => {
-    setSelected(new Set(pages.map(p => p.pageNumber)))
+    setSelected(new Set(pageShells.map(s => s.pageNumber)))
   }
 
   const deselectAll = () => {
@@ -307,35 +350,41 @@ export default function PdfPageSelectorModal({
           </div>
         )}
 
-        {loading && pages.length === 0 && (
+        {loading && pageShells.length === 0 && (
           <div className="pdf-modal__loading">
             <span className="pdf-modal__spinner" aria-hidden />
             <span>{t('pdfPageSelector.loading')}</span>
           </div>
         )}
 
-        {!error && pages.length > 0 && (
+        {!error && pageShells.length > 0 && (
           <>
-            <div className="pdf-modal__grid">
-              {pages.map(({ pageNumber, thumbnailUrl }) => {
-                const isSelected = selected.has(pageNumber)
+            <div className="pdf-modal__grid" ref={gridRef}>
+              {pageShells.map(shell => {
+                const isSelected = selected.has(shell.pageNumber)
                 return (
                   <button
-                    key={pageNumber}
+                    key={shell.pageNumber}
                     type="button"
+                    data-page-number={shell.pageNumber}
                     className={`pdf-modal__card${isSelected ? ' pdf-modal__card--selected' : ''}`}
-                    onClick={() => togglePage(pageNumber)}
+                    onClick={() => togglePage(shell.pageNumber)}
                     aria-pressed={isSelected}
-                    aria-label={`${t('pdfPageSelector.page')} ${pageNumber}`}
+                    aria-label={`${t('pdfPageSelector.page')} ${shell.pageNumber}`}
                   >
-                    <img
-                      src={thumbnailUrl}
-                      alt={`${t('pdfPageSelector.page')} ${pageNumber}`}
-                      className="pdf-modal__thumbnail"
-                      loading="lazy"
-                    />
+                    {shell.thumbnailUrl ? (
+                      <img
+                        src={shell.thumbnailUrl}
+                        alt={`${t('pdfPageSelector.page')} ${shell.pageNumber}`}
+                        className="pdf-modal__thumbnail"
+                      />
+                    ) : (
+                      <div className="pdf-modal__thumbnail-placeholder">
+                        <span className="pdf-modal__spinner" aria-hidden />
+                      </div>
+                    )}
                     <span className="pdf-modal__page-number">
-                      {t('pdfPageSelector.page')} {pageNumber}
+                      {t('pdfPageSelector.page')} {shell.pageNumber}
                     </span>
                   </button>
                 )
@@ -347,7 +396,7 @@ export default function PdfPageSelectorModal({
                 type="button"
                 className="btn btn--ghost"
                 onClick={selectAll}
-                disabled={selected.size === pages.length}
+                disabled={selected.size === pageShells.length}
               >
                 {t('pdfPageSelector.selectAll')}
               </button>

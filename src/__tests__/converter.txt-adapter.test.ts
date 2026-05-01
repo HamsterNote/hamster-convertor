@@ -36,7 +36,7 @@ const createImageRequest = (
   return {
     file,
     source: 'txt',
-    target: 'image'
+    target: 'png'
   }
 }
 
@@ -96,7 +96,7 @@ describe('txt to image adapter', () => {
     expect(result).toMatchObject({
       filename: 'document.png',
       mimeType: 'image/png',
-      targetFormat: 'image'
+      targetFormat: 'png'
     })
     expect(mockCtx.fillText).toHaveBeenCalled()
   })
@@ -112,7 +112,7 @@ describe('txt to image adapter', () => {
     expect(result).toMatchObject({
       filename: 'document.png',
       mimeType: 'image/png',
-      targetFormat: 'image'
+      targetFormat: 'png'
     })
     expect(result.warnings).toContain('Used fallback text reader')
   })

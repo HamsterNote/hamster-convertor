@@ -177,11 +177,11 @@ function App() {
     setItems(prev =>
       prev.map(it => {
         if (it.id !== id) return it
-        const hadImageTarget = it.target === 'image'
+        const hadImageTarget = ['png', 'jpg', 'webp'].includes(it.target)
         const newItem = { ...it, target }
         if (
           hadImageTarget &&
-          target !== 'image' &&
+          !['png', 'jpg', 'webp'].includes(target) &&
           (it.status === 'done' || it.status === 'failed')
         ) {
           return {
@@ -269,7 +269,7 @@ function App() {
 
         if (
           current.source === 'pdf' &&
-          current.target === 'image' &&
+          ['png', 'jpg', 'webp'].includes(current.target) &&
           hasExplicitlyEmptySelectedPages(current)
         ) {
           markFailed(id, t('errors.noPagesSelected'))
@@ -386,6 +386,12 @@ function App() {
                 <tbody>
                   {items.map(it => {
                     const supportedTargets = getSupportedTargets(it.source)
+                    const targets = supportedTargets.filter(target => {
+                      if (it.source === 'image' && /\.(gif|svg)$/i.test(it.file.name)) {
+                        return !['png', 'jpg', 'webp'].includes(target)
+                      }
+                      return true
+                    })
                     return (
                       <tr key={it.id}>
                         <td>{it.file.name}</td>
@@ -402,7 +408,7 @@ function App() {
                               isPreparingDownload
                             }
                           >
-                            {supportedTargets.map(target => (
+                            {targets.map(target => (
                               <option key={target} value={target}>
                                 {t(`formats.targets.${target}`)}
                               </option>
@@ -424,25 +430,27 @@ function App() {
                               {t('options.ocr')}
                             </label>
                           )}
-                          {it.source === 'pdf' && it.target === 'image' && it.status !== 'done' && (
-                            <div>
-                              <button
-                                type="button"
-                                className="btn btn--ghost page-selector-btn"
-                                onClick={() => setActivePdfPageSelectorItemId(it.id)}
-                                disabled={isPreparingDownload}
-                              >
-                                {t('actions.selectPages')}
-                              </button>
-                              {it.conversionOptions.pdf.selectedImagePages !== undefined && (
-                                <div className="selected-pages-summary">
-                                  {t('options.pdfPages.selectedCount', {
-                                    count: it.conversionOptions.pdf.selectedImagePages.length
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          {it.source === 'pdf' &&
+                            (it.target === 'png' || it.target === 'jpg' || it.target === 'webp') &&
+                            it.status !== 'done' && (
+                              <div>
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost page-selector-btn"
+                                  onClick={() => setActivePdfPageSelectorItemId(it.id)}
+                                  disabled={isPreparingDownload}
+                                >
+                                  {t('actions.selectPages')}
+                                </button>
+                                {it.conversionOptions.pdf.selectedImagePages !== undefined && (
+                                  <div className="selected-pages-summary">
+                                    {t('options.pdfPages.selectedCount', {
+                                      count: it.conversionOptions.pdf.selectedImagePages.length
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                         </td>
                         <td className={`status status--${it.status}`}>
                           {t(`status.${it.status}` as const)}

@@ -1,6 +1,7 @@
 import type { IntermediateDocument } from '@hamster-note/types'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import type { ConversionRequest, ConversionResult } from '../converter'
+import { encodeCanvasToImage } from './image-encoding'
 
 type TextItem = {
   str: string
@@ -151,7 +152,7 @@ const extractTextWithPdfJs = async (arrayBuffer: ArrayBuffer): Promise<string> =
   return pages.join('\n').trim()
 }
 
-const renderPageToBlob = async (page: PdfPage): Promise<Blob> => {
+const renderPageToCanvas = async (page: PdfPage): Promise<HTMLCanvasElement> => {
   const viewport = page.getViewport({ scale: 2 })
   const canvas = document.createElement('canvas')
   canvas.width = Math.ceil(viewport.width)
@@ -164,15 +165,7 @@ const renderPageToBlob = async (page: PdfPage): Promise<Blob> => {
 
   await page.render({ canvasContext, viewport }).promise
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => {
-      if (blob) {
-        resolve(blob)
-        return
-      }
-      reject(new Error('Failed to render PDF page as PNG'))
-    }, 'image/png')
-  })
+  return canvas
 }
 
 const convertRenderedPageToOcrText = async (
@@ -219,6 +212,7 @@ export const convertPdfToTxt = async ({ file }: ConversionRequest): Promise<Conv
 
 export const convertPdfToImage = async ({
   file,
+  target,
   options
 }: ConversionRequest): Promise<ConversionResult[]> => {
   const arrayBuffer = await readFileAsArrayBuffer(file)
@@ -238,15 +232,25 @@ export const convertPdfToImage = async ({
     }
   }
 
+  const effectiveTarget = target ?? 'png'
+
+  if (!['png', 'jpg', 'webp'].includes(effectiveTarget)) {
+    throw new Error(`Unsupported PDF image target: ${effectiveTarget}`)
+  }
+
   return Promise.all(
     pageNumbers.map(async pageNumber => {
       const page = await pdfDocument.getPage(pageNumber)
-      const blob = await renderPageToBlob(page)
+      const canvas = await renderPageToCanvas(page)
+      const { blob, extension, mimeType } = await encodeCanvasToImage(
+        canvas,
+        effectiveTarget as import('./image-encoding').ConcreteImageTarget
+      )
       return {
         blob,
-        filename: `${baseName}-page-${String(pageNumber).padStart(3, '0')}.png`,
-        mimeType: 'image/png',
-        targetFormat: 'image'
+        filename: `${baseName}-page-${String(pageNumber).padStart(3, '0')}${extension}`,
+        mimeType,
+        targetFormat: effectiveTarget
       }
     })
   )
@@ -282,7 +286,8 @@ const processOcrPage = async (
 
   let blob: Blob | undefined
   try {
-    blob = await renderPageToBlob(page)
+    const canvas = await renderPageToCanvas(page)
+    ;({ blob } = await encodeCanvasToImage(canvas, 'png'))
   } catch {
     blob = undefined
   }

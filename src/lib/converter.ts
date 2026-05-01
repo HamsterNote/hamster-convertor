@@ -1,5 +1,9 @@
 import type { IntermediateDocument } from '@hamster-note/types'
-import { convertImageToPdf, convertImageToTxt } from './converter/image-adapters'
+import {
+  convertImageToImage,
+  convertImageToPdf,
+  convertImageToTxt
+} from './converter/image-adapters'
 import { convertPdfToImage, convertPdfToPdf, convertPdfToTxt } from './converter/pdf-adapters'
 import { convertTxtToImage } from './converter/txt-adapter'
 
@@ -14,7 +18,7 @@ export type ConvertPdfToHtml = (input: Uint8Array) => Promise<PdfToHtmlResult>
 
 export type SourceFormat = 'pdf' | 'txt' | 'image'
 
-export type TargetFormat = 'html' | 'txt' | 'image' | 'pdf'
+export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
 export type ConversionResult = {
   blob: Blob
@@ -50,9 +54,9 @@ export class UnsupportedConversionError extends Error {
 }
 
 const supportedTargets = {
-  pdf: ['txt', 'image', 'pdf'],
-  txt: ['image'],
-  image: ['pdf', 'txt']
+  pdf: ['txt', 'png', 'jpg', 'webp', 'pdf'],
+  txt: ['png'],
+  image: ['pdf', 'txt', 'png', 'jpg', 'webp']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
 
 export const getSupportedTargets = (source: SourceFormat): TargetFormat[] => [
@@ -198,14 +202,35 @@ const createE2EResult = async (request: ConversionRequest): Promise<ConversionRe
     return convertPdfFileToHtml(request.file)
   }
 
-  if (request.source === 'pdf' && request.target === 'image') {
+  if (
+    request.source === 'pdf' &&
+    (request.target === 'png' || request.target === 'jpg' || request.target === 'webp')
+  ) {
     const selected = request.options?.pdf?.selectedImagePages ?? [1, 2]
+    const ext = request.target
+    const mimeType = `image/${request.target === 'jpg' ? 'jpeg' : request.target}`
     return selected.map(pageNumber => ({
-      blob: new Blob([`fake image ${pageNumber}`], { type: 'image/png' }),
-      filename: `fake-page-${String(pageNumber).padStart(3, '0')}.png`,
-      mimeType: 'image/png',
-      targetFormat: 'image'
+      blob: new Blob([`fake ${request.target} ${pageNumber}`], { type: mimeType }),
+      filename: `fake-page-${String(pageNumber).padStart(3, '0')}.${ext}`,
+      mimeType,
+      targetFormat: request.target
     }))
+  }
+
+  if (
+    request.source === 'image' &&
+    (request.target === 'png' || request.target === 'jpg' || request.target === 'webp')
+  ) {
+    const ext = request.target
+    const mimeType = `image/${request.target === 'jpg' ? 'jpeg' : request.target}`
+    return [
+      {
+        blob: new Blob([`fake ${request.target}`], { type: mimeType }),
+        filename: replaceExtension(request.file.name, ext),
+        mimeType,
+        targetFormat: request.target
+      }
+    ]
   }
 
   const fakeResults: Record<Exclude<TargetFormat, 'html'>, ConversionResult> = {
@@ -215,11 +240,23 @@ const createE2EResult = async (request: ConversionRequest): Promise<ConversionRe
       mimeType: 'text/plain',
       targetFormat: 'txt'
     },
-    image: {
-      blob: new Blob(['fake image'], { type: 'image/png' }),
+    png: {
+      blob: new Blob(['fake png'], { type: 'image/png' }),
       filename: 'fake.png',
       mimeType: 'image/png',
-      targetFormat: 'image'
+      targetFormat: 'png'
+    },
+    jpg: {
+      blob: new Blob(['fake jpg'], { type: 'image/jpeg' }),
+      filename: 'fake.jpg',
+      mimeType: 'image/jpeg',
+      targetFormat: 'jpg'
+    },
+    webp: {
+      blob: new Blob(['fake webp'], { type: 'image/webp' }),
+      filename: 'fake.webp',
+      mimeType: 'image/webp',
+      targetFormat: 'webp'
     },
     pdf: {
       blob: new Blob(['fake pdf'], { type: 'application/pdf' }),
@@ -238,15 +275,20 @@ type ConversionAdapterMap = Record<SourceFormat, Partial<Record<TargetFormat, Co
 const adapters: ConversionAdapterMap = {
   pdf: {
     txt: convertPdfToTxt,
-    image: convertPdfToImage,
+    png: convertPdfToImage,
+    jpg: convertPdfToImage,
+    webp: convertPdfToImage,
     pdf: convertPdfToPdf
   },
   txt: {
-    image: convertTxtToImage
+    png: convertTxtToImage
   },
   image: {
     pdf: convertImageToPdf,
-    txt: convertImageToTxt
+    txt: convertImageToTxt,
+    png: convertImageToImage,
+    jpg: convertImageToImage,
+    webp: convertImageToImage
   }
 }
 

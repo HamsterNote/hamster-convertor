@@ -516,6 +516,14 @@ a {
   object-fit: contain;
 }
 
+.pdf-modal__thumbnail-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  background: #f5f5f5;
+}
+
 .pdf-modal__page-number {
   font-size: 13px;
   color: var(--color-muted);

@@ -8,9 +8,9 @@ vi.mock('../lib/converter', () => ({
   convertFile: vi.fn(),
   getSupportedTargets: vi.fn((source: string) => {
     const targets: Record<string, string[]> = {
-      pdf: ['pdf', 'txt', 'image'],
-      txt: ['image'],
-      image: ['pdf', 'txt']
+      pdf: ['pdf', 'txt', 'png', 'jpg', 'webp'],
+      txt: ['png'],
+      image: ['pdf', 'txt', 'png', 'jpg', 'webp']
     }
     return targets[source] ?? ['txt']
   })
@@ -395,6 +395,37 @@ describe('app upload feedback', () => {
     })
   })
 
+  it('hides PNG/JPG/WEBP targets for GIF and SVG image files', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    // Upload GIF
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['gif'], 'animated.gif', { type: 'image/gif' })] }
+    })
+    await screen.findByRole('row', { name: /animated\.gif/ })
+    const gifSelect = getFileTargetSelects()[0]
+    const gifOptions = Array.from(gifSelect.querySelectorAll('option')).map(o => o.value)
+    expect(gifOptions).not.toContain('png')
+    expect(gifOptions).not.toContain('jpg')
+    expect(gifOptions).not.toContain('webp')
+    expect(gifOptions).toContain('pdf')
+    expect(gifOptions).toContain('txt')
+
+    // Upload SVG
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['svg'], 'icon.svg', { type: 'image/svg+xml' })] }
+    })
+    await screen.findByRole('row', { name: /icon\.svg/ })
+    const svgSelect = getFileTargetSelects()[1]
+    const svgOptions = Array.from(svgSelect.querySelectorAll('option')).map(o => o.value)
+    expect(svgOptions).not.toContain('png')
+    expect(svgOptions).not.toContain('jpg')
+    expect(svgOptions).not.toContain('webp')
+    expect(svgOptions).toContain('pdf')
+    expect(svgOptions).toContain('txt')
+  })
+
   it('shows page-select button for PDF source with image target only', async () => {
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -406,7 +437,13 @@ describe('app upload feedback', () => {
     expect(screen.queryByRole('button', { name: 'Select pages' })).not.toBeInTheDocument()
 
     const tableSelects = getFileTargetSelects()
-    fireEvent.change(tableSelects[0], { target: { value: 'image' } })
+    fireEvent.change(tableSelects[0], { target: { value: 'png' } })
+    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
+
+    fireEvent.change(tableSelects[0], { target: { value: 'jpg' } })
+    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
+
+    fireEvent.change(tableSelects[0], { target: { value: 'webp' } })
     expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
 
     fireEvent.change(tableSelects[0], { target: { value: 'txt' } })
@@ -429,7 +466,7 @@ describe('app upload feedback', () => {
         blob: new Blob(['fake'], { type: 'image/png' }),
         filename: 'page-001.png',
         mimeType: 'image/png',
-        targetFormat: 'image'
+        targetFormat: 'png'
       }
     ])
 
@@ -440,7 +477,7 @@ describe('app upload feedback', () => {
     })
 
     await screen.findByRole('row', { name: /sample\.pdf/ })
-    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'image' } })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'png' } })
     fireEvent.click(screen.getByRole('button', { name: 'Select pages' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm test pages' }))
 
@@ -452,7 +489,7 @@ describe('app upload feedback', () => {
       expect(convertFile).toHaveBeenCalledWith(
         expect.objectContaining({
           source: 'pdf',
-          target: 'image',
+          target: 'png',
           options: expect.objectContaining({
             pdf: expect.objectContaining({ selectedImagePages: [1, 3] })
           })

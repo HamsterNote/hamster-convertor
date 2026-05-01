@@ -16,7 +16,9 @@
     "supported": "支持的格式",
     "targets": {
       "txt": "TXT",
-      "image": "图片",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
       "pdf": "PDF"
     }
   },

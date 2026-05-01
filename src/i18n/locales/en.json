@@ -16,7 +16,9 @@
     "supported": "Supported formats",
     "targets": {
       "txt": "TXT",
-      "image": "Image",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
       "pdf": "PDF"
     }
   },

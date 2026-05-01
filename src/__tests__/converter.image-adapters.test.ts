@@ -17,6 +17,7 @@ vi.mock('@hamster-note/image-parser', () => ({
 }))
 
 import {
+  convertImageToImage,
   convertImageToPdf,
   convertImageToTxt,
   EmptyOcrError
@@ -57,6 +58,7 @@ describe('image conversion adapters', () => {
   const originalCreateObjectUrl = URL.createObjectURL
   const originalRevokeObjectUrl = URL.revokeObjectURL
   const OriginalImage = globalThis.Image
+  const originalCreateElement = document.createElement.bind(document)
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -129,5 +131,123 @@ describe('image conversion adapters', () => {
     await expect(
       convertImageToTxt({ ...createImageRequest(), target: 'txt' })
     ).rejects.toBeInstanceOf(EmptyOcrError)
+  })
+
+  describe('convertImageToImage', () => {
+    const mockCanvas = {
+      width: 320,
+      height: 240,
+      getContext: vi.fn(() => ({
+        drawImage: vi.fn(),
+        fillRect: vi.fn()
+      })),
+      toBlob: vi.fn()
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks()
+      document.createElement = vi.fn((tag: string) => {
+        if (tag === 'canvas') {
+          return mockCanvas as unknown as HTMLCanvasElement
+        }
+        return originalCreateElement(tag)
+      })
+    })
+
+    afterEach(() => {
+      document.createElement = originalCreateElement
+    })
+
+    const setupCanvasToBlobMock = (blob: Blob) => {
+      mockCanvas.toBlob.mockImplementation((callback, _mimeType, _quality) => {
+        callback(blob)
+      })
+    }
+
+    it('converts PNG to WEBP', async () => {
+      const webpBlob = new Blob(['webp'], { type: 'image/webp' })
+      setupCanvasToBlobMock(webpBlob)
+
+      const request: ConversionRequest = {
+        file: new File(['png'], 'photo.png', { type: 'image/png' }),
+        source: 'image',
+        target: 'webp'
+      }
+
+      const [result] = await convertImageToImage(request)
+
+      expect(result).toMatchObject({
+        filename: 'photo.webp',
+        mimeType: 'image/webp',
+        targetFormat: 'webp'
+      })
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image-url')
+    })
+
+    it('converts JPG to PNG', async () => {
+      const pngBlob = new Blob(['png'], { type: 'image/png' })
+      setupCanvasToBlobMock(pngBlob)
+
+      const request: ConversionRequest = {
+        file: new File(['jpg'], 'photo.jpg', { type: 'image/jpeg' }),
+        source: 'image',
+        target: 'png'
+      }
+
+      const [result] = await convertImageToImage(request)
+
+      expect(result).toMatchObject({
+        filename: 'photo.png',
+        mimeType: 'image/png',
+        targetFormat: 'png'
+      })
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image-url')
+    })
+
+    it('converts WEBP to JPG', async () => {
+      const jpgBlob = new Blob(['jpg'], { type: 'image/jpeg' })
+      setupCanvasToBlobMock(jpgBlob)
+
+      const request: ConversionRequest = {
+        file: new File(['webp'], 'photo.webp', { type: 'image/webp' }),
+        source: 'image',
+        target: 'jpg'
+      }
+
+      const [result] = await convertImageToImage(request)
+
+      expect(result).toMatchObject({
+        filename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        targetFormat: 'jpg'
+      })
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image-url')
+    })
+
+    it('rejects GIF input with clear error', async () => {
+      const request: ConversionRequest = {
+        file: new File(['gif'], 'animation.gif', { type: 'image/gif' }),
+        source: 'image',
+        target: 'png'
+      }
+
+      await expect(convertImageToImage(request)).rejects.toThrow(
+        'Unsupported image format for conversion: svg/gif'
+      )
+      // URL is never created for unsupported formats, so no revocation needed
+    })
+
+    it('rejects SVG input with clear error', async () => {
+      const request: ConversionRequest = {
+        file: new File(['svg'], 'vector.svg', { type: 'image/svg+xml' }),
+        source: 'image',
+        target: 'png'
+      }
+
+      await expect(convertImageToImage(request)).rejects.toThrow(
+        'Unsupported image format for conversion: svg/gif'
+      )
+      // URL is never created for unsupported formats, so no revocation needed
+    })
   })
 })

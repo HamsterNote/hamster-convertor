@@ -114,7 +114,7 @@ export const convertTxtToImage = async (
       blob,
       filename: `${baseName}.png`,
       mimeType: 'image/png',
-      targetFormat: 'image',
+      targetFormat: 'png',
       warnings: warnings.length > 0 ? warnings : undefined
     }
   ]

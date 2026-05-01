@@ -82,11 +82,20 @@ describe('PDF conversion adapters', () => {
     vi.clearAllMocks()
     pdfJsMocks.GlobalWorkerOptions.workerSrc = ''
     HTMLCanvasElement.prototype.getContext = vi.fn((contextId: string) =>
-      contextId === '2d' ? ({} as CanvasRenderingContext2D) : null
+      contextId === '2d'
+        ? ({
+            fillStyle: '',
+            fillRect: vi.fn(),
+            drawImage: vi.fn()
+          } as unknown as CanvasRenderingContext2D)
+        : null
     ) as HTMLCanvasElement['getContext']
-    HTMLCanvasElement.prototype.toBlob = vi.fn(callback => {
-      callback(new Blob(['png'], { type: 'image/png' }))
-    }) as HTMLCanvasElement['toBlob']
+    HTMLCanvasElement.prototype.toBlob = vi.fn(
+      (callback: BlobCallback, mimeType?: string, _quality?: number) => {
+        const type = mimeType ?? 'image/png'
+        callback(new Blob(['mock'], { type }))
+      }
+    ) as HTMLCanvasElement['toBlob']
   })
 
   it('converts PDF to TXT using Hamster intermediate text', async () => {
@@ -116,7 +125,7 @@ describe('PDF conversion adapters', () => {
     const pages = [createMockPage(), createMockPage()]
     mockPdfDocument(pages)
 
-    const results = await convertPdfToImage({ ...createRequest('report.pdf'), target: 'image' })
+    const results = await convertPdfToImage({ ...createRequest('report.pdf'), target: 'png' })
 
     expect(pdfJsMocks.GlobalWorkerOptions.workerSrc).toContain('pdf.worker.mjs')
     expect(pdfJsMocks.getDocument).toHaveBeenCalledOnce()
@@ -128,7 +137,7 @@ describe('PDF conversion adapters', () => {
       'report-page-002.png'
     ])
     expect(results.map(result => result.mimeType)).toEqual(['image/png', 'image/png'])
-    expect(results.map(result => result.targetFormat)).toEqual(['image', 'image'])
+    expect(results.map(result => result.targetFormat)).toEqual(['png', 'png'])
   })
 
   it('throws a typed OCR-required error for scanned PDFs without text', async () => {
@@ -150,7 +159,7 @@ describe('PDF conversion adapters', () => {
 
     const results = await convertPdfToImage({
       ...createRequest('report.pdf'),
-      target: 'image',
+      target: 'png',
       options: { pdf: { ocr: false, selectedImagePages: [2] } }
     })
 
@@ -167,7 +176,7 @@ describe('PDF conversion adapters', () => {
 
     const results = await convertPdfToImage({
       ...createRequest('report.pdf'),
-      target: 'image',
+      target: 'png',
       options: { pdf: { ocr: false, selectedImagePages: [3, 1, 2, 2, 1] } }
     })
 
@@ -186,7 +195,7 @@ describe('PDF conversion adapters', () => {
     await expect(
       convertPdfToImage({
         ...createRequest('report.pdf'),
-        target: 'image',
+        target: 'png',
         options: { pdf: { ocr: false, selectedImagePages: [5, 10] } }
       })
     ).rejects.toThrow('No pages selected')
@@ -198,10 +207,34 @@ describe('PDF conversion adapters', () => {
 
     const results = await convertPdfToImage({
       ...createRequest('report.pdf'),
-      target: 'image'
+      target: 'png'
     })
 
     expect(results).toHaveLength(2)
     expect(results.map(r => r.filename)).toEqual(['report-page-001.png', 'report-page-002.png'])
+  })
+
+  it('converts PDF pages to JPG with correct mime type and filename', async () => {
+    const pages = [createMockPage()]
+    mockPdfDocument(pages)
+
+    const results = await convertPdfToImage({ ...createRequest('report.pdf'), target: 'jpg' })
+
+    expect(results).toHaveLength(1)
+    expect(results[0].filename).toBe('report-page-001.jpg')
+    expect(results[0].mimeType).toBe('image/jpeg')
+    expect(results[0].targetFormat).toBe('jpg')
+  })
+
+  it('converts PDF pages to WEBP with correct mime type and filename', async () => {
+    const pages = [createMockPage()]
+    mockPdfDocument(pages)
+
+    const results = await convertPdfToImage({ ...createRequest('report.pdf'), target: 'webp' })
+
+    expect(results).toHaveLength(1)
+    expect(results[0].filename).toBe('report-page-001.webp')
+    expect(results[0].mimeType).toBe('image/webp')
+    expect(results[0].targetFormat).toBe('webp')
   })
 })

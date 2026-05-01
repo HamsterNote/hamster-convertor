@@ -6,7 +6,8 @@ const adapterMocks = vi.hoisted(() => ({
   convertPdfToPdf: vi.fn(),
   convertTxtToImage: vi.fn(),
   convertImageToPdf: vi.fn(),
-  convertImageToTxt: vi.fn()
+  convertImageToTxt: vi.fn(),
+  convertImageToImage: vi.fn()
 }))
 
 vi.mock('@hamster-note/pdf-parser', () => ({
@@ -33,7 +34,8 @@ vi.mock('../lib/converter/txt-adapter', () => ({
 
 vi.mock('../lib/converter/image-adapters', () => ({
   convertImageToPdf: adapterMocks.convertImageToPdf,
-  convertImageToTxt: adapterMocks.convertImageToTxt
+  convertImageToTxt: adapterMocks.convertImageToTxt,
+  convertImageToImage: adapterMocks.convertImageToImage
 }))
 
 vi.mock('@hamster-note/image-parser', () => ({
@@ -90,8 +92,8 @@ describe('converter contract', () => {
 
   it('exposes supported targets for each source format', () => {
     expect(getSupportedTargets('pdf')).toContain('pdf')
-    expect(getSupportedTargets('txt')).toEqual(['image'])
-    expect(getSupportedTargets('image')).toEqual(['pdf', 'txt'])
+    expect(getSupportedTargets('txt')).toEqual(['png'])
+    expect(getSupportedTargets('image')).toEqual(['pdf', 'txt', 'png', 'jpg', 'webp'])
   })
 
   it('rejects unsupported conversion pairs with typed errors', async () => {
@@ -146,27 +148,25 @@ describe('converter contract', () => {
     expect(results[0]).toMatchObject({ filename: 'sample.txt', targetFormat: 'txt' })
   })
 
-  it('routes PDF to IMAGE through the PDF image adapter', async () => {
+  it('routes PDF to PNG through the PDF image adapter', async () => {
     adapterMocks.convertPdfToImage.mockResolvedValue([
-      makeResult('sample-page-001.png', 'image/png', 'image')
+      makeResult('sample-page-001.png', 'image/png', 'png')
     ])
 
-    const results = await convertFile(createRequest({ target: 'image' }))
+    const results = await convertFile(createRequest({ target: 'png' }))
 
     expect(adapterMocks.convertPdfToImage).toHaveBeenCalledOnce()
-    expect(results[0]).toMatchObject({ filename: 'sample-page-001.png', targetFormat: 'image' })
+    expect(results[0]).toMatchObject({ filename: 'sample-page-001.png', targetFormat: 'png' })
   })
 
-  it('routes TXT to IMAGE through the TXT image adapter', async () => {
-    adapterMocks.convertTxtToImage.mockResolvedValue([
-      makeResult('sample.png', 'image/png', 'image')
-    ])
+  it('routes TXT to PNG through the TXT image adapter', async () => {
+    adapterMocks.convertTxtToImage.mockResolvedValue([makeResult('sample.png', 'image/png', 'png')])
 
     const results = await convertFile(
       createRequest({
         file: new File(['sample'], 'sample.txt', { type: 'text/plain' }),
         source: 'txt',
-        target: 'image'
+        target: 'png'
       })
     )
 
