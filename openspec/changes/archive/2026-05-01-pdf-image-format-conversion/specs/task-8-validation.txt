@@ -1,0 +1,25 @@
+Task 8 Validation Evidence (Updated)
+Generated: 2026-05-01T12:42:00Z
+
+## yarn lint
+Status: PASS
+Output: eslint . --max-warnings=0 (0 errors, 0 warnings)
+
+## yarn test:run
+Status: PASS
+Output: 11 test files passed, 77 tests passed
+
+## yarn build
+Status: PASS
+Output: tsc -b && vite build (built in 9.05s)
+
+## yarn test:e2e
+Status: CANNOT RUN (environment limitation)
+Reason: Playwright chromium browser not installable on ubuntu26.04-x64 platform
+Note: E2E test code is syntactically correct and was reviewed manually.
+
+## Fixes Applied After Initial Review
+1. Blob URL leak in PdfPageSelectorModal.tsx: Added isMountedRef checks in IntersectionObserver callback and revoked URLs if component unmounted during render
+2. Runtime target validation: Added guards in pdf-adapters.ts and image-adapters.ts to reject unsupported targets before encoding
+3. Cognitive complexity: Extracted renderThumbnailForPage from IntersectionObserver callback
+4. TypeScript casts: Fixed unsafe type casts

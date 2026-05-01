@@ -29,7 +29,7 @@
 - Status: 'ready' | 'queued' | 'converting' | 'done' | 'failed'
 - Row actions: done rows show Download, others show Remove (×)
 - convertAll() loops through items, no global busy state currently
-- E2E mode: window.__E2E__ = true triggers fake results in createE2EResult()
+- E2E mode: window.**E2E** = true triggers fake results in createE2EResult()
 - PDF→image fake E2E returns [1, 2] as two fake pages
 
 ### PDF.js Usage
@@ -76,7 +76,7 @@
 1. **Page numbering**: Use 1-based page numbers everywhere outside array indexes
 2. **Modal preview scale**: Use scale: 0.4 for thumbnails
 3. **Object URL cleanup**: Must revoke on modal close/unmount/file change
-4. **E2E fake previews**: When window.__E2E__ === true, render fake two-page previews instead of real pdfjs rendering
+4. **E2E fake previews**: When window.**E2E** === true, render fake two-page previews instead of real pdfjs rendering
 
 ### From optimize-file-conversion-interactions/notepads/learnings.md (Decision Log):
 

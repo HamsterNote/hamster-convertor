@@ -1,0 +1,61 @@
+{
+  "active_plan": "/home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/.sisyphus/plans/pdf-image-format-conversion.md",
+  "started_at": "2026-05-01T02:25:42.364Z",
+  "session_ids": [
+    "ses_21ea4d244ffemJ2yqGpav39adc",
+    "ses_21e5c94f5ffeBUc68V7k1dJa5T"
+  ],
+  "session_origins": {
+    "ses_21ea4d244ffemJ2yqGpav39adc": "direct",
+    "ses_21e5c94f5ffeBUc68V7k1dJa5T": "direct"
+  },
+  "plan_name": "pdf-image-format-conversion",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Replace Generic Image Target With Concrete Image Targets",
+      "session_id": "ses_21ea35b2affekBLQ3kOcXrhW2b",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-05-01T02:34:12.807Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Generalize PDF to PNG/JPG/WEBP Conversion",
+      "session_id": "ses_21e84ca8fffekinnh6lYhAi8PS",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-05-01T03:04:07.548Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Rework PDF Page Selector Modal to Skeleton-First Lazy Rendering",
+      "session_id": "ses_21e39e9feffey33vU8B3sqPH1C",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-05-01T04:29:03.282Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Update Unit and E2E Test Coverage",
+      "session_id": "ses_21e323571ffe7n53Ttsq8tDI05",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-05-01T04:33:19.310Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_21e080f51ffe8I9AXDIoSkIdZ3",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-05-01T05:19:00.566Z"
+    }
+  }
+}
