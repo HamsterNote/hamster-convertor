@@ -1,0 +1,309 @@
+yarn run v1.22.22
+$ /home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/.bin/playwright test e2e/app.spec.ts --project=chromium
+
+
+
+Running 20 tests using 6 workers
+
+[1A[2K[1/20] [chromium] › e2e/app.spec.ts:78:3 › converter app › shows PDF target options for text and images
+[1A[2K[2/20] [chromium] › e2e/app.spec.ts:114:3 › converter app › hides OCR option when PDF target changes to TXT
+[1A[2K  1) [chromium] › e2e/app.spec.ts:78:3 › converter app › shows PDF target options for text and images 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[3/20] [chromium] › e2e/app.spec.ts:128:3 › converter app › shows feedback when selected files are unsupported
+[1A[2K[4/20] [chromium] › e2e/app.spec.ts:89:3 › converter app › converts PDF to PDF with OCR and keeps completed target locked
+[1A[2K[5/20] [chromium] › e2e/app.spec.ts:45:3 › converter app › uploads files, converts all, and downloads row and global results
+[1A[2K  2) [chromium] › e2e/app.spec.ts:114:3 › converter app › hides OCR option when PDF target changes to TXT 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[6/20] [chromium] › e2e/app.spec.ts:140:3 › converter app › shows only image as TXT target option
+[1A[2K  3) [chromium] › e2e/app.spec.ts:89:3 › converter app › converts PDF to PDF with OCR and keeps completed target locked 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  4) [chromium] › e2e/app.spec.ts:128:3 › converter app › shows feedback when selected files are unsupported 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  5) [chromium] › e2e/app.spec.ts:45:3 › converter app › uploads files, converts all, and downloads row and global results 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  6) [chromium] › e2e/app.spec.ts:140:3 › converter app › shows only image as TXT target option ────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[7/20] [chromium] › e2e/app.spec.ts:163:3 › converter app › converts PDF to HTML and downloads
+[1A[2K  7) [chromium] › e2e/app.spec.ts:163:3 › converter app › converts PDF to HTML and downloads ───────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[8/20] [chromium] › e2e/app.spec.ts:180:3 › converter app › converts TXT to HTML and downloads
+[1A[2K[9/20] [chromium] › e2e/app.spec.ts:197:3 › converter app › converts HTML to TXT and downloads
+[1A[2K[10/20] [chromium] › e2e/app.spec.ts:152:3 › converter app › converts a single file to Done status
+[1A[2K[11/20] [chromium] › e2e/app.spec.ts:146:3 › converter app › shows PDF, TXT, PNG, JPG, and WEBP as image target options
+[1A[2K  8) [chromium] › e2e/app.spec.ts:180:3 › converter app › converts TXT to HTML and downloads ───────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  9) [chromium] › e2e/app.spec.ts:197:3 › converter app › converts HTML to TXT and downloads ───────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  10) [chromium] › e2e/app.spec.ts:146:3 › converter app › shows PDF, TXT, PNG, JPG, and WEBP as image target options 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[12/20] [chromium] › e2e/app.spec.ts:214:3 › converter app › keeps row failures isolated from successful conversions
+[1A[2K  11) [chromium] › e2e/app.spec.ts:152:3 › converter app › converts a single file to Done status ───
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  12) [chromium] › e2e/app.spec.ts:214:3 › converter app › keeps row failures isolated from successful conversions 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[13/20] [chromium] › e2e/app.spec.ts:227:3 › converter app › downloads PDF to image multi-output result as a row ZIP
+[1A[2K  13) [chromium] › e2e/app.spec.ts:227:3 › converter app › downloads PDF to image multi-output result as a row ZIP 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[14/20] [chromium] › e2e/app.spec.ts:322:3 › converter app › shows full-screen loading during convert-all
+[1A[2K[15/20] [chromium] › e2e/app.spec.ts:262:3 › converter app › selects PDF pages and converts to exact output count in zh-CN
+[1A[2K[16/20] [chromium] › e2e/app.spec.ts:296:3 › converter app › deletes completed row after global download
+[1A[2K  14) [chromium] › e2e/app.spec.ts:322:3 › converter app › shows full-screen loading during convert-all 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[17/20] [chromium] › e2e/app.spec.ts:245:3 › converter app › converts image to WEBP and downloads
+[1A[2K  15) [chromium] › e2e/app.spec.ts:262:3 › converter app › selects PDF pages and converts to exact output count in zh-CN 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  16) [chromium] › e2e/app.spec.ts:296:3 › converter app › deletes completed row after global download 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[18/20] [chromium] › e2e/app.spec.ts:336:3 › converter app › shows loading during row download of multi-output PDF→image
+[1A[2K  17) [chromium] › e2e/app.spec.ts:245:3 › converter app › converts image to WEBP and downloads ────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  18) [chromium] › e2e/app.spec.ts:336:3 › converter app › shows loading during row download of multi-output PDF→image 
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K[19/20] [chromium] › e2e/app.spec.ts:357:3 › converter app › switches language to zh-CN
+[1A[2K[20/20] [chromium] › e2e/app.spec.ts:370:3 › converter app › removes a file row
+[1A[2K  19) [chromium] › e2e/app.spec.ts:357:3 › converter app › switches language to zh-CN ──────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  20) [chromium] › e2e/app.spec.ts:370:3 › converter app › removes a file row ──────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/zhangxiao/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     yarn playwright install                                             ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+[1A[2K  20 failed
+    [chromium] › e2e/app.spec.ts:45:3 › converter app › uploads files, converts all, and downloads row and global results 
+    [chromium] › e2e/app.spec.ts:78:3 › converter app › shows PDF target options for text and images 
+    [chromium] › e2e/app.spec.ts:89:3 › converter app › converts PDF to PDF with OCR and keeps completed target locked 
+    [chromium] › e2e/app.spec.ts:114:3 › converter app › hides OCR option when PDF target changes to TXT 
+    [chromium] › e2e/app.spec.ts:128:3 › converter app › shows feedback when selected files are unsupported 
+    [chromium] › e2e/app.spec.ts:140:3 › converter app › shows only image as TXT target option ─────
+    [chromium] › e2e/app.spec.ts:146:3 › converter app › shows PDF, TXT, PNG, JPG, and WEBP as image target options 
+    [chromium] › e2e/app.spec.ts:152:3 › converter app › converts a single file to Done status ─────
+    [chromium] › e2e/app.spec.ts:163:3 › converter app › converts PDF to HTML and downloads ────────
+    [chromium] › e2e/app.spec.ts:180:3 › converter app › converts TXT to HTML and downloads ────────
+    [chromium] › e2e/app.spec.ts:197:3 › converter app › converts HTML to TXT and downloads ────────
+    [chromium] › e2e/app.spec.ts:214:3 › converter app › keeps row failures isolated from successful conversions 
+    [chromium] › e2e/app.spec.ts:227:3 › converter app › downloads PDF to image multi-output result as a row ZIP 
+    [chromium] › e2e/app.spec.ts:245:3 › converter app › converts image to WEBP and downloads ──────
+    [chromium] › e2e/app.spec.ts:262:3 › converter app › selects PDF pages and converts to exact output count in zh-CN 
+    [chromium] › e2e/app.spec.ts:296:3 › converter app › deletes completed row after global download 
+    [chromium] › e2e/app.spec.ts:322:3 › converter app › shows full-screen loading during convert-all 
+    [chromium] › e2e/app.spec.ts:336:3 › converter app › shows loading during row download of multi-output PDF→image 
+    [chromium] › e2e/app.spec.ts:357:3 › converter app › switches language to zh-CN ────────────────
+    [chromium] › e2e/app.spec.ts:370:3 › converter app › removes a file row ────────────────────────
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.

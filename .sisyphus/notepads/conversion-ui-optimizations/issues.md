@@ -29,6 +29,7 @@
 Verdict: REJECT.
 
 Findings:
+
 - `convertPdfToImage` treats `selectedImagePages: []` as no selection and renders all pages instead of throwing a normal Error.
 - `changeTarget` only clears stale done/failed outputs when changing away from image; failed/done state from other target changes can remain stale, contrary to target-change clearing requirement.
 - `changeOcrOption` replaces the full `pdf` options object and can drop previously selected image pages after switching PDF targets and toggling OCR.
@@ -42,6 +43,7 @@ Findings:
 Verdict: REJECT.
 
 Findings:
+
 - `PdfPageSelectorModal` has Biome diagnostics: unsorted imports and missing hook dependencies for `handleE2EThumbnails` / `handleRealPdfThumbnails`.
 - `PdfPageSelectorModal` lacks modal focus management and Escape/backdrop close keyboard support.
 - `PdfPageSelectorModal` can leave `loading` true if the effect is aborted before an async path clears it.
@@ -53,6 +55,7 @@ Findings:
 Verdict: REJECT.
 
 Findings:
+
 - Implementation files are within the expected modified/created source/test/style/i18n set, except unexpected untracked paths exist: `openspec/` and `playwright-firefox.config.ts`.
 - `package.json` is unchanged and no Redux/Zustand/state-library dependency is present.
 - Forbidden UI additions were not found in the inspected implementation: no range input, drag reorder, zoom controls, page-selection storage, or new formats.
@@ -64,6 +67,7 @@ Findings:
 Verdict: REJECT.
 
 Findings:
+
 - `yarn test:run` passes: 9 files, 61 tests.
 - Convert-all loading path is implemented with `setIsConvertingAll(true)` before queueing and `finally` cleanup after sequential conversions.
 - PDF→image selection UI covers modal open, fake E2E previews, default all pages, deselect/select, disabled Done at zero selected, selected-count summary, and selected pages passed to conversion.

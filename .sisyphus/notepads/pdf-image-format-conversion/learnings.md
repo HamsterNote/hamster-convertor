@@ -25,21 +25,25 @@
 ## Post-Review Fixes (2026-05-01)
 
 ### Fix 1: Blob URL leak in PdfPageSelectorModal
+
 - Added `isMountedRef.current` check in IntersectionObserver callback before calling setPageShells
 - Revoke blob URL if component unmounts during `renderPageThumbnail`
 - Extracted `renderThumbnailForPage` to reduce cognitive complexity
 
 ### Fix 2: Unsafe target casts
+
 - Added runtime validation in `convertPdfToImage`: throws if target not in `['png', 'jpg', 'webp']`
 - Added runtime validation in `convertImageToImage`: throws if target not in `['png', 'jpg', 'webp']`
 - Preserves TypeScript cast for `encodeCanvasToImage` but now with guard
 
 ### Fix 3: TypeScript build errors
+
 - Fixed `target !== 'image'` comparison (TargetFormat no longer includes 'image')
 - Fixed getContext mock cast in tests
 - Formatted code with Prettier
 
 ### Pre-existing issues (out of scope)
+
 - BMP upload support: already existed, not added by this plan
 - Duplicated helpers (readFileAsArrayBuffer): pre-existing across files
 - Modal focus trap/Escape handling: pre-existing

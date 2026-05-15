@@ -60,10 +60,10 @@
 - E2E fake results use `selectedImagePages ?? [1, 2]`
 - Tests added in `converter.pdf-adapters.test.ts`: single page, multi-page dedup/sort, empty throws, undefined renders all
 
-
 ## FullscreenLoading Component - 2026-04-30
 
 ### Implementation Details
+
 - Created `src/components/FullscreenLoading.tsx` with props `{ visible: boolean; label: string }`
 - Returns `null` when not visible, avoiding any DOM footprint
 - Uses fixed positioning with `z-index: 50` to overlay above header (z-index: 10)
@@ -72,20 +72,24 @@
 - Supports light/dark themes via CSS variables from theme.css
 
 ### CSS Classes (BEM)
+
 - `.fullscreen-loading` - fixed overlay, backdrop blur, veil background
 - `.fullscreen-loading__card` - centered panel with padding and shadow
 - `.fullscreen-loading__spinner` - rotating border spinner using primary-500
 - `.fullscreen-loading__label` - label text below spinner
 
 ### i18n Keys Added
+
 - `loading.converting`: 'Converting...' / '转换中...' / '轉換中...'
 - `loading.preparingDownload`: 'Preparing download...' / '准备下载中...' / '準備下載中...'
 
 ### Test Coverage
+
 - Test file: `src/__tests__/FullscreenLoading.test.tsx`
 - 3 tests: not visible (null render), visible overlay structure, custom label
 
 ### Verification
+
 - `yarn build`: PASS (tsc + vite build)
 - `yarn test:run`: PASS (53 tests including 3 new)
 
