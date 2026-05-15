@@ -51,6 +51,11 @@ const getBaseName = (filename: string): string => {
   return filename.replace(/\.[^/.]+$/, '')
 }
 
+const replaceExtension = (filename: string, extension: string): string => {
+  const withoutExtension = filename.replace(/\.[^/.]+$/, '')
+  return `${withoutExtension || filename}.${extension}`
+}
+
 export const convertTxtToImage = async (
   request: ConversionRequest
 ): Promise<ConversionResult[]> => {
@@ -116,6 +121,35 @@ export const convertTxtToImage = async (
       mimeType: 'image/png',
       targetFormat: 'png',
       warnings: warnings.length > 0 ? warnings : undefined
+    }
+  ]
+}
+
+export const convertTxtToHtml = async (request: ConversionRequest): Promise<ConversionResult[]> => {
+  const { file } = request
+
+  const buffer = await file.arrayBuffer()
+
+  const { TxtParser } = await import('@hamster-note/txt-parser')
+  const intermediate: IntermediateDocument = await TxtParser.encode(buffer)
+
+  const { HtmlParser } = await import('@hamster-note/html-parser')
+  const result = await HtmlParser.decode(intermediate)
+
+  let blob: Blob
+  if (result instanceof File) {
+    blob = result
+  } else {
+    blob = new Blob([result], { type: 'text/html' })
+  }
+
+  const mimeType = 'text/html;charset=utf-8'
+  return [
+    {
+      blob,
+      filename: replaceExtension(file.name, 'html'),
+      mimeType,
+      targetFormat: 'html'
     }
   ]
 }

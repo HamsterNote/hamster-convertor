@@ -3,15 +3,44 @@ declare module '@hamster-note/pdf-parser' {
 
   export type ParserInput = File | ArrayBuffer
 
+  export type EncodeOptions = {
+    maxPages?: number
+    pageLoadTimeoutMs?: number
+  }
+
+  export type DecodeOptions = {
+    fonts?: unknown
+  }
+
+  export type ProgressStage =
+    | 'encode:start'
+    | 'encode:complete'
+    | 'decode:start'
+    | 'decode:complete'
+
+  export type ProgressReport = {
+    stage: ProgressStage
+    current: number
+    total: number
+  }
+
+  export type ProgressReporter = (report: ProgressReport) => void
+
   export class PdfParser {
     static readonly exts: readonly ['pdf']
 
-    static encode(fileOrBuffer: ParserInput): Promise<IntermediateDocument | undefined>
+    static encode(
+      fileOrBuffer: ParserInput,
+      options?: EncodeOptions,
+      onProgress?: ProgressReporter
+    ): Promise<IntermediateDocument | undefined>
 
     static toArrayBuffer(fileOrBuffer: ParserInput): Promise<ArrayBuffer>
 
     static decode(
-      intermediateDocument: IntermediateDocument
+      intermediateDocument: IntermediateDocument,
+      options?: DecodeOptions,
+      onProgress?: ProgressReporter
     ): Promise<File | ArrayBuffer | undefined>
 
     encode(input: ParserInput): Promise<IntermediateDocument>

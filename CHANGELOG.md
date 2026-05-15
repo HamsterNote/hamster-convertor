@@ -20,6 +20,9 @@ All notable changes to this project will be documented in this file.
 - 改进用户界面，转换完成后的文件可单独下载
 - 更新多语言文本，添加错误和警告相关的翻译
 - 转换按钮行为优化，避免重复触发
+- 升级 `@hamster-note/pdf-parser` 至 `^0.6.0`：`PdfParser.encode/decode` 新增可选 `options`（`maxPages`、`pageLoadTimeoutMs`）和 `onProgress` 进度回调参数；现有单参数调用保持兼容
+- 升级 `@hamster-note/html-parser` 至 `^0.6.0`：HTML 解析改为基于隐藏 iframe 的真实 DOM 测量（替换原 DOMParser 启发式估算），并新增 `setIframeHostDocument` 用于注入宿主文档
+- 同步更新 `src/types/{pdf,html}-parser.d.ts` 类型声明以匹配新签名
 
 ### Fixed
 

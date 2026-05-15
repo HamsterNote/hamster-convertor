@@ -16,8 +16,77 @@ const html = `<!doctype html>
 </html>
 `
 
+class MockHtmlPage {
+  private number: number
+  private pureText: string
+
+  constructor(pageNumber: number, pureText: string) {
+    this.number = pageNumber
+    this.pureText = pureText
+  }
+
+  getNumber(): number {
+    return this.number
+  }
+
+  getSize(_scale: number): [number, number] {
+    return [595, 842]
+  }
+
+  getPureText(): string {
+    return this.pureText
+  }
+}
+
+class MockHtmlDocument {
+  private pages: MockHtmlPage[]
+
+  constructor(pageTexts: string[]) {
+    this.pages = pageTexts.map((text, index) => new MockHtmlPage(index + 1, text))
+  }
+
+  getPages(): Promise<MockHtmlPage[]> {
+    return Promise.resolve(this.pages)
+  }
+
+  getPage(pageNumber: number): Promise<MockHtmlPage | undefined> {
+    return Promise.resolve(this.pages.find(p => p.getNumber() === pageNumber))
+  }
+
+  getOutline(): Promise<IntermediateDocument['outline']> {
+    return Promise.resolve(undefined)
+  }
+
+  getCover(): Promise<HTMLCanvasElement | HTMLImageElement> {
+    return Promise.resolve({} as HTMLCanvasElement)
+  }
+
+  getTitle(): string {
+    return 'Sample Document'
+  }
+
+  getId(): string {
+    return 'mock-html-doc-id'
+  }
+
+  getIntermediateDocument(): IntermediateDocument {
+    return { outline: undefined }
+  }
+}
+
 export class HtmlParser {
   static readonly exts = ['html'] as const
+  static readonly ext = 'html' as const
+
+  static async encode(_input: File | ArrayBuffer): Promise<MockHtmlDocument> {
+    const pageTexts = ['Page 1: Hamster Note Sample', 'Page 2: Nested Content with Script']
+    return new MockHtmlDocument(pageTexts)
+  }
+
+  static async decode(_intermediateDocument: IntermediateDocument): Promise<File> {
+    const file = new File([html], 'converted.html', { type: 'text/html' })
+    return file
+  }
 
   static async decodeToHtml(_intermediateDocument: IntermediateDocument): Promise<string> {
     return html

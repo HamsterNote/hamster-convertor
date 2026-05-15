@@ -35,7 +35,19 @@ type FileItem = {
   conversionOptions: ConversionOptions
 }
 
-const SUPPORTED_FORMATS = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
+const SUPPORTED_FORMATS = [
+  'pdf',
+  'txt',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+  'html',
+  'htm'
+]
 const SUPPORTED_FORMAT_LIST = SUPPORTED_FORMATS.map(format => `.${format}`).join(', ')
 
 const extToFormat = (name: string): SourceFormat | 'unsupported' => {
@@ -49,7 +61,9 @@ const extToFormat = (name: string): SourceFormat | 'unsupported' => {
     gif: 'image',
     webp: 'image',
     bmp: 'image',
-    svg: 'image'
+    svg: 'image',
+    html: 'html',
+    htm: 'html'
   }
 
   if (ext && ext in extMap) {
@@ -300,7 +314,7 @@ function App() {
     }
   }
 
-  const acceptAttr = useMemo(() => '.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg', [])
+  const acceptAttr = useMemo(() => '.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.html,.htm', [])
 
   const handleDownloadAll = async () => {
     const allOutputs = downloadableItems.flatMap(it => it.outputs ?? [])

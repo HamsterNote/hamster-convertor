@@ -157,7 +157,7 @@ test.describe('converter app', () => {
       .locator(dropzoneFileInput)
       .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
 
-    await expect(await optionValues(targetSelectForRow(page, 'notes.txt'))).toEqual(['png'])
+    await expect(await optionValues(targetSelectForRow(page, 'notes.txt'))).toEqual(['png', 'html'])
   })
 
   test('shows PDF, TXT, PNG, JPG, and WEBP as image target options', async ({ page }) => {
@@ -184,6 +184,49 @@ test.describe('converter app', () => {
     await expect(rowForFile(page, 'notes.txt').locator('.status')).toContainText('Done', {
       timeout: 15000
     })
+  })
+
+  test('converts PDF to HTML and downloads', async ({ page }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+
+    await targetSelectForRow(page, 'sample.pdf').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+
+    await pdfRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample.html'])
+  })
+
+  test('converts TXT to HTML and downloads', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
+
+    await targetSelectForRow(page, 'notes.txt').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const txtRow = rowForFile(page, 'notes.txt')
+    await expect(txtRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+
+    await txtRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['notes.html'])
+  })
+
+  test('converts HTML to TXT and downloads', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('sample.html', 'text/html', '<h1>Test</h1>'))
+
+    await targetSelectForRow(page, 'sample.html').selectOption('txt')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const htmlRow = rowForFile(page, 'sample.html')
+    await expect(htmlRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+
+    await htmlRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample.txt'])
   })
 
   test('keeps row failures isolated from successful conversions', async ({ page }) => {

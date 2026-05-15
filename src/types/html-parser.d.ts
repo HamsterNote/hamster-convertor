@@ -6,6 +6,10 @@ declare module '@hamster-note/html-parser' {
     views?: ('TEXT' | 'THUMBNAIL')[]
   }
 
+  export type IframeHostDocument = Pick<Document, 'createElement' | 'body' | 'documentElement'>
+
+  export function setIframeHostDocument(documentOverride: IframeHostDocument | null): void
+
   export class HtmlPage {
     constructor(intermediateDocument: IntermediateDocument)
     getNumber(): number

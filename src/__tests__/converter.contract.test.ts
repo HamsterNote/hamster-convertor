@@ -5,6 +5,8 @@ const adapterMocks = vi.hoisted(() => ({
   convertPdfToImage: vi.fn(),
   convertPdfToPdf: vi.fn(),
   convertTxtToImage: vi.fn(),
+  convertTxtToHtml: vi.fn(),
+  convertHtmlToTxt: vi.fn(),
   convertImageToPdf: vi.fn(),
   convertImageToTxt: vi.fn(),
   convertImageToImage: vi.fn()
@@ -29,7 +31,12 @@ vi.mock('../lib/converter/pdf-adapters', () => ({
 }))
 
 vi.mock('../lib/converter/txt-adapter', () => ({
-  convertTxtToImage: adapterMocks.convertTxtToImage
+  convertTxtToImage: adapterMocks.convertTxtToImage,
+  convertTxtToHtml: adapterMocks.convertTxtToHtml
+}))
+
+vi.mock('../lib/converter/html-adapter', () => ({
+  convertHtmlToTxt: adapterMocks.convertHtmlToTxt
 }))
 
 vi.mock('../lib/converter/image-adapters', () => ({
@@ -92,7 +99,9 @@ describe('converter contract', () => {
 
   it('exposes supported targets for each source format', () => {
     expect(getSupportedTargets('pdf')).toContain('pdf')
-    expect(getSupportedTargets('txt')).toEqual(['png'])
+    expect(getSupportedTargets('pdf')).toContain('html')
+    expect(getSupportedTargets('txt')).toContain('html')
+    expect(getSupportedTargets('html')).toEqual(['txt'])
     expect(getSupportedTargets('image')).toEqual(['pdf', 'txt', 'png', 'jpg', 'webp'])
   })
 
@@ -206,6 +215,71 @@ describe('converter contract', () => {
 
     expect(adapterMocks.convertImageToTxt).toHaveBeenCalledOnce()
     expect(results[0]).toMatchObject({ filename: 'sample-ocr.txt', targetFormat: 'txt' })
+  })
+
+  it('routes TXT to HTML through the TXT HTML adapter', async () => {
+    adapterMocks.convertTxtToHtml.mockResolvedValue([
+      makeResult('sample.html', 'text/html;charset=utf-8', 'html')
+    ])
+
+    const results = await convertFile(
+      createRequest({
+        file: new File(['sample'], 'sample.txt', { type: 'text/plain' }),
+        source: 'txt',
+        target: 'html'
+      })
+    )
+
+    expect(adapterMocks.convertTxtToHtml).toHaveBeenCalledOnce()
+    expect(results[0]).toMatchObject({
+      filename: 'sample.html',
+      mimeType: 'text/html;charset=utf-8'
+    })
+  })
+
+  it('routes HTML to TXT through the HTML TXT adapter', async () => {
+    adapterMocks.convertHtmlToTxt.mockResolvedValue([makeResult('sample.txt', 'text/plain', 'txt')])
+
+    const results = await convertFile(
+      createRequest({
+        file: new File(['<html><body>test</body></html>'], 'sample.html', { type: 'text/html' }),
+        source: 'html',
+        target: 'txt'
+      })
+    )
+
+    expect(adapterMocks.convertHtmlToTxt).toHaveBeenCalledOnce()
+    expect(results[0]).toMatchObject({ filename: 'sample.txt', mimeType: 'text/plain' })
+  })
+
+  describe('guard: unsupported HTML targets throw UnsupportedConversionError', () => {
+    it('throws UnsupportedConversionError for html to pdf', async () => {
+      await expect(
+        convertFile(
+          createRequest({
+            file: new File(['<html><body>test</body></html>'], 'sample.html', {
+              type: 'text/html'
+            }),
+            source: 'html',
+            target: 'pdf'
+          })
+        )
+      ).rejects.toBeInstanceOf(UnsupportedConversionError)
+    })
+
+    it('throws UnsupportedConversionError for html to png', async () => {
+      await expect(
+        convertFile(
+          createRequest({
+            file: new File(['<html><body>test</body></html>'], 'sample.html', {
+              type: 'text/html'
+            }),
+            source: 'html',
+            target: 'png'
+          })
+        )
+      ).rejects.toBeInstanceOf(UnsupportedConversionError)
+    })
   })
 
   describe('pdf to pdf conversion', () => {

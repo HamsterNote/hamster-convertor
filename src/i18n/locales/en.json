@@ -19,7 +19,8 @@
       "png": "PNG",
       "jpg": "JPG",
       "webp": "WEBP",
-      "pdf": "PDF"
+      "pdf": "PDF",
+      "html": "HTML"
     }
   },
   "actions": {

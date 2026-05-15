@@ -1,16 +1,12 @@
-import path from 'path'
-import { existsSync } from 'fs'
-import { fileURLToPath } from 'url'
-import { configDefaults, defineConfig } from 'vitest/config'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const documentParserPath = path.resolve(__dirname, '../DocumentParser/dist/index.js')
 const typesPath = path.resolve(__dirname, './src/types/hamster-note-types.d.ts')
-const pdfjsPath = path.resolve(
-  __dirname,
-  '../PdfParser/node_modules/pdfjs-dist/legacy/build/pdf.mjs'
-)
 const mockPdfParserPath = path.resolve(__dirname, './src/test/mocks/pdf-parser.ts')
 const mockHtmlParserPath = path.resolve(__dirname, './src/test/mocks/html-parser.ts')
 const mockTxtParserPath = path.resolve(__dirname, './src/test/mocks/txt-parser.ts')
@@ -26,10 +22,6 @@ const alias: Record<string, string> = {
 
 if (existsSync(documentParserPath)) {
   alias['@hamster-note/document-parser'] = documentParserPath
-}
-
-if (existsSync(pdfjsPath)) {
-  alias['pdfjs-dist'] = pdfjsPath
 }
 
 export default defineConfig({

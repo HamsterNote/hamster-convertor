@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadPdfFixture } from '../test/fixtures'
+import { loadPdfFixture, loadHtmlFixture } from '../test/fixtures'
 import { normalizeHtml } from '../test/normalizeHtml'
 import { convertPdfToHtml, convertFile, UnsupportedConversionError } from '../lib/converter'
 import { EmptyOcrError } from '../lib/converter/pdf-adapters'
@@ -12,6 +12,33 @@ vi.mock('@hamster-note/image-parser', () => ({
   ImageParser: {
     exts: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'],
     encode: imageParserMocks.encode
+  }
+}))
+
+const htmlParserMocks = vi.hoisted(() => ({
+  encode: vi.fn()
+}))
+
+vi.mock('@hamster-note/html-parser', () => ({
+  HtmlParser: {
+    exts: ['html'],
+    encode: htmlParserMocks.encode,
+    decodeToHtml: vi.fn().mockResolvedValue(
+      `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <style>
+      .hamster-note-document { position: relative; display: block; contain: layout style size; }
+      .hamster-note-document .hamster-note-page { position: relative; overflow: hidden; background-repeat: no-repeat; background-position: top center; background-size: contain; }
+      .hamster-note-document .hamster-note-text { position: absolute; white-space: pre; transform-origin: 0 0; }
+    </style>
+    <div class="hamster-note-document">Hamster PDF Sample</div>
+  </body>
+</html>`
+    )
   }
 }))
 
@@ -103,6 +130,20 @@ const stubBlobArrayBuffer = (): Blob['arrayBuffer'] => {
   const original = Blob.prototype.arrayBuffer
   Blob.prototype.arrayBuffer = function (this: Blob) {
     return Promise.resolve(new ArrayBuffer(this.size))
+  }
+  return original
+}
+
+const stubBlobText = (): Blob['text'] => {
+  const original = Blob.prototype.text
+  Blob.prototype.text = function (this: Blob) {
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.addEventListener('load', () => {
+        resolve(reader.result as string)
+      })
+      reader.readAsText(this)
+    })
   }
   return original
 }
@@ -256,5 +297,52 @@ describe('pdf to pdf integration', () => {
       expect(results[0].mimeType).toBe('application/pdf')
       expect(results[0].blob.size).toBeGreaterThan(0)
     })
+  })
+})
+
+describe('html to txt integration', () => {
+  let originalBlobText: Blob['text']
+
+  beforeEach(() => {
+    originalBlobText = stubBlobText()
+  })
+
+  afterEach(() => {
+    Blob.prototype.text = originalBlobText
+  })
+
+  it('converts sample.html fixture to txt', async () => {
+    const htmlContent = await loadHtmlFixture('sample.html')
+
+    const mockPage1 = {
+      getNumber: () => 1,
+      getSize: (_scale: number): [number, number] => [595, 842],
+      getPureText: () => 'Hamster Note Document'
+    }
+    const mockPage2 = {
+      getNumber: () => 2,
+      getSize: (_scale: number): [number, number] => [595, 842],
+      getPureText: () => 'This is a nested strong text and emphasized content within a paragraph.'
+    }
+
+    htmlParserMocks.encode.mockResolvedValue({
+      getPages: () => Promise.resolve([mockPage1, mockPage2])
+    })
+
+    const file = new File([htmlContent], 'sample.html', { type: 'text/html' })
+    const results = await convertFile({ file, source: 'html', target: 'txt' })
+
+    expect(results).toHaveLength(1)
+    expect(results[0].filename).toBe('sample.txt')
+    expect(results[0].mimeType).toBe('text/plain')
+    expect(results[0].targetFormat).toBe('txt')
+    expect(results[0].blob).toBeInstanceOf(Blob)
+    expect(results[0].blob.size).toBeGreaterThan(0)
+
+    const text = await results[0].blob.text()
+    expect(text).toContain('Hamster Note Document')
+    expect(text).toContain(
+      'This is a nested strong text and emphasized content within a paragraph.'
+    )
   })
 })

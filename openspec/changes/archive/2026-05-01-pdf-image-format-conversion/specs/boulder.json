@@ -1,10 +1,7 @@
 {
   "active_plan": "/home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/.sisyphus/plans/pdf-image-format-conversion.md",
   "started_at": "2026-05-01T02:25:42.364Z",
-  "session_ids": [
-    "ses_21ea4d244ffemJ2yqGpav39adc",
-    "ses_21e5c94f5ffeBUc68V7k1dJa5T"
-  ],
+  "session_ids": ["ses_21ea4d244ffemJ2yqGpav39adc", "ses_21e5c94f5ffeBUc68V7k1dJa5T"],
   "session_origins": {
     "ses_21ea4d244ffemJ2yqGpav39adc": "direct",
     "ses_21e5c94f5ffeBUc68V7k1dJa5T": "direct"

@@ -1,11 +1,12 @@
 import type { IntermediateDocument } from '@hamster-note/types'
+import { convertHtmlToTxt } from './converter/html-adapter'
 import {
   convertImageToImage,
   convertImageToPdf,
   convertImageToTxt
 } from './converter/image-adapters'
 import { convertPdfToImage, convertPdfToPdf, convertPdfToTxt } from './converter/pdf-adapters'
-import { convertTxtToImage } from './converter/txt-adapter'
+import { convertTxtToImage, convertTxtToHtml } from './converter/txt-adapter'
 
 export type ConversionWarning = string | { message: string }
 
@@ -16,7 +17,7 @@ export type PdfToHtmlResult = {
 
 export type ConvertPdfToHtml = (input: Uint8Array) => Promise<PdfToHtmlResult>
 
-export type SourceFormat = 'pdf' | 'txt' | 'image'
+export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
 
 export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
@@ -54,9 +55,10 @@ export class UnsupportedConversionError extends Error {
 }
 
 const supportedTargets = {
-  pdf: ['txt', 'png', 'jpg', 'webp', 'pdf'],
-  txt: ['png'],
-  image: ['pdf', 'txt', 'png', 'jpg', 'webp']
+  pdf: ['txt', 'png', 'jpg', 'webp', 'pdf', 'html'],
+  txt: ['png', 'html'],
+  image: ['pdf', 'txt', 'png', 'jpg', 'webp'],
+  html: ['txt']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
 
 export const getSupportedTargets = (source: SourceFormat): TargetFormat[] => [
@@ -191,6 +193,10 @@ const convertPdfFileToHtml = async (file: File): Promise<ConversionResult[]> => 
   ]
 }
 
+const convertPdfToHtmlAdapter = async (request: ConversionRequest): Promise<ConversionResult[]> => {
+  return convertPdfFileToHtml(request.file)
+}
+
 const createE2EResult = async (request: ConversionRequest): Promise<ConversionResult[]> => {
   await waitForE2EPaint()
 
@@ -199,7 +205,30 @@ const createE2EResult = async (request: ConversionRequest): Promise<ConversionRe
   }
 
   if (request.target === 'html') {
-    return convertPdfFileToHtml(request.file)
+    if (request.source === 'pdf') {
+      return convertPdfFileToHtml(request.file)
+    }
+
+    const mimeType = 'text/html;charset=utf-8'
+    return [
+      {
+        blob: new Blob(['<html><body>fake html</body></html>'], { type: mimeType }),
+        filename: replaceExtension(request.file.name, 'html'),
+        mimeType,
+        targetFormat: 'html'
+      }
+    ]
+  }
+
+  if (request.source === 'html' && request.target === 'txt') {
+    return [
+      {
+        blob: new Blob(['fake extracted text'], { type: 'text/plain' }),
+        filename: replaceExtension(request.file.name, 'txt'),
+        mimeType: 'text/plain',
+        targetFormat: 'txt'
+      }
+    ]
   }
 
   if (
@@ -278,10 +307,12 @@ const adapters: ConversionAdapterMap = {
     png: convertPdfToImage,
     jpg: convertPdfToImage,
     webp: convertPdfToImage,
-    pdf: convertPdfToPdf
+    pdf: convertPdfToPdf,
+    html: convertPdfToHtmlAdapter
   },
   txt: {
-    png: convertTxtToImage
+    png: convertTxtToImage,
+    html: convertTxtToHtml
   },
   image: {
     pdf: convertImageToPdf,
@@ -289,20 +320,15 @@ const adapters: ConversionAdapterMap = {
     png: convertImageToImage,
     jpg: convertImageToImage,
     webp: convertImageToImage
+  },
+  html: {
+    txt: convertHtmlToTxt
   }
 }
 
 export const convertFile = async (request: ConversionRequest): Promise<ConversionResult[]> => {
   if (isE2E()) {
     return createE2EResult(request)
-  }
-
-  if (request.source === 'pdf' && request.target === 'html') {
-    return convertPdfFileToHtml(request.file)
-  }
-
-  if (request.target === 'html') {
-    throw new UnsupportedConversionError(request.source, request.target)
   }
 
   const adapter = adapters[request.source][request.target]

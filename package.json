@@ -23,9 +23,9 @@
   },
   "dependencies": {
     "@hamster-note/document-parser": "^0.3.1",
-    "@hamster-note/html-parser": "^0.5.0",
+    "@hamster-note/html-parser": "^0.6.0",
     "@hamster-note/image-parser": "^0.1.0",
-    "@hamster-note/pdf-parser": "^0.5.0",
+    "@hamster-note/pdf-parser": "^0.6.0",
     "@hamster-note/txt-parser": "^0.1.0",
     "@hamster-note/types": "^0.7.0",
     "i18next": "^23.10.1",
@@ -33,7 +33,7 @@
     "jspdf": "^2.5.2",
     "jszip": "^3.10.1",
     "loglevel": "^1.9.1",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "5.4.530",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^15.0.1"
@@ -66,6 +66,9 @@
     "vite": "^5.4.8",
     "vitest": "^2.1.8",
     "@playwright/test": "^1.48.2"
+  },
+  "resolutions": {
+    "pdfjs-dist": "5.4.530"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
