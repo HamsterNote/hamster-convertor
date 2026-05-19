@@ -6,7 +6,7 @@ import {
   convertImageToTxt
 } from './converter/image-adapters'
 import { convertPdfToImage, convertPdfToPdf, convertPdfToTxt } from './converter/pdf-adapters'
-import { convertTxtToImage, convertTxtToHtml } from './converter/txt-adapter'
+import { convertTxtToHtml, convertTxtToImage } from './converter/txt-adapter'
 
 export type ConversionWarning = string | { message: string }
 
@@ -15,7 +15,10 @@ export type PdfToHtmlResult = {
   warnings: ConversionWarning[]
 }
 
-export type ConvertPdfToHtml = (input: Uint8Array) => Promise<PdfToHtmlResult>
+export type ConvertPdfToHtml = (
+  input: Uint8Array,
+  options?: { selectedPages?: number[] }
+) => Promise<PdfToHtmlResult>
 
 export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
 
@@ -37,6 +40,7 @@ export type ConversionRequest = {
   options?: {
     pdf?: {
       ocr: boolean
+      selectedPages?: number[]
       selectedImagePages?: number[]
     }
   }
@@ -138,12 +142,25 @@ const waitForE2EPaint = async (): Promise<void> => {
   })
 }
 
-export const convertPdfToHtml: ConvertPdfToHtml = async input => {
+export const convertPdfToHtml: ConvertPdfToHtml = async (input, options) => {
   if (isE2E()) {
     return {
       html: fallbackHtml,
       warnings: []
     }
+  }
+
+  if (options?.selectedPages !== undefined) {
+    const { getSelectedPdfPageNumbers, extractPdfPages } = await import('./converter/pdf-pages')
+    const { PDFDocument } = await import('pdf-lib')
+    const arrayBuffer = input.buffer.slice(
+      input.byteOffset,
+      input.byteOffset + input.byteLength
+    ) as ArrayBuffer
+    const srcDoc = await PDFDocument.load(arrayBuffer)
+    const pageNumbers = getSelectedPdfPageNumbers(srcDoc.getPageCount(), options.selectedPages)
+    const subsetBuffer = await extractPdfPages(arrayBuffer, pageNumbers)
+    return decodeByParserModules(new Uint8Array(subsetBuffer))
   }
 
   return decodeByParserModules(input)
@@ -177,9 +194,12 @@ const readFileAsArrayBuffer = async (file: File): Promise<ArrayBuffer> => {
   })
 }
 
-const convertPdfFileToHtml = async (file: File): Promise<ConversionResult[]> => {
+const convertPdfFileToHtml = async (
+  file: File,
+  options?: { selectedPages?: number[] }
+): Promise<ConversionResult[]> => {
   const buffer = await readFileAsArrayBuffer(file)
-  const { html, warnings } = await convertPdfToHtml(new Uint8Array(buffer))
+  const { html, warnings } = await convertPdfToHtml(new Uint8Array(buffer), options)
   const mimeType = 'text/html;charset=utf-8'
 
   return [
@@ -194,7 +214,7 @@ const convertPdfFileToHtml = async (file: File): Promise<ConversionResult[]> => 
 }
 
 const convertPdfToHtmlAdapter = async (request: ConversionRequest): Promise<ConversionResult[]> => {
-  return convertPdfFileToHtml(request.file)
+  return convertPdfFileToHtml(request.file, { selectedPages: request.options?.pdf?.selectedPages })
 }
 
 const createE2EResult = async (request: ConversionRequest): Promise<ConversionResult[]> => {
@@ -235,7 +255,8 @@ const createE2EResult = async (request: ConversionRequest): Promise<ConversionRe
     request.source === 'pdf' &&
     (request.target === 'png' || request.target === 'jpg' || request.target === 'webp')
   ) {
-    const selected = request.options?.pdf?.selectedImagePages ?? [1, 2]
+    const selected = request.options?.pdf?.selectedPages ??
+      request.options?.pdf?.selectedImagePages ?? [1, 2]
     const ext = request.target
     const mimeType = `image/${request.target === 'jpg' ? 'jpeg' : request.target}`
     return selected.map(pageNumber => ({

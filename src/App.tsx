@@ -19,7 +19,7 @@ import { downloadBlobFile, downloadResultArchive } from './lib/download'
 type ConversionOptions = {
   pdf: {
     ocr: boolean
-    selectedImagePages?: number[]
+    selectedPages?: number[]
   }
 }
 
@@ -99,7 +99,7 @@ const isConvertibleStatus = (status: FileItem['status']) =>
   status === 'ready' || status === 'failed'
 
 const hasExplicitlyEmptySelectedPages = (item: FileItem): boolean => {
-  const selected = item.conversionOptions.pdf.selectedImagePages
+  const selected = item.conversionOptions.pdf.selectedPages
   return selected !== undefined && selected.length === 0
 }
 
@@ -221,13 +221,13 @@ function App() {
     )
   }
 
-  const changeSelectedImagePages = (id: string, selectedImagePages: number[] | undefined) => {
+  const changeSelectedPages = (id: string, selectedPages: number[] | undefined) => {
     setItems(prev =>
       prev.map(it =>
         it.id === id
           ? {
               ...it,
-              conversionOptions: { pdf: { ...it.conversionOptions.pdf, selectedImagePages } }
+              conversionOptions: { pdf: { ...it.conversionOptions.pdf, selectedPages } }
             }
           : it
       )
@@ -281,11 +281,7 @@ function App() {
           continue
         }
 
-        if (
-          current.source === 'pdf' &&
-          ['png', 'jpg', 'webp'].includes(current.target) &&
-          hasExplicitlyEmptySelectedPages(current)
-        ) {
+        if (current.source === 'pdf' && hasExplicitlyEmptySelectedPages(current)) {
           markFailed(id, t('errors.noPagesSelected'))
           continue
         }
@@ -444,27 +440,25 @@ function App() {
                               {t('options.ocr')}
                             </label>
                           )}
-                          {it.source === 'pdf' &&
-                            (it.target === 'png' || it.target === 'jpg' || it.target === 'webp') &&
-                            it.status !== 'done' && (
-                              <div>
-                                <button
-                                  type="button"
-                                  className="btn btn--ghost page-selector-btn"
-                                  onClick={() => setActivePdfPageSelectorItemId(it.id)}
-                                  disabled={isPreparingDownload}
-                                >
-                                  {t('actions.selectPages')}
-                                </button>
-                                {it.conversionOptions.pdf.selectedImagePages !== undefined && (
-                                  <div className="selected-pages-summary">
-                                    {t('options.pdfPages.selectedCount', {
-                                      count: it.conversionOptions.pdf.selectedImagePages.length
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                          {it.source === 'pdf' && it.status !== 'done' && (
+                            <div>
+                              <button
+                                type="button"
+                                className="btn btn--ghost page-selector-btn"
+                                onClick={() => setActivePdfPageSelectorItemId(it.id)}
+                                disabled={isPreparingDownload}
+                              >
+                                {t('actions.selectPages')}
+                              </button>
+                              {it.conversionOptions.pdf.selectedPages !== undefined && (
+                                <div className="selected-pages-summary">
+                                  {t('options.pdfPages.selectedCount', {
+                                    count: it.conversionOptions.pdf.selectedPages.length
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className={`status status--${it.status}`}>
                           {t(`status.${it.status}` as const)}
@@ -576,10 +570,10 @@ function App() {
         <PdfPageSelectorModal
           open
           file={activePdfItem.file}
-          selectedPages={activePdfItem.conversionOptions.pdf.selectedImagePages}
+          selectedPages={activePdfItem.conversionOptions.pdf.selectedPages}
           onCancel={() => setActivePdfPageSelectorItemId(null)}
           onConfirm={pages => {
-            changeSelectedImagePages(activePdfItem.id, pages)
+            changeSelectedPages(activePdfItem.id, pages)
             setActivePdfPageSelectorItemId(null)
           }}
         />

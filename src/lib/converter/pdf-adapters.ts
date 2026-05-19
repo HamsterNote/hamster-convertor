@@ -181,18 +181,32 @@ const convertRenderedPageToOcrText = async (
   }
 }
 
-export const convertPdfToTxt = async ({ file }: ConversionRequest): Promise<ConversionResult[]> => {
+export const convertPdfToTxt = async ({
+  file,
+  options
+}: ConversionRequest): Promise<ConversionResult[]> => {
   const arrayBuffer = await readFileAsArrayBuffer(file)
+  let effectiveBuffer = arrayBuffer
+  const selectedPages = options?.pdf?.selectedPages ?? options?.pdf?.selectedImagePages
+
+  if (selectedPages !== undefined) {
+    const { getSelectedPdfPageNumbers, extractPdfPages } = await import('./pdf-pages')
+    const { PDFDocument } = await import('pdf-lib')
+    const srcDoc = await PDFDocument.load(arrayBuffer)
+    const pageNumbers = getSelectedPdfPageNumbers(srcDoc.getPageCount(), selectedPages)
+    effectiveBuffer = await extractPdfPages(arrayBuffer, pageNumbers)
+  }
+
   let text = ''
 
   try {
-    text = await extractTextWithHamster(arrayBuffer)
+    text = await extractTextWithHamster(effectiveBuffer)
   } catch {
     text = ''
   }
 
   if (!text) {
-    text = await extractTextWithPdfJs(arrayBuffer)
+    text = await extractTextWithPdfJs(effectiveBuffer)
   }
 
   if (!text) {
@@ -221,7 +235,7 @@ export const convertPdfToImage = async ({
 
   let pageNumbers = Array.from({ length: pdfDocument.numPages }, (_, i) => i + 1)
 
-  const selected = options?.pdf?.selectedImagePages
+  const selected = options?.pdf?.selectedPages ?? options?.pdf?.selectedImagePages
   if (selected !== undefined) {
     pageNumbers = selected.filter(
       (p): p is number => Number.isInteger(p) && p >= 1 && p <= pdfDocument.numPages
@@ -318,22 +332,37 @@ const processOcrPage = async (
   return false
 }
 
-const createOcrPdf = async (file: File, arrayBuffer: ArrayBuffer): Promise<ConversionResult[]> => {
+const createOcrPdf = async (
+  file: File,
+  arrayBuffer: ArrayBuffer,
+  selectedPages?: number[]
+): Promise<ConversionResult[]> => {
   const [{ ImageParser }, { jsPDF }, pdfDocument] = await Promise.all([
     import('@hamster-note/image-parser') as Promise<ImageParserModule>,
     import('jspdf') as Promise<JsPdfModule>,
     loadPdfDocument(arrayBuffer.slice(0))
   ])
 
-  const firstPage = await pdfDocument.getPage(1)
+  const { getSelectedPdfPageNumbers } = await import('./pdf-pages')
+  const pageNumbers = getSelectedPdfPageNumbers(pdfDocument.numPages, selectedPages)
+
+  const firstPage = await pdfDocument.getPage(pageNumbers[0])
   const firstViewport = firstPage.getViewport({ scale: 2 })
   const doc = new jsPDF({ unit: 'px', format: [firstViewport.width, firstViewport.height] })
 
   let hasText = false
+  let isFirst = true
 
-  for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
-    const page = pageNumber === 1 ? firstPage : await pdfDocument.getPage(pageNumber)
-    const pageHadText = await processOcrPage(page, doc, ImageParser, arrayBuffer, pageNumber)
+  for (const pageNumber of pageNumbers) {
+    const page = isFirst ? firstPage : await pdfDocument.getPage(pageNumber)
+    const pageHadText = await processOcrPage(
+      page,
+      doc,
+      ImageParser,
+      arrayBuffer,
+      isFirst ? 1 : pageNumber
+    )
+    isFirst = false
     if (pageHadText) {
       hasText = true
     }
@@ -359,10 +388,27 @@ export const convertPdfToPdf = async ({
   options
 }: ConversionRequest): Promise<ConversionResult[]> => {
   const arrayBuffer = await readFileAsArrayBuffer(file)
+  const selectedPages = options?.pdf?.selectedPages ?? options?.pdf?.selectedImagePages
 
   if (!options?.pdf?.ocr) {
+    if (selectedPages !== undefined) {
+      const { getSelectedPdfPageNumbers, extractPdfPages } = await import('./pdf-pages')
+      const { PDFDocument } = await import('pdf-lib')
+      const srcDoc = await PDFDocument.load(arrayBuffer)
+      const pageNumbers = getSelectedPdfPageNumbers(srcDoc.getPageCount(), selectedPages)
+      const subsetBuffer = await extractPdfPages(arrayBuffer, pageNumbers)
+      const mimeType = 'application/pdf'
+      return [
+        {
+          blob: new Blob([subsetBuffer], { type: mimeType }),
+          filename: file.name,
+          mimeType,
+          targetFormat: 'pdf'
+        }
+      ]
+    }
     return copyPdfWithoutOcr(file, arrayBuffer)
   }
 
-  return createOcrPdf(file, arrayBuffer)
+  return createOcrPdf(file, arrayBuffer, selectedPages)
 }

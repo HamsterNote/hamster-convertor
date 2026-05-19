@@ -426,7 +426,7 @@ describe('app upload feedback', () => {
     expect(svgOptions).toContain('txt')
   })
 
-  it('shows page-select button for PDF source with image target only', async () => {
+  it('shows page-select button for all PDF source targets', async () => {
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
     fireEvent.change(input as HTMLInputElement, {
@@ -434,7 +434,7 @@ describe('app upload feedback', () => {
     })
 
     await screen.findByRole('row', { name: /sample\.pdf/ })
-    expect(screen.queryByRole('button', { name: 'Select pages' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
 
     const tableSelects = getFileTargetSelects()
     fireEvent.change(tableSelects[0], { target: { value: 'png' } })
@@ -447,16 +447,7 @@ describe('app upload feedback', () => {
     expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
 
     fireEvent.change(tableSelects[0], { target: { value: 'txt' } })
-    expect(screen.queryByRole('button', { name: 'Select pages' })).not.toBeInTheDocument()
-
-    fireEvent.change(input as HTMLInputElement, {
-      target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] }
-    })
-
-    await screen.findByRole('row', { name: /photo\.png/ })
-    const updatedTableSelects = getFileTargetSelects()
-    fireEvent.change(updatedTableSelects[1], { target: { value: 'pdf' } })
-    expect(screen.queryAllByRole('button', { name: 'Select pages' })).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
   })
 
   it('confirms selected PDF image pages and passes them to convertFile', async () => {
@@ -491,7 +482,7 @@ describe('app upload feedback', () => {
           source: 'pdf',
           target: 'png',
           options: expect.objectContaining({
-            pdf: expect.objectContaining({ selectedImagePages: [1, 3] })
+            pdf: expect.objectContaining({ selectedPages: [1, 3] })
           })
         })
       )
