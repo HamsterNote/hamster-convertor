@@ -437,10 +437,10 @@
     "@hamster-note/document-parser" "0.3.1"
     "@hamster-note/types" "^0.7.0"
 
-"@hamster-note/image-parser@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@hamster-note/image-parser/-/image-parser-0.1.0.tgz#ae94eb5b25bae3d47a4bbfaace2159520fec5001"
-  integrity sha512-GCZyVpJIkEP96KrUC2jKZtw9fkb4/b3Oxq0FWa5B5eqhgGqntBAHv7v8MbNS6Sa3FSUkSXNxZP8DIkJIx0Csiw==
+"@hamster-note/image-parser@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.npmjs.org/@hamster-note/image-parser/-/image-parser-0.2.0.tgz#1c5891b979c2a084f6a831a18828338b8f9abab0"
+  integrity sha512-Il34v6prDi5njQ3PlqBRTnG+q/LFeB9tcsv6/pd7QTh9ajKpUgYV7TFiw/LCGi01aH6DK3G+Erab3Rj5m4J1Pw==
   dependencies:
     "@hamster-note/document-parser" "^0.3.0"
     "@hamster-note/types" "0.7.0"

@@ -24,7 +24,7 @@
   "dependencies": {
     "@hamster-note/document-parser": "^0.3.1",
     "@hamster-note/html-parser": "^0.6.0",
-    "@hamster-note/image-parser": "^0.1.0",
+    "@hamster-note/image-parser": "^0.2.0",
     "@hamster-note/pdf-parser": "^0.6.0",
     "@hamster-note/txt-parser": "^0.1.0",
     "@hamster-note/types": "^0.7.0",
