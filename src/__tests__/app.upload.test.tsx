@@ -8,8 +8,8 @@ vi.mock('../lib/converter', () => ({
   convertFile: vi.fn(),
   getSupportedTargets: vi.fn((source: string) => {
     const targets: Record<string, string[]> = {
-      pdf: ['pdf', 'txt', 'png', 'jpg', 'webp'],
-      txt: ['png'],
+      pdf: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
+      txt: ['png', 'html'],
       image: ['pdf', 'txt', 'png', 'jpg', 'webp']
     }
     return targets[source] ?? ['txt']
@@ -27,6 +27,31 @@ vi.mock('../components/PdfPageSelectorModal', () => ({
       <div role="dialog" aria-label="Select Pages">
         <button type="button" onClick={() => onConfirm([1, 3])}>
           Confirm test pages
+        </button>
+      </div>
+    ) : null
+}))
+
+vi.mock('../components/TextControlModal', () => ({
+  default: ({
+    open,
+    onConfirm,
+    onCancel
+  }: {
+    open: boolean
+    onConfirm: (options: { respectWhitespaces: boolean; ignoreImages: boolean }) => void
+    onCancel: () => void
+  }) =>
+    open ? (
+      <div role="dialog" aria-label="Text Control Settings">
+        <button
+          type="button"
+          onClick={() => onConfirm({ respectWhitespaces: true, ignoreImages: false })}
+        >
+          Confirm text control
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel text control
         </button>
       </div>
     ) : null
@@ -628,5 +653,212 @@ describe('app upload feedback', () => {
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
     })
+  })
+
+  // TDD: HTML Decode Options UI tests for html-parser@0.8.0 DecodeOptions
+
+  it('TDD-1: HTML decode options visible only when target is html', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    const targetSelect = getFileTargetSelects()[0]
+
+    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: /exclude text from background/i })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /text control/i })).not.toBeInTheDocument()
+
+    fireEvent.change(targetSelect, { target: { value: 'html' } })
+
+    expect(screen.getByRole('checkbox', { name: /include background/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('checkbox', { name: /exclude text from background/i })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /text control/i })).toBeInTheDocument()
+
+    fireEvent.change(targetSelect, { target: { value: 'txt' } })
+
+    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: /exclude text from background/i })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /text control/i })).not.toBeInTheDocument()
+  })
+
+  it('TDD-2: background options rendered inline for html target', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    const includeBackgroundCheckbox = screen.getByRole('checkbox', { name: /include background/i })
+    const excludeTextCheckbox = screen.getByRole('checkbox', {
+      name: /exclude text from background/i
+    })
+    const backgroundQualitySelect = screen.getByRole('combobox', { name: /background quality/i })
+
+    const row = screen.getByRole('row', { name: /sample\.pdf/ })
+    expect(row).toContainElement(includeBackgroundCheckbox)
+    expect(row).toContainElement(excludeTextCheckbox)
+    expect(row).toContainElement(backgroundQualitySelect)
+
+    expect(includeBackgroundCheckbox).toBeChecked()
+    expect(excludeTextCheckbox).not.toBeChecked()
+  })
+
+  it('TDD-3: text control button opens modal with settings', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /text control/i }))
+
+    expect(screen.getByRole('dialog', { name: /text control/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /text control/i })).not.toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/text control configured/i)).toBeInTheDocument()
+  })
+
+  it('TDD-4: row-scoped HTML options - changing one row does not affect another', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf1'], 'first.pdf', { type: 'application/pdf' })] }
+    })
+    await screen.findByRole('row', { name: /first\.pdf/ })
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf2'], 'second.pdf', { type: 'application/pdf' })] }
+    })
+    await screen.findByRole('row', { name: /second\.pdf/ })
+
+    const selects = getFileTargetSelects()
+    fireEvent.change(selects[0], { target: { value: 'html' } })
+    fireEvent.change(selects[1], { target: { value: 'html' } })
+
+    const includeBgCheckboxes = screen.getAllByRole('checkbox', { name: /include background/i })
+    expect(includeBgCheckboxes).toHaveLength(2)
+    expect(includeBgCheckboxes[0]).toBeChecked()
+    expect(includeBgCheckboxes[1]).toBeChecked()
+
+    fireEvent.click(includeBgCheckboxes[0])
+
+    const updatedCheckboxes = screen.getAllByRole('checkbox', { name: /include background/i })
+    expect(updatedCheckboxes[0]).not.toBeChecked()
+    expect(updatedCheckboxes[1]).toBeChecked()
+
+    const textControlBtns = screen.getAllByRole('button', { name: /text control/i })
+    fireEvent.click(textControlBtns[0])
+    fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
+
+    await waitFor(() => {
+      const summaries = screen.getAllByText(/text control configured/i)
+      expect(summaries).toHaveLength(1)
+    })
+  })
+
+  it('TDD-5: convertFile receives options.html with decode options', async () => {
+    const { convertFile } = await import('../lib/converter')
+    vi.mocked(convertFile).mockResolvedValue([
+      {
+        blob: new Blob(['<html></html>'], { type: 'text/html' }),
+        filename: 'sample.html',
+        mimeType: 'text/html',
+        targetFormat: 'html'
+      }
+    ])
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /exclude text from background/i }))
+
+    fireEvent.change(screen.getByRole('combobox', { name: /background quality/i }), {
+      target: { value: '1.0' }
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /text control/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /text control/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(convertFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'pdf',
+          target: 'html',
+          options: expect.objectContaining({
+            decode: expect.objectContaining({
+              includeBackground: true,
+              excludeTextFromBackground: true,
+              backgroundQuality: 1.0,
+              textControl: expect.objectContaining({
+                respectWhitespaces: true,
+                ignoreImages: false
+              }),
+              background: expect.objectContaining({
+                includeBackground: true,
+                excludeTextFromBackground: true,
+                backgroundQuality: 1.0
+              })
+            })
+          })
+        })
+      )
+    })
+  })
+
+  it('TDD-6: HTML decode options not visible for non-html targets', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['text'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+
+    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /text control/i })).not.toBeInTheDocument()
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    expect(screen.getByRole('checkbox', { name: /include background/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /text control/i })).toBeInTheDocument()
   })
 })

@@ -5,23 +5,41 @@ import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
 import FullscreenLoading from './components/FullscreenLoading'
 import Header from './components/Header'
+import HtmlDecodeOptionsModal, { type DecodeTextControl } from './components/HtmlDecodeOptionsModal'
 import PdfPageSelectorModal from './components/PdfPageSelectorModal'
 import {
   type ConversionResult,
   type ConversionWarning,
   convertFile,
   getSupportedTargets,
+  type HtmlDecodeOptions,
   type SourceFormat,
   type TargetFormat
 } from './lib/converter'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
+
+type BackgroundDecodeOptions = NonNullable<HtmlDecodeOptions['background']>
 
 type ConversionOptions = {
   pdf: {
     ocr: boolean
     selectedPages?: number[]
   }
+  html?: {
+    textControl?: DecodeTextControl
+    background?: BackgroundDecodeOptions
+  }
 }
+
+const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
+  includeBackground: true,
+  backgroundQuality: 0.3,
+  excludeTextFromBackground: false
+}
+
+const createDefaultHtmlOptions = (): NonNullable<ConversionOptions['html']> => ({
+  background: { ...DEFAULT_HTML_BACKGROUND_OPTIONS }
+})
 
 type FileItem = {
   id: string
@@ -135,9 +153,13 @@ function App() {
   const [activePdfPageSelectorItemId, setActivePdfPageSelectorItemId] = useState<string | null>(
     null
   )
+  const [activeHtmlOptionsItemId, setActiveHtmlOptionsItemId] = useState<string | null>(null)
 
   const activePdfItem = activePdfPageSelectorItemId
     ? items.find(it => it.id === activePdfPageSelectorItemId)
+    : undefined
+  const activeHtmlOptionsItem = activeHtmlOptionsItemId
+    ? items.find(it => it.id === activeHtmlOptionsItemId)
     : undefined
 
   useEffect(() => {
@@ -192,7 +214,14 @@ function App() {
       prev.map(it => {
         if (it.id !== id) return it
         const hadImageTarget = ['png', 'jpg', 'webp'].includes(it.target)
-        const newItem = { ...it, target }
+        const conversionOptions: ConversionOptions = {
+          ...it.conversionOptions,
+          html:
+            target === 'html'
+              ? (it.conversionOptions.html ?? createDefaultHtmlOptions())
+              : undefined
+        }
+        const newItem = { ...it, target, conversionOptions }
         if (
           hadImageTarget &&
           !['png', 'jpg', 'webp'].includes(target) &&
@@ -215,7 +244,13 @@ function App() {
     setItems(prev =>
       prev.map(it =>
         it.id === id
-          ? { ...it, conversionOptions: { pdf: { ...it.conversionOptions.pdf, ocr } } }
+          ? {
+              ...it,
+              conversionOptions: {
+                ...it.conversionOptions,
+                pdf: { ...it.conversionOptions.pdf, ocr }
+              }
+            }
           : it
       )
     )
@@ -227,10 +262,54 @@ function App() {
         it.id === id
           ? {
               ...it,
-              conversionOptions: { pdf: { ...it.conversionOptions.pdf, selectedPages } }
+              conversionOptions: {
+                ...it.conversionOptions,
+                pdf: { ...it.conversionOptions.pdf, selectedPages }
+              }
             }
           : it
       )
+    )
+  }
+
+  const changeHtmlBackgroundOption = <Key extends keyof BackgroundDecodeOptions>(
+    id: string,
+    key: Key,
+    value: BackgroundDecodeOptions[Key]
+  ) => {
+    setItems(prev =>
+      prev.map(it => {
+        if (it.id !== id) return it
+        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
+        const background = {
+          ...DEFAULT_HTML_BACKGROUND_OPTIONS,
+          ...htmlOptions.background,
+          [key]: value
+        }
+        return {
+          ...it,
+          conversionOptions: {
+            ...it.conversionOptions,
+            html: { ...htmlOptions, background }
+          }
+        }
+      })
+    )
+  }
+
+  const changeHtmlTextControl = (id: string, textControl: DecodeTextControl | undefined) => {
+    setItems(prev =>
+      prev.map(it => {
+        if (it.id !== id) return it
+        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
+        return {
+          ...it,
+          conversionOptions: {
+            ...it.conversionOptions,
+            html: { ...htmlOptions, textControl }
+          }
+        }
+      })
     )
   }
 
@@ -289,11 +368,25 @@ function App() {
         markConverting(id)
 
         try {
+          const htmlBackground = {
+            ...DEFAULT_HTML_BACKGROUND_OPTIONS,
+            ...current.conversionOptions.html?.background
+          }
+          const htmlOptions = current.conversionOptions.html
+            ? {
+                ...htmlBackground,
+                textControl: current.conversionOptions.html.textControl,
+                background: htmlBackground
+              }
+            : undefined
           const results = await convertFile({
             file: current.file,
             source: current.source,
             target: current.target,
-            options: current.conversionOptions
+            options: {
+              pdf: current.conversionOptions.pdf,
+              decode: htmlOptions
+            }
           })
           markDone(id, results)
         } catch (error) {
@@ -342,6 +435,12 @@ function App() {
     } finally {
       setIsPreparingDownload(false)
     }
+  }
+
+  const getTextControlSummary = (textControl?: DecodeTextControl): string => {
+    if (!textControl || Object.keys(textControl).length === 0)
+      return t('options.textControlsDefault')
+    return t('options.textControlConfigured')
   }
 
   return (
@@ -402,6 +501,16 @@ function App() {
                       }
                       return true
                     })
+                    const isOptionsDisabled =
+                      it.status === 'queued' ||
+                      it.status === 'converting' ||
+                      it.status === 'done' ||
+                      isPreparingDownload
+                    const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
+                    const htmlBackground = {
+                      ...DEFAULT_HTML_BACKGROUND_OPTIONS,
+                      ...htmlOptions.background
+                    }
                     return (
                       <tr key={it.id}>
                         <td>{it.file.name}</td>
@@ -457,6 +566,73 @@ function App() {
                                   })}
                                 </div>
                               )}
+                            </div>
+                          )}
+                          {it.target === 'html' && (
+                            <div className="html-row-options">
+                              <div className="html-row-options__title">
+                                {t('options.htmlBackground')}
+                              </div>
+                              <label className="html-row-options__check">
+                                <input
+                                  type="checkbox"
+                                  checked={htmlBackground.includeBackground}
+                                  onChange={event =>
+                                    changeHtmlBackgroundOption(
+                                      it.id,
+                                      'includeBackground',
+                                      event.target.checked
+                                    )
+                                  }
+                                  disabled={isOptionsDisabled}
+                                />
+                                <span>{t('options.includeBackground')}</span>
+                              </label>
+                              <label className="html-row-options__quality">
+                                <span>{t('options.backgroundQuality')}</span>
+                                <select
+                                  value={String(htmlBackground.backgroundQuality)}
+                                  onChange={event =>
+                                    changeHtmlBackgroundOption(
+                                      it.id,
+                                      'backgroundQuality',
+                                      Number(event.target.value)
+                                    )
+                                  }
+                                  disabled={isOptionsDisabled}
+                                  aria-label={t('options.backgroundQuality')}
+                                >
+                                  <option value="0.3">{t('options.backgroundQualityLow')}</option>
+                                  <option value="0.6">
+                                    {t('options.backgroundQualityMedium')}
+                                  </option>
+                                  <option value="1.0">{t('options.backgroundQualityHigh')}</option>
+                                </select>
+                              </label>
+                              <label className="html-row-options__check">
+                                <input
+                                  type="checkbox"
+                                  checked={htmlBackground.excludeTextFromBackground}
+                                  onChange={event =>
+                                    changeHtmlBackgroundOption(
+                                      it.id,
+                                      'excludeTextFromBackground',
+                                      event.target.checked
+                                    )
+                                  }
+                                  disabled={isOptionsDisabled}
+                                />
+                                <span>{t('options.excludeTextFromBackground')}</span>
+                              </label>
+                              <button
+                                type="button"
+                                className="btn btn--ghost html-row-options__text-button"
+                                onClick={() => setActiveHtmlOptionsItemId(it.id)}
+                                disabled={isOptionsDisabled}
+                              >
+                                <span>{t('options.textControls')}</span>
+                                <small>{getTextControlSummary(htmlOptions.textControl)}</small>
+                              </button>
                             </div>
                           )}
                         </td>
@@ -575,6 +751,17 @@ function App() {
           onConfirm={pages => {
             changeSelectedPages(activePdfItem.id, pages)
             setActivePdfPageSelectorItemId(null)
+          }}
+        />
+      )}
+      {activeHtmlOptionsItem && (
+        <HtmlDecodeOptionsModal
+          open
+          textControl={activeHtmlOptionsItem.conversionOptions.html?.textControl}
+          onCancel={() => setActiveHtmlOptionsItemId(null)}
+          onConfirm={textControl => {
+            changeHtmlTextControl(activeHtmlOptionsItem.id, textControl)
+            setActiveHtmlOptionsItemId(null)
           }}
         />
       )}

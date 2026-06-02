@@ -240,4 +240,46 @@ describe('txt to html adapter', () => {
     expect(htmlContent).not.toContain('<script>alert("xss")</script>')
     expect(htmlContent).toContain('&lt;script&gt;')
   })
+
+  // TDD: 验证 DecodeOptions 能从 ConversionRequest.options.decode 传递到 HtmlParser.decode
+  // html-parser@0.8.0 新增 DecodeOptions 参数，此处测试 plumbing 是否就绪
+  it('passes DecodeOptions to HtmlParser.decode when options.decode is provided', async () => {
+    // 定义样本 DecodeOptions，包含 textControl 和 background 两个子字段
+    const decodeOptions = {
+      textControl: {
+        fontSize: 14,
+        lineHeight: 1.5,
+        fontWeight: 700,
+        italic: true,
+        color: '#333333',
+        fontFamily: 'Arial'
+      },
+      background: {
+        includeBackground: true,
+        backgroundQuality: 0.8,
+        excludeTextFromBackground: true
+      }
+    }
+
+    mockTxtParserEncode.mockResolvedValue({
+      outline: undefined,
+      text: 'Hello World'
+    })
+
+    mockHtmlParserDecode.mockResolvedValue(
+      new File(['<html><body>Hello World</body></html>'], 'output.html', { type: 'text/html' })
+    )
+
+    const request = createHtmlRequest()
+    request.options = { decode: decodeOptions }
+
+    await convertTxtToHtml(request)
+
+    // 核心断言：HtmlParser.decode 应被调用两次参数 (intermediate, decodeOptions)
+    // 当前实现只传了 intermediate，所以这个测试会 FAIL（TDD 红灯阶段）
+    expect(mockHtmlParserDecode).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Hello World' }),
+      decodeOptions
+    )
+  })
 })

@@ -10,6 +10,28 @@ import { convertTxtToHtml, convertTxtToImage } from './converter/txt-adapter'
 
 export type ConversionWarning = string | { message: string }
 
+/**
+ * html-parser@0.8.0 的 DecodeOptions 类型定义
+ * 用于控制 HTML 解码时的文字样式和背景渲染行为
+ */
+export type HtmlDecodeOptions = {
+  textControl?: {
+    fontSize?: number
+    lineHeight?: number
+    fontWeight?: number
+    italic?: boolean
+    color?: string
+    fontFamily?: string
+    vertical?: string
+    dir?: string
+  }
+  background?: {
+    includeBackground?: boolean
+    backgroundQuality?: number
+    excludeTextFromBackground?: boolean
+  }
+}
+
 export type PdfToHtmlResult = {
   html: string
   warnings: ConversionWarning[]
@@ -17,7 +39,7 @@ export type PdfToHtmlResult = {
 
 export type ConvertPdfToHtml = (
   input: Uint8Array,
-  options?: { selectedPages?: number[] }
+  options?: { selectedPages?: number[]; decodeOptions?: HtmlDecodeOptions }
 ) => Promise<PdfToHtmlResult>
 
 export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
@@ -43,6 +65,7 @@ export type ConversionRequest = {
       selectedPages?: number[]
       selectedImagePages?: number[]
     }
+    decode?: HtmlDecodeOptions
   }
 }
 
@@ -88,17 +111,22 @@ const loadParserModules = async (): Promise<[PdfParserModule, HtmlParserModule]>
 
 const extractHtml = async ({
   HtmlParser,
-  intermediateDocument
+  intermediateDocument,
+  decodeOptions
 }: {
   HtmlParser: HtmlParserModule['HtmlParser']
   intermediateDocument: IntermediateDocument
+  decodeOptions?: HtmlDecodeOptions
 }): Promise<HtmlDecodeResult> => {
   const warnings: ConversionWarning[] = []
-  const html = await HtmlParser.decodeToHtml(intermediateDocument)
+  const html = await HtmlParser.decodeToHtml(intermediateDocument, decodeOptions)
   return { html, warnings }
 }
 
-const decodeByParserModules = async (input: Uint8Array): Promise<PdfToHtmlResult> => {
+const decodeByParserModules = async (
+  input: Uint8Array,
+  decodeOptions?: HtmlDecodeOptions
+): Promise<PdfToHtmlResult> => {
   const [pdfParserModule, htmlParserModule] = await loadParserModules()
   const { PdfParser } = pdfParserModule
   const { HtmlParser } = htmlParserModule
@@ -113,7 +141,7 @@ const decodeByParserModules = async (input: Uint8Array): Promise<PdfToHtmlResult
     throw new Error('PDF parser returned no intermediate document')
   }
 
-  return extractHtml({ HtmlParser, intermediateDocument: intermediate })
+  return extractHtml({ HtmlParser, intermediateDocument: intermediate, decodeOptions })
 }
 
 const fallbackHtml = `<!doctype html>
@@ -160,10 +188,10 @@ export const convertPdfToHtml: ConvertPdfToHtml = async (input, options) => {
     const srcDoc = await PDFDocument.load(arrayBuffer)
     const pageNumbers = getSelectedPdfPageNumbers(srcDoc.getPageCount(), options.selectedPages)
     const subsetBuffer = await extractPdfPages(arrayBuffer, pageNumbers)
-    return decodeByParserModules(new Uint8Array(subsetBuffer))
+    return decodeByParserModules(new Uint8Array(subsetBuffer), options?.decodeOptions)
   }
 
-  return decodeByParserModules(input)
+  return decodeByParserModules(input, options?.decodeOptions)
 }
 
 const replaceExtension = (filename: string, extension: string): string => {
@@ -196,7 +224,7 @@ const readFileAsArrayBuffer = async (file: File): Promise<ArrayBuffer> => {
 
 const convertPdfFileToHtml = async (
   file: File,
-  options?: { selectedPages?: number[] }
+  options?: { selectedPages?: number[]; decodeOptions?: HtmlDecodeOptions }
 ): Promise<ConversionResult[]> => {
   const buffer = await readFileAsArrayBuffer(file)
   const { html, warnings } = await convertPdfToHtml(new Uint8Array(buffer), options)
@@ -214,7 +242,10 @@ const convertPdfFileToHtml = async (
 }
 
 const convertPdfToHtmlAdapter = async (request: ConversionRequest): Promise<ConversionResult[]> => {
-  return convertPdfFileToHtml(request.file, { selectedPages: request.options?.pdf?.selectedPages })
+  return convertPdfFileToHtml(request.file, {
+    selectedPages: request.options?.pdf?.selectedPages,
+    decodeOptions: request.options?.decode
+  })
 }
 
 const createE2EResult = async (request: ConversionRequest): Promise<ConversionResult[]> => {

@@ -134,7 +134,7 @@ export const convertTxtToHtml = async (request: ConversionRequest): Promise<Conv
   const intermediate: IntermediateDocument = await TxtParser.encode(buffer)
 
   const { HtmlParser } = await import('@hamster-note/html-parser')
-  const result = await HtmlParser.decode(intermediate)
+  const result = await HtmlParser.decode(intermediate, request.options?.decode)
 
   let blob: Blob
   if (result instanceof File) {

@@ -29,8 +29,9 @@ class MockHtmlPage {
     return this.number
   }
 
-  getSize(_scale: number): [number, number] {
-    return [595, 842]
+  // getSize 返回类型从 [number, number] 改为 Number2 ({x, y})
+  getSize(_scale: number): { x: number; y: number } {
+    return { x: 595, y: 842 }
   }
 
   getPureText(): string {
@@ -83,12 +84,18 @@ export class HtmlParser {
     return new MockHtmlDocument(pageTexts)
   }
 
-  static async decode(_intermediateDocument: IntermediateDocument): Promise<File> {
+  static async decode(
+    _intermediateDocument: IntermediateDocument,
+    _options?: unknown
+  ): Promise<File> {
     const file = new File([html], 'converted.html', { type: 'text/html' })
     return file
   }
 
-  static async decodeToHtml(_intermediateDocument: IntermediateDocument): Promise<string> {
+  static async decodeToHtml(
+    _intermediateDocument: IntermediateDocument,
+    _options?: unknown
+  ): Promise<string> {
     return html
   }
 }

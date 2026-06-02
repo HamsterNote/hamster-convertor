@@ -282,6 +282,123 @@ a {
   color: inherit;
 }
 
+.html-row-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, var(--surface-veil-80), var(--surface-veil-70)),
+    repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 8px,
+      var(--color-primary-veil) 8px,
+      var(--color-primary-veil) 16px
+    );
+}
+
+.html-row-options__title {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-table-head);
+}
+
+.html-row-options__check,
+.html-row-options__quality {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.html-row-options__quality {
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+
+.html-row-options__quality select {
+  flex: 1 1 110px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: inherit;
+}
+
+.html-row-options__check input {
+  accent-color: var(--color-primary-500);
+}
+
+.html-row-options__text-button {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+}
+
+.html-row-options__text-button small {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.html-options-modal {
+  max-width: 560px;
+}
+
+.html-options-modal__body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px 20px;
+  overflow-y: auto;
+}
+
+.html-options-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.html-options-modal__field--wide {
+  grid-column: 1 / -1;
+}
+
+.html-options-modal__field input,
+.html-options-modal__field select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+}
+
+.html-options-modal__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.html-options-modal__checkbox input {
+  accent-color: var(--color-primary-500);
+}
+
 .actions {
   display: flex;
   gap: 10px;
@@ -565,6 +682,10 @@ a {
   .pdf-modal__actions .btn {
     flex: 1 1 auto;
     text-align: center;
+  }
+  .html-options-modal__body {
+    grid-template-columns: 1fr;
+    padding: 14px 16px;
   }
 }
 

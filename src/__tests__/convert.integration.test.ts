@@ -314,14 +314,15 @@ describe('html to txt integration', () => {
   it('converts sample.html fixture to txt', async () => {
     const htmlContent = await loadHtmlFixture('sample.html')
 
+    // getSize 返回类型从 [number, number] 改为 Number2 ({x, y})
     const mockPage1 = {
       getNumber: () => 1,
-      getSize: (_scale: number): [number, number] => [595, 842],
+      getSize: (_scale: number): { x: number; y: number } => ({ x: 595, y: 842 }),
       getPureText: () => 'Hamster Note Document'
     }
     const mockPage2 = {
       getNumber: () => 2,
-      getSize: (_scale: number): [number, number] => [595, 842],
+      getSize: (_scale: number): { x: number; y: number } => ({ x: 595, y: 842 }),
       getPureText: () => 'This is a nested strong text and emphasized content within a paragraph.'
     }
 
@@ -343,6 +344,52 @@ describe('html to txt integration', () => {
     expect(text).toContain('Hamster Note Document')
     expect(text).toContain(
       'This is a nested strong text and emphasized content within a paragraph.'
+    )
+  })
+})
+
+// TDD: 验证 DecodeOptions 能从 ConversionRequest.options.decode 传递到 HtmlParser.decodeToHtml
+// html-parser@0.8.0 新增 DecodeOptions 参数，此处测试 pdf→html 流程的 plumbing 是否就绪
+describe('decode options forwarding', () => {
+  it('passes DecodeOptions to HtmlParser.decodeToHtml when options.decode is provided', async () => {
+    const decodeOptions = {
+      textControl: {
+        fontSize: 16,
+        lineHeight: 1.8,
+        fontWeight: 400,
+        italic: false,
+        color: '#000000',
+        fontFamily: 'Helvetica',
+        vertical: '',
+        dir: 'ltr' as const
+      },
+      background: {
+        includeBackground: false,
+        backgroundQuality: 0.3,
+        excludeTextFromBackground: false
+      }
+    }
+
+    const pdfBuffer = await loadPdfFixture('sample.pdf')
+    const file = new File([new Uint8Array(pdfBuffer)], 'sample.pdf', { type: 'application/pdf' })
+
+    // 捕获 decodeToHtml 的调用参数
+    const { HtmlParser } = await import('@hamster-note/html-parser')
+    const decodeToHtmlSpy = HtmlParser.decodeToHtml as ReturnType<typeof vi.fn>
+    decodeToHtmlSpy.mockClear()
+
+    await convertFile({
+      file,
+      source: 'pdf',
+      target: 'html',
+      options: { decode: decodeOptions }
+    } as Parameters<typeof convertFile>[0])
+
+    // 核心断言：decodeToHtml 应被调用两次参数 (intermediateDocument, decodeOptions)
+    // 当前实现只传了 intermediateDocument，所以这个测试会 FAIL（TDD 红灯阶段）
+    expect(decodeToHtmlSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ outline: undefined }),
+      decodeOptions
     )
   })
 })

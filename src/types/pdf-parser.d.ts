@@ -1,7 +1,8 @@
 declare module '@hamster-note/pdf-parser' {
   import { IntermediateDocument } from '@hamster-note/types'
 
-  export type ParserInput = File | ArrayBuffer
+  // ParserInput 与 @hamster-note/document-parser 保持一致
+  export type ParserInput = ArrayBuffer | ArrayBufferView | Blob
 
   export type EncodeOptions = {
     maxPages?: number
@@ -29,23 +30,25 @@ declare module '@hamster-note/pdf-parser' {
   export class PdfParser {
     static readonly exts: readonly ['pdf']
 
+    // encode 不再返回 undefined
     static encode(
       fileOrBuffer: ParserInput,
       options?: EncodeOptions,
       onProgress?: ProgressReporter
-    ): Promise<IntermediateDocument | undefined>
+    ): Promise<IntermediateDocument>
 
     static toArrayBuffer(fileOrBuffer: ParserInput): Promise<ArrayBuffer>
 
+    // decode 不再返回 undefined
     static decode(
       intermediateDocument: IntermediateDocument,
       options?: DecodeOptions,
       onProgress?: ProgressReporter
-    ): Promise<File | ArrayBuffer | undefined>
+    ): Promise<ParserInput>
 
     encode(input: ParserInput): Promise<IntermediateDocument>
 
-    decode(intermediateDocument: IntermediateDocument): Promise<File | ArrayBuffer | undefined>
+    decode(intermediateDocument: IntermediateDocument): Promise<ParserInput>
   }
 
   export { PdfParser }
