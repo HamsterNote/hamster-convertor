@@ -1,12 +1,19 @@
 import type { IntermediateDocument } from '@hamster-note/types'
 
-import type { ConversionRequest, ConversionResult } from '../converter'
-import { encodeCanvasToImage } from './image-encoding'
+import {
+  applyHtmlLayout,
+  type ConversionRequest,
+  type ConversionResult,
+  type HtmlDecodeOptions
+} from '../converter'
 import type { ConcreteImageTarget } from './image-encoding'
+import { encodeCanvasToImage } from './image-encoding'
 
 type JsPdfModule = typeof import('jspdf')
 
 type ImageParserModule = typeof import('@hamster-note/image-parser')
+
+type HtmlParserModule = typeof import('@hamster-note/html-parser')
 
 type ImageDimensions = {
   height: number
@@ -142,6 +149,32 @@ export const convertImageToTxt = async ({
       filename: appendBeforeExtension(file.name, '-ocr', 'txt'),
       mimeType,
       targetFormat: 'txt'
+    }
+  ]
+}
+
+export const convertImageToHtml = async ({
+  file,
+  options
+}: ConversionRequest): Promise<ConversionResult[]> => {
+  const [{ ImageParser }, { HtmlParser }, arrayBuffer] = await Promise.all([
+    import('@hamster-note/image-parser') as Promise<ImageParserModule>,
+    import('@hamster-note/html-parser') as Promise<HtmlParserModule>,
+    readFileAsArrayBuffer(file)
+  ])
+
+  const intermediate = await ImageParser.encode(arrayBuffer)
+  const decodeOptions: HtmlDecodeOptions | undefined = options?.decode
+  const html = await HtmlParser.decodeToHtml(intermediate, decodeOptions)
+  const laidOutHtml = applyHtmlLayout(html, options?.layout)
+  const mimeType = 'text/html;charset=utf-8'
+
+  return [
+    {
+      blob: new Blob([laidOutHtml], { type: mimeType }),
+      filename: replaceExtension(file.name, 'html'),
+      mimeType,
+      targetFormat: 'html'
     }
   ]
 }

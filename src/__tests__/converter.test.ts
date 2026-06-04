@@ -11,7 +11,7 @@ describe('getSupportedTargets', () => {
   })
 
   it('returns exact ordered list for image source', () => {
-    expect(getSupportedTargets('image')).toEqual(['pdf', 'txt', 'png', 'jpg', 'webp'])
+    expect(getSupportedTargets('image')).toEqual(['pdf', 'txt', 'png', 'jpg', 'webp', 'html'])
   })
 
   it('returns exact ordered list for html source', () => {

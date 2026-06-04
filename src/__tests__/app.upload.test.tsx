@@ -62,6 +62,15 @@ const getFileTargetSelects = () => {
   return table.querySelectorAll('select.file-table.select')
 }
 
+const changeNativeSelectValue = (select: HTMLSelectElement, value: string) => {
+  const valueDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')
+  const setValue = valueDescriptor?.set
+  if (!setValue) throw new Error('HTMLSelectElement value setter is unavailable')
+
+  setValue.call(select, value)
+  select.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
 describe('app upload feedback', () => {
   beforeEach(async () => {
     window.localStorage.setItem('i18nextLng', 'en')
@@ -804,9 +813,10 @@ describe('app upload feedback', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: /exclude text from background/i }))
 
-    fireEvent.change(screen.getByRole('combobox', { name: /background quality/i }), {
-      target: { value: '1.0' }
-    })
+    const qualitySelect = screen.getByRole('combobox', {
+      name: /background quality/i
+    }) as HTMLSelectElement
+    changeNativeSelectValue(qualitySelect, '0.85')
 
     fireEvent.click(screen.getByRole('button', { name: /text control/i }))
     fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
@@ -823,24 +833,65 @@ describe('app upload feedback', () => {
           source: 'pdf',
           target: 'html',
           options: expect.objectContaining({
-            decode: expect.objectContaining({
-              includeBackground: true,
-              excludeTextFromBackground: true,
-              backgroundQuality: 1.0,
+            decode: {
               textControl: expect.objectContaining({
                 respectWhitespaces: true,
                 ignoreImages: false
               }),
-              background: expect.objectContaining({
+              background: {
                 includeBackground: true,
                 excludeTextFromBackground: true,
-                backgroundQuality: 1.0
-              })
-            })
+                backgroundQuality: 0.85
+              }
+            }
           })
         })
       )
     })
+  })
+
+  it('TDD-7: background quality select value changes on user interaction', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    const qualitySelect = screen.getByRole('combobox', {
+      name: /background quality/i
+    }) as HTMLSelectElement
+
+    expect(qualitySelect.value).toBe('0.3')
+
+    changeNativeSelectValue(qualitySelect, '1')
+
+    await waitFor(() => {
+      expect(qualitySelect.value).toBe('1')
+    })
+  })
+
+  it('TDD-8: background quality options stay within html-parser contract', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    const qualitySelect = screen.getByRole('combobox', {
+      name: /background quality/i
+    }) as HTMLSelectElement
+    const optionValues = Array.from(qualitySelect.options).map(option => option.value)
+
+    expect(optionValues).toEqual(['0.3', '0.6', '0.85', '1'])
+    expect(optionValues).not.toContain('2')
   })
 
   it('TDD-6: HTML decode options not visible for non-html targets', async () => {

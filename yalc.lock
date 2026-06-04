@@ -8,6 +8,11 @@
     "@hamster-note/types": {
       "signature": "fa2b8b5ff0d9fa519831ed01ebaa4904",
       "file": true
+    },
+    "@hamster-note/html-parser": {
+      "signature": "2f6aebae96adf1b3869e10a1523e6071",
+      "file": true,
+      "replaced": "0.8.0"
     }
   }
 }

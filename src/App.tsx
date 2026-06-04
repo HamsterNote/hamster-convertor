@@ -26,8 +26,12 @@ type ConversionOptions = {
     selectedPages?: number[]
   }
   html?: {
-    textControl?: DecodeTextControl
+    textControl?: HtmlDecodeOptions['textControl']
     background?: BackgroundDecodeOptions
+    htmlLayout?: {
+      mode: 'paginated' | 'continuous'
+      widthMode?: 'actual' | 'fit'
+    }
   }
 }
 
@@ -37,8 +41,16 @@ const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
   excludeTextFromBackground: false
 }
 
+const HTML_BACKGROUND_QUALITY_OPTIONS = [
+  { value: 0.3, labelKey: 'options.backgroundQualityLow' },
+  { value: 0.6, labelKey: 'options.backgroundQualityMedium' },
+  { value: 0.85, labelKey: 'options.backgroundQualityHigh' },
+  { value: 1, labelKey: 'options.backgroundQualityUltra' }
+] as const
+
 const createDefaultHtmlOptions = (): NonNullable<ConversionOptions['html']> => ({
-  background: { ...DEFAULT_HTML_BACKGROUND_OPTIONS }
+  background: { ...DEFAULT_HTML_BACKGROUND_OPTIONS },
+  htmlLayout: { mode: 'paginated' }
 })
 
 type FileItem = {
@@ -313,6 +325,45 @@ function App() {
     )
   }
 
+  const changeHtmlLayoutMode = (id: string, mode: 'paginated' | 'continuous') => {
+    setItems(prev =>
+      prev.map(it => {
+        if (it.id !== id) return it
+        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
+        return {
+          ...it,
+          conversionOptions: {
+            ...it.conversionOptions,
+            html: {
+              ...htmlOptions,
+              htmlLayout: mode === 'continuous' ? { mode, widthMode: 'actual' } : { mode }
+            }
+          }
+        }
+      })
+    )
+  }
+
+  const changeHtmlLayoutWidthMode = (id: string, widthMode: 'actual' | 'fit') => {
+    setItems(prev =>
+      prev.map(it => {
+        if (it.id !== id) return it
+        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
+        const currentLayout = htmlOptions.htmlLayout ?? { mode: 'continuous' as const }
+        return {
+          ...it,
+          conversionOptions: {
+            ...it.conversionOptions,
+            html: {
+              ...htmlOptions,
+              htmlLayout: { ...currentLayout, widthMode }
+            }
+          }
+        }
+      })
+    )
+  }
+
   const markFailed = (id: string, errorMessage: string) => {
     setItems(prev =>
       prev.map(it => (it.id === id ? { ...it, status: 'failed', errorMessage } : it))
@@ -374,7 +425,6 @@ function App() {
           }
           const htmlOptions = current.conversionOptions.html
             ? {
-                ...htmlBackground,
                 textControl: current.conversionOptions.html.textControl,
                 background: htmlBackground
               }
@@ -385,7 +435,8 @@ function App() {
             target: current.target,
             options: {
               pdf: current.conversionOptions.pdf,
-              decode: htmlOptions
+              decode: htmlOptions,
+              layout: current.conversionOptions.html?.htmlLayout
             }
           })
           markDone(id, results)
@@ -511,6 +562,7 @@ function App() {
                       ...DEFAULT_HTML_BACKGROUND_OPTIONS,
                       ...htmlOptions.background
                     }
+                    const htmlLayout = htmlOptions.htmlLayout ?? { mode: 'paginated' as const }
                     return (
                       <tr key={it.id}>
                         <td>{it.file.name}</td>
@@ -602,11 +654,11 @@ function App() {
                                   disabled={isOptionsDisabled}
                                   aria-label={t('options.backgroundQuality')}
                                 >
-                                  <option value="0.3">{t('options.backgroundQualityLow')}</option>
-                                  <option value="0.6">
-                                    {t('options.backgroundQualityMedium')}
-                                  </option>
-                                  <option value="1.0">{t('options.backgroundQualityHigh')}</option>
+                                  {HTML_BACKGROUND_QUALITY_OPTIONS.map(option => (
+                                    <option key={option.value} value={String(option.value)}>
+                                      {t(option.labelKey)}
+                                    </option>
+                                  ))}
                                 </select>
                               </label>
                               <label className="html-row-options__check">
@@ -633,6 +685,56 @@ function App() {
                                 <span>{t('options.textControls')}</span>
                                 <small>{getTextControlSummary(htmlOptions.textControl)}</small>
                               </button>
+                              <div className="html-row-options__title">
+                                {t('options.htmlLayout')}
+                              </div>
+                              <label className="html-row-options__check">
+                                <input
+                                  type="radio"
+                                  name={`html-layout-${it.id}`}
+                                  checked={htmlLayout.mode === 'paginated'}
+                                  onChange={() => changeHtmlLayoutMode(it.id, 'paginated')}
+                                  disabled={isOptionsDisabled}
+                                />
+                                <span>{t('options.paginated')}</span>
+                              </label>
+                              <label className="html-row-options__check">
+                                <input
+                                  type="radio"
+                                  name={`html-layout-${it.id}`}
+                                  checked={htmlLayout.mode === 'continuous'}
+                                  onChange={() => changeHtmlLayoutMode(it.id, 'continuous')}
+                                  disabled={isOptionsDisabled}
+                                />
+                                <span>{t('options.continuous')}</span>
+                              </label>
+                              {htmlLayout.mode === 'continuous' && (
+                                <>
+                                  <div className="html-row-options__title">
+                                    {t('options.htmlWidthMode')}
+                                  </div>
+                                  <label className="html-row-options__check">
+                                    <input
+                                      type="radio"
+                                      name={`html-width-mode-${it.id}`}
+                                      checked={(htmlLayout.widthMode ?? 'actual') === 'actual'}
+                                      onChange={() => changeHtmlLayoutWidthMode(it.id, 'actual')}
+                                      disabled={isOptionsDisabled}
+                                    />
+                                    <span>{t('options.actualWidth')}</span>
+                                  </label>
+                                  <label className="html-row-options__check">
+                                    <input
+                                      type="radio"
+                                      name={`html-width-mode-${it.id}`}
+                                      checked={htmlLayout.widthMode === 'fit'}
+                                      onChange={() => changeHtmlLayoutWidthMode(it.id, 'fit')}
+                                      disabled={isOptionsDisabled}
+                                    />
+                                    <span>{t('options.fitWidth')}</span>
+                                  </label>
+                                </>
+                              )}
                             </div>
                           )}
                         </td>

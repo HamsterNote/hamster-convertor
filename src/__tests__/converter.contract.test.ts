@@ -9,7 +9,8 @@ const adapterMocks = vi.hoisted(() => ({
   convertHtmlToTxt: vi.fn(),
   convertImageToPdf: vi.fn(),
   convertImageToTxt: vi.fn(),
-  convertImageToImage: vi.fn()
+  convertImageToImage: vi.fn(),
+  convertImageToHtml: vi.fn()
 }))
 
 vi.mock('@hamster-note/pdf-parser', () => ({
@@ -42,7 +43,8 @@ vi.mock('../lib/converter/html-adapter', () => ({
 vi.mock('../lib/converter/image-adapters', () => ({
   convertImageToPdf: adapterMocks.convertImageToPdf,
   convertImageToTxt: adapterMocks.convertImageToTxt,
-  convertImageToImage: adapterMocks.convertImageToImage
+  convertImageToImage: adapterMocks.convertImageToImage,
+  convertImageToHtml: adapterMocks.convertImageToHtml
 }))
 
 vi.mock('@hamster-note/image-parser', () => ({
@@ -102,7 +104,7 @@ describe('converter contract', () => {
     expect(getSupportedTargets('pdf')).toContain('html')
     expect(getSupportedTargets('txt')).toContain('html')
     expect(getSupportedTargets('html')).toEqual(['txt'])
-    expect(getSupportedTargets('image')).toEqual(['pdf', 'txt', 'png', 'jpg', 'webp'])
+    expect(getSupportedTargets('image')).toEqual(['pdf', 'txt', 'png', 'jpg', 'webp', 'html'])
   })
 
   it('rejects unsupported conversion pairs with typed errors', async () => {
