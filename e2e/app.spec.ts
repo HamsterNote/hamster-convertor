@@ -1,7 +1,43 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 
 const dropzoneFileInput = '.dropzone + input[type="file"]'
+
+type ParserRuntimeReadyMessage = {
+  type: 'ready'
+  source?: string
+  parserNames?: string[]
+}
+
+type E2EWindow = Window & {
+  __downloadNames?: string[]
+  __downloadTypes?: string[]
+  __E2E__?: boolean
+  __parserReadyMessages?: ParserRuntimeReadyMessage[]
+}
+
+type ManualRuntimeScenario = 'queue' | 'cancel-queued'
+
+type ManualRuntimeProgressEvent = {
+  requestId: string
+  phase: string
+  percent: number
+  queueLength: number
+}
+
+type ManualRuntimeErrorEvent = {
+  requestId: string
+  code: string
+}
+
+type ManualRuntimeTranscript = {
+  readyCount: number
+  progressEvents: ManualRuntimeProgressEvent[]
+  resultNames: string[]
+  errorEvents: ManualRuntimeErrorEvent[]
+}
 
 const targetSelectForRow = (page: Page, fileName: string): Locator =>
   page.locator('tbody tr').filter({ hasText: fileName }).locator('select')
@@ -15,7 +51,15 @@ const filePayload = (name: string, mimeType: string, content: string) => ({
   buffer: Buffer.from(content)
 })
 
-const samplePdf = () => filePayload('sample.pdf', 'application/pdf', 'fake pdf')
+const fixturePath = (name: string): string => path.join(process.cwd(), 'e2e', 'fixtures', name)
+
+const samplePdf = () => ({
+  name: 'sample.pdf',
+  mimeType: 'application/pdf',
+  buffer: readFileSync(fixturePath('sample.pdf'))
+})
+
+const sampleTextFixture = () => fixturePath('bridge-sample.txt')
 
 const optionValues = (select: Locator): Promise<string[]> =>
   select.evaluate(element =>
@@ -25,20 +69,207 @@ const optionValues = (select: Locator): Promise<string[]> =>
 const downloadNames = (page: Page): Promise<string[]> =>
   page.evaluate(() => (window as Window & { __downloadNames?: string[] }).__downloadNames ?? [])
 
+const parserReadyMessages = (page: Page): Promise<ParserRuntimeReadyMessage[]> =>
+  page.evaluate(() => (window as E2EWindow).__parserReadyMessages ?? [])
+
 const loadingOverlay = (page: Page): Locator => page.locator('.fullscreen-loading')
+
+const waitForBridgeReady = async (page: Page): Promise<void> => {
+  await expect.poll(async () => parserReadyMessages(page)).not.toHaveLength(0)
+  await page.waitForTimeout(500)
+}
+
+const activeProgressPhases = ['reading', 'encoding', 'decoding', 'rendering', 'packaging']
+
+const expectSerialProgress = (progressEvents: ManualRuntimeProgressEvent[]) => {
+  const firstCompletedAt = progressEvents.findIndex(
+    event => event.requestId === 'queue-first' && event.phase === 'completed'
+  )
+  const secondActiveAt = progressEvents.findIndex(
+    event => event.requestId === 'queue-second' && activeProgressPhases.includes(event.phase)
+  )
+
+  expect(firstCompletedAt).toBeGreaterThanOrEqual(0)
+  expect(secondActiveAt).toBeGreaterThan(firstCompletedAt)
+}
+
+const runManualRuntimeScenario = async (
+  page: Page,
+  scenario: ManualRuntimeScenario
+): Promise<ManualRuntimeTranscript> =>
+  page.evaluate(async scenarioName => {
+    type MessageRecord = Record<string, unknown>
+    type ProgressEvent = {
+      requestId: string
+      phase: string
+      percent: number
+      queueLength: number
+    }
+    type ErrorEvent = { requestId: string; code: string }
+    type Transcript = {
+      readyCount: number
+      progressEvents: ProgressEvent[]
+      resultNames: string[]
+      errorEvents: ErrorEvent[]
+    }
+
+    const toRecord = (value: unknown): MessageRecord | undefined =>
+      typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? (value as MessageRecord)
+        : undefined
+
+    const textBuffer = (text: string): ArrayBuffer => {
+      const bytes = new TextEncoder().encode(text)
+      return bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      ) as ArrayBuffer
+    }
+
+    const iframe = document.querySelector<HTMLIFrameElement>('iframe[title="parser-runtime"]')
+    if (!iframe?.contentWindow) {
+      throw new Error('Parser runtime iframe is not available')
+    }
+    // 缓存 contentWindow，避免闭包内 TypeScript 无法收窄 null 联合类型
+    const contentWindow = iframe.contentWindow
+
+    return new Promise<Transcript>((resolve, reject) => {
+      const channel = new MessageChannel()
+      const port = channel.port1
+      const transcript: Transcript = {
+        readyCount: 0,
+        progressEvents: [],
+        resultNames: [],
+        errorEvents: []
+      }
+      let started = false
+
+      const firstRequestId = `${scenarioName === 'queue' ? 'queue' : 'cancel'}-first`
+      const secondRequestId = `${scenarioName === 'queue' ? 'queue' : 'cancel'}-second`
+
+      const timeoutId = window.setTimeout(() => {
+        port.close()
+        reject(new Error(`Timed out waiting for manual runtime scenario: ${scenarioName}`))
+      }, 15000)
+
+      const finish = () => {
+        window.clearTimeout(timeoutId)
+        port.close()
+        resolve(transcript)
+      }
+
+      const postConvert = (requestId: string, filename: string, content: string) => {
+        port.postMessage({
+          requestId,
+          type: 'convert',
+          filename,
+          sourceFormat: 'txt',
+          targetFormat: 'html',
+          buffer: textBuffer(content)
+        })
+      }
+
+      const startScenario = () => {
+        if (started) return
+        started = true
+        postConvert(firstRequestId, `${firstRequestId}.txt`, 'First runtime conversion')
+        postConvert(secondRequestId, `${secondRequestId}.txt`, 'Second runtime conversion')
+        if (scenarioName === 'cancel-queued') {
+          port.postMessage({ requestId: secondRequestId, type: 'cancel' })
+        }
+      }
+
+      const maybeFinish = () => {
+        if (scenarioName === 'queue' && transcript.resultNames.length === 2) {
+          finish()
+          return
+        }
+
+        const firstFinished = transcript.resultNames.includes(`${firstRequestId}.html`)
+        let secondCancelled = false
+        for (const progressEvent of transcript.progressEvents) {
+          if (progressEvent.requestId === secondRequestId && progressEvent.phase === 'cancelled') {
+            secondCancelled = true
+            break
+          }
+        }
+        if (scenarioName === 'cancel-queued' && firstFinished && secondCancelled) {
+          finish()
+        }
+      }
+
+      port.addEventListener('message', event => {
+        const message = toRecord(event.data)
+        if (!message || typeof message.type !== 'string') return
+
+        if (message.type === 'ready') {
+          transcript.readyCount += 1
+          startScenario()
+          return
+        }
+
+        if (typeof message.requestId !== 'string') return
+
+        if (message.type === 'progress') {
+          const progress = toRecord(message.progress)
+          if (
+            progress &&
+            typeof progress.phase === 'string' &&
+            typeof progress.percent === 'number' &&
+            typeof progress.queueLength === 'number'
+          ) {
+            transcript.progressEvents.push({
+              requestId: message.requestId,
+              phase: progress.phase,
+              percent: progress.percent,
+              queueLength: progress.queueLength
+            })
+          }
+        }
+
+        if (message.type === 'convert:result') {
+          const payload = toRecord(message.payload)
+          if (payload && typeof payload.filename === 'string') {
+            transcript.resultNames.push(payload.filename)
+          }
+        }
+
+        if (message.type === 'convert:error') {
+          const error = toRecord(message.error)
+          if (error && typeof error.code === 'string') {
+            transcript.errorEvents.push({
+              requestId: message.requestId,
+              code: error.code
+            })
+          }
+        }
+
+        maybeFinish()
+      })
+      port.start()
+      contentWindow.postMessage({ type: 'parser-bridge:connect' }, '*', [channel.port2])
+    })
+  }, scenario)
 
 test.describe('converter app', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      const e2eWindow = window as Window & {
-        __downloadNames?: string[]
-        __downloadTypes?: string[]
-        __E2E__?: boolean
-      }
+      const e2eWindow = window as E2EWindow
       window.localStorage.setItem('i18nextLng', 'en')
       e2eWindow.__E2E__ = true
       e2eWindow.__downloadNames = []
       e2eWindow.__downloadTypes = []
+      e2eWindow.__parserReadyMessages = []
+      window.addEventListener('message', event => {
+        const data = event.data as Partial<ParserRuntimeReadyMessage>
+        if (data?.type === 'ready' && data.source === 'hamster-parser-runtime') {
+          e2eWindow.__parserReadyMessages?.push({
+            type: 'ready',
+            source: data.source,
+            parserNames: data.parserNames
+          })
+        }
+      })
       URL.createObjectURL = (blob: Blob) => {
         e2eWindow.__downloadTypes?.push(blob.type)
         return `blob:e2e-${e2eWindow.__downloadTypes?.length ?? 0}`
@@ -50,6 +281,7 @@ test.describe('converter app', () => {
       Math.random = () => 0.9
     })
     await page.goto('/')
+    await waitForBridgeReady(page)
   })
 
   test('uploads files, converts all, and downloads row and global results', async ({ page }) => {
@@ -75,16 +307,115 @@ test.describe('converter app', () => {
     await expect(rowForFile(page, 'notes.txt').locator('.status')).toContainText('Done')
 
     await rowForFile(page, 'sample.pdf').getByRole('button', { name: 'Download' }).click()
-    await expect.poll(async () => downloadNames(page)).toEqual(['fake.txt'])
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample.txt'])
 
     await page.locator('.actions').getByRole('button', { name: 'Download' }).click()
     await expect
       .poll(async () => downloadNames(page))
-      .toEqual(['fake.txt', 'hamster-conversions.zip'])
+      .toEqual(['sample.txt', 'hamster-conversions.zip'])
 
     const clearButton = page.getByRole('button', { name: 'Clear all' })
     await clearButton.click()
     await expect(table).toBeHidden()
+  })
+
+  test('loads parser iframe and receives ready handshake from real runtime', async ({ page }) => {
+    const iframe = page.locator('iframe[title="parser-runtime"]')
+
+    await expect(iframe).toHaveAttribute('src', /parser-runtime\/index\.html/)
+    await expect
+      .poll(async () => parserReadyMessages(page))
+      .toEqual([
+        expect.objectContaining({
+          type: 'ready',
+          source: 'hamster-parser-runtime',
+          parserNames: expect.arrayContaining(['pdf', 'txt', 'html', 'image', 'document'])
+        })
+      ])
+
+    expect(page.frame({ url: /parser-runtime\/index\.html/ })).not.toBeNull()
+  })
+
+  test('converts through parser iframe and exposes download-ready output', async ({ page }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(sampleTextFixture())
+
+    const textRow = rowForFile(page, 'bridge-sample.txt')
+    await targetSelectForRow(page, 'bridge-sample.txt').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    await expect(loadingOverlay(page)).toBeVisible()
+    await expect(textRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+    await expect(textRow.getByRole('button', { name: 'Download' })).toBeEnabled()
+
+    await textRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['bridge-sample.html'])
+  })
+
+  test('reports serial runtime progress for two iframe conversions', async ({ page }) => {
+    await expect.poll(async () => parserReadyMessages(page)).not.toHaveLength(0)
+
+    const transcript = await runManualRuntimeScenario(page, 'queue')
+
+    expect(transcript.readyCount).toBe(1)
+    expect(transcript.resultNames).toEqual(['queue-first.html', 'queue-second.html'])
+    expect(transcript.errorEvents).toEqual([])
+    expect(transcript.progressEvents.map(event => event.phase)).toEqual(
+      expect.arrayContaining([
+        'queued',
+        'reading',
+        'encoding',
+        'decoding',
+        'rendering',
+        'packaging',
+        'completed'
+      ])
+    )
+    expectSerialProgress(transcript.progressEvents)
+  })
+
+  test('cancels a queued iframe conversion without producing output', async ({ page }) => {
+    await expect.poll(async () => parserReadyMessages(page)).not.toHaveLength(0)
+
+    const transcript = await runManualRuntimeScenario(page, 'cancel-queued')
+
+    expect(transcript.readyCount).toBe(1)
+    expect(transcript.resultNames).toEqual(['cancel-first.html'])
+    expect(transcript.errorEvents).toEqual([])
+    expect(transcript.progressEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          requestId: 'cancel-second',
+          phase: 'queued'
+        }),
+        expect.objectContaining({
+          requestId: 'cancel-second',
+          phase: 'cancelled'
+        })
+      ])
+    )
+  })
+
+  test('marks conversion failed when parser iframe load times out', async ({ page }) => {
+    await page.route('**/parser-runtime/index.html', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html;charset=utf-8',
+        body: '<!doctype html><html><body><p>parser runtime intentionally never posts ready</p></body></html>'
+      })
+    })
+    await page.clock.install()
+    await page.reload()
+    await page.clock.fastForward(31000)
+
+    await page.locator(dropzoneFileInput).setInputFiles(sampleTextFixture())
+    await targetSelectForRow(page, 'bridge-sample.txt').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const textRow = rowForFile(page, 'bridge-sample.txt')
+    await expect(textRow.locator('.status')).toContainText('Failed')
+    await expect(textRow.locator('.status')).toContainText('Conversion failed, please retry')
   })
 
   test('shows PDF target options for text and images', async ({ page }) => {
@@ -116,7 +447,9 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: '全部转换' }).click()
 
     const pdfRow = rowForFile(page, 'sample.pdf')
-    await expect(pdfRow.locator('.status')).toHaveClass(/status--done/, { timeout: 15000 })
+    await expect(pdfRow.locator('.status')).toHaveClass(/status--done/, {
+      timeout: 15000
+    })
     await expect(targetSelect).toBeDisabled()
 
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
@@ -193,7 +526,9 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     const pdfRow = rowForFile(page, 'sample.pdf')
-    await expect(pdfRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(pdfRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
 
     await pdfRow.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['sample.html'])
@@ -208,7 +543,9 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     const txtRow = rowForFile(page, 'notes.txt')
-    await expect(txtRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(txtRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
 
     await txtRow.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['notes.html'])
@@ -223,7 +560,9 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     const htmlRow = rowForFile(page, 'sample.html')
-    await expect(htmlRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(htmlRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
 
     await htmlRow.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['sample.txt'])
@@ -255,12 +594,14 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     const pdfRow = rowForFile(page, 'sample.pdf')
-    await expect(pdfRow.locator('.status')).toContainText('Done', { timeout: 15000 })
-    await expect(pdfRow.locator('.status')).toContainText('2 outputs')
+    await expect(pdfRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+    await expect(pdfRow.locator('.status')).toContainText('1 output')
 
     await pdfRow.getByRole('button', { name: 'Download' }).click()
 
-    await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample-page-001.png'])
   })
 
   test('converts image to WEBP and downloads', async ({ page }) => {
@@ -272,7 +613,9 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     const imageRow = rowForFile(page, 'photo.png')
-    await expect(imageRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(imageRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
 
     await imageRow.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['photo.webp'])
@@ -291,7 +634,7 @@ test.describe('converter app', () => {
 
     const pageCards = page.locator('.pdf-modal__card')
     await expect(pageCards).toHaveCount(2)
-    await pageCards.nth(1).click()
+    await pageCards.nth(0).click()
 
     await page.getByRole('button', { name: '完成' }).click()
     await expect(page.locator('.pdf-modal')).toBeHidden()
@@ -301,11 +644,13 @@ test.describe('converter app', () => {
 
     await page.getByRole('button', { name: '全部转换' }).click()
 
-    await expect(pdfRow.locator('.status')).toContainText('完成', { timeout: 15000 })
+    await expect(pdfRow.locator('.status')).toContainText('完成', {
+      timeout: 15000
+    })
     await expect(pdfRow.locator('.status')).toContainText('1 个输出')
 
     await pdfRow.getByRole('button', { name: '下载' }).click()
-    await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample-page-001.png'])
   })
 
   test('deletes completed row after global download', async ({ page }) => {
@@ -351,13 +696,12 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     const pdfRow = rowForFile(page, 'sample.pdf')
-    await expect(pdfRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(pdfRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
 
     await pdfRow.getByRole('button', { name: 'Download' }).click()
-    await expect(loadingOverlay(page)).toBeVisible()
-    await expect(loadingOverlay(page)).toBeHidden({ timeout: 15000 })
-
-    await expect.poll(async () => downloadNames(page)).toEqual(['sample.zip'])
+    await expect.poll(async () => downloadNames(page)).toEqual(['sample-page-001.png'])
   })
 
   test('switches language to zh-CN', async ({ page }) => {

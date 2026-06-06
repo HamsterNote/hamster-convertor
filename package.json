@@ -6,9 +6,10 @@
   "description": "仓鼠文档转换 - 免费文档转换平台（前端）",
   "license": "GPL v3.0",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview --port 5073",
+    "build:parser-runtime": "cd packages/parser-runtime && yarn build",
+    "build": "yarn build:parser-runtime && vite build",
+    "dev": "vite --host 0.0.0.0",
+    "preview": "vite preview --host 0.0.0.0",
     "preview:build": "yarn build && yarn preview --port 5073",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
@@ -22,11 +23,6 @@
     "test:e2e:install": "npx playwright install --with-deps"
   },
   "dependencies": {
-    "@hamster-note/document-parser": "^0.3.1",
-    "@hamster-note/html-parser": "file:.yalc/@hamster-note/html-parser",
-    "@hamster-note/image-parser": "^0.3.0",
-    "@hamster-note/pdf-parser": "^0.7.0",
-    "@hamster-note/txt-parser": "^0.2.0",
     "@hamster-note/types": "^0.8.0",
     "i18next": "^23.10.1",
     "i18next-browser-languagedetector": "^8.0.0",

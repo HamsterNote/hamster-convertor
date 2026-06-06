@@ -16,8 +16,16 @@
 
 构建与预览：
 
-- 构建：yarn build
+- 构建：yarn build（同时构建 host 与 iframe 解析器运行时）
 - 预览：yarn preview
+- 单独构建解析器运行时：yarn build:parser-runtime
+- 单元测试：yarn test:run
+- 端到端测试：yarn test:e2e（需先 `yarn test:e2e:install` 安装 Chromium）
+
+iframe 解析器运行时：
+
+- 详细架构、协议消息、队列/取消语义、构建/测试命令见 `docs/parser-iframe-runtime.md`。
+- 所有 PDF/HTML/TXT/image 解析在 `/parser-runtime/index.html` 同源 iframe 内执行，host 通过 `<ParserIframeBridge />` 转发请求。
 
 目录结构：
 

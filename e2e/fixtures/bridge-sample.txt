@@ -1,0 +1,3 @@
+Hamster iframe bridge fixture
+
+This text file is intentionally tiny so the real parser runtime can convert it in browser E2E tests.

@@ -1,14 +1,3 @@
-import type { IntermediateDocument } from '@hamster-note/types'
-import { convertHtmlToTxt } from './converter/html-adapter'
-import {
-  convertImageToHtml,
-  convertImageToImage,
-  convertImageToPdf,
-  convertImageToTxt
-} from './converter/image-adapters'
-import { convertPdfToImage, convertPdfToPdf, convertPdfToTxt } from './converter/pdf-adapters'
-import { convertTxtToHtml, convertTxtToImage } from './converter/txt-adapter'
-
 export type ConversionWarning = string | { message: string }
 
 /**
@@ -103,23 +92,6 @@ export const getSupportedTargets = (source: SourceFormat): TargetFormat[] => [
   ...supportedTargets[source]
 ]
 
-type HtmlDecodeResult = {
-  html: string
-  warnings: ConversionWarning[]
-}
-
-type PdfParserModule = typeof import('@hamster-note/pdf-parser')
-
-type HtmlParserModule = typeof import('@hamster-note/html-parser')
-
-const loadParserModules = async (): Promise<[PdfParserModule, HtmlParserModule]> => {
-  const [pdfParserModule, htmlParserModule] = await Promise.all([
-    import('@hamster-note/pdf-parser'),
-    import('@hamster-note/html-parser')
-  ])
-  return [pdfParserModule, htmlParserModule]
-}
-
 // 确保 HTML 输出包含 <meta charset="utf-8"> 声明
 // 这对本地文件浏览器正确显示中文至关重要 — 没有 charset 声明时浏览器默认 Latin-1 编码导致乱码
 const ensureCharsetDeclaration = (html: string): string => {
@@ -163,13 +135,22 @@ const convertTextStylesToVw = (pageHtml: string, pageWidth: number): string => {
     const style = match[1]
 
     const convertedStyle = style
-      .replace(/font-size:(\d+(?:\.\d+)?)px/g, (_, size) => `font-size:${(parseFloat(size) / pageWidth * 100)}vw`)
-      .replace(/left:(\d+(?:\.\d+)?)px/g, (_, left) => `left:${(parseFloat(left) / pageWidth * 100)}vw`)
-      .replace(/top:(\d+(?:\.\d+)?)px/g, (_, top) => `top:${(parseFloat(top) / pageWidth * 100)}vw`)
+      .replace(
+        /font-size:(\d+(?:\.\d+)?)px/g,
+        (_, size) => `font-size:${(parseFloat(size) / pageWidth) * 100}vw`
+      )
+      .replace(
+        /left:(\d+(?:\.\d+)?)px/g,
+        (_, left) => `left:${(parseFloat(left) / pageWidth) * 100}vw`
+      )
+      .replace(/top:(\d+(?:\.\d+)?)px/g, (_, top) => `top:${(parseFloat(top) / pageWidth) * 100}vw`)
 
     const matchStart = (match.index ?? 0) + offset
     const matchEnd = matchStart + match[0].length
-    result = result.substring(0, matchStart) + match[0].replace(style, convertedStyle) + result.substring(matchEnd)
+    result =
+      result.substring(0, matchStart) +
+      match[0].replace(style, convertedStyle) +
+      result.substring(matchEnd)
     offset += convertedStyle.length - style.length
   }
 
@@ -191,7 +172,7 @@ const convertPxToVw = (html: string): string => {
     const pageHeight = heightMatch ? parseFloat(heightMatch[1]) : 0
     if (pageWidth <= 0) continue
 
-    const aspectRatio = pageHeight > 0 ? (pageHeight / pageWidth * 100) : 100
+    const aspectRatio = pageHeight > 0 ? (pageHeight / pageWidth) * 100 : 100
 
     const pageStart = (match.index ?? 0) + offset
     const pageEnd = html.indexOf('</div>', pageStart)
@@ -200,16 +181,12 @@ const convertPxToVw = (html: string): string => {
     const pageContent = html.substring(pageStart, pageEnd + 6)
     const convertedPage = convertTextStylesToVw(pageContent, pageWidth)
 
-    const updatedPage = convertedPage.replace(
-      /style="([^"]*)"/,
-      (_, existingStyle: string) => {
-        const newStyle = existingStyle
-          .replace(/width:\d+(?:\.\d+)?px/g, '')
-          .replace(/height:\d+(?:\.\d+)?px/g, '')
-          + `;width:100%;padding-bottom:${aspectRatio}%;position:relative;`
-        return `style="${newStyle}"`
-      }
-    )
+    const updatedPage = convertedPage.replace(/style="([^"]*)"/, (_, existingStyle: string) => {
+      const newStyle =
+        existingStyle.replace(/width:\d+(?:\.\d+)?px/g, '').replace(/height:\d+(?:\.\d+)?px/g, '') +
+        `;width:100%;padding-bottom:${aspectRatio}%;position:relative;`
+      return `style="${newStyle}"`
+    })
 
     result = result.substring(0, pageStart) + updatedPage + result.substring(pageEnd + 6)
     offset += updatedPage.length - pageContent.length
@@ -218,10 +195,7 @@ const convertPxToVw = (html: string): string => {
   return result
 }
 
-export const applyHtmlLayout = (
-  html: string,
-  layoutOptions?: HtmlLayoutOptions
-): string => {
+export const applyHtmlLayout = (html: string, layoutOptions?: HtmlLayoutOptions): string => {
   const withCharset = ensureCharsetDeclaration(html)
 
   if (!layoutOptions || layoutOptions.mode === 'paginated') {
@@ -273,7 +247,7 @@ export const applyHtmlLayout = (
 
   // 连续模式 - 撑满宽度：将 px 转换为 vw 实现响应式缩放
   const processedHtml = convertPxToVw(withCharset)
-  
+
   const fitWidthCss = `
     html, body {
       overflow-x: hidden !important;
@@ -302,300 +276,16 @@ export const applyHtmlLayout = (
   )
 }
 
-const extractHtml = async ({
-  HtmlParser,
-  intermediateDocument,
-  decodeOptions
-}: {
-  HtmlParser: HtmlParserModule['HtmlParser']
-  intermediateDocument: IntermediateDocument
-  decodeOptions?: HtmlDecodeOptions
-}): Promise<HtmlDecodeResult> => {
-  const warnings: ConversionWarning[] = []
-
-  const html = await HtmlParser.decodeToHtml(intermediateDocument, decodeOptions)
-  return { html, warnings }
-}
-
-const decodeByParserModules = async (
-  input: Uint8Array,
-  decodeOptions?: HtmlDecodeOptions
-): Promise<PdfToHtmlResult> => {
-  const [pdfParserModule, htmlParserModule] = await loadParserModules()
-  const { PdfParser } = pdfParserModule
-  const { HtmlParser } = htmlParserModule
-
-  const arrayBuffer = input.buffer.slice(
-    input.byteOffset,
-    input.byteOffset + input.byteLength
-  ) as ArrayBuffer
-
-  const intermediate = await PdfParser.encode(arrayBuffer)
-  if (!intermediate) {
-    throw new Error('PDF parser returned no intermediate document')
-  }
-
-  return extractHtml({ HtmlParser, intermediateDocument: intermediate, decodeOptions })
-}
-
-const fallbackHtml = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Hamster PDF Sample</title>
-  </head>
-  <body>
-    <style>
-      .hamster-note-document { position: relative; display: block; contain: layout style size; }
-      .hamster-note-document .hamster-note-page { position: relative; overflow: hidden; background-repeat: no-repeat; background-position: top center; background-size: contain; }
-      .hamster-note-document .hamster-note-text { position: absolute; white-space: pre; transform-origin: 0 0; }
-    </style>
-    <div class="hamster-note-document">Hamster PDF Sample</div>
-  </body>
-</html>
-`
-
-const isE2E = () =>
-  typeof window !== 'undefined' && (window as Window & { __E2E__?: boolean }).__E2E__ === true
-
-const waitForE2EPaint = async (): Promise<void> => {
-  await new Promise<void>(resolve => {
-    globalThis.setTimeout(resolve, 50)
-  })
-}
+const createHostParserRuntimeError = (source: SourceFormat, target: TargetFormat): Error =>
+  new Error(
+    `Host direct conversion is deprecated for ${source} to ${target}; use parser iframe bridge.`
+  )
 
 export const convertPdfToHtml: ConvertPdfToHtml = async (input, options) => {
-  if (isE2E()) {
-    return {
-      html: fallbackHtml,
-      warnings: []
-    }
-  }
-
-  if (options?.selectedPages !== undefined) {
-    const { getSelectedPdfPageNumbers, extractPdfPages } = await import('./converter/pdf-pages')
-    const { PDFDocument } = await import('pdf-lib')
-    const arrayBuffer = input.buffer.slice(
-      input.byteOffset,
-      input.byteOffset + input.byteLength
-    ) as ArrayBuffer
-    const srcDoc = await PDFDocument.load(arrayBuffer)
-    const pageNumbers = getSelectedPdfPageNumbers(srcDoc.getPageCount(), options.selectedPages)
-    const subsetBuffer = await extractPdfPages(arrayBuffer, pageNumbers)
-    const result = await decodeByParserModules(new Uint8Array(subsetBuffer), options?.decodeOptions)
-    return {
-      html: applyHtmlLayout(result.html, options?.layoutOptions),
-      warnings: result.warnings
-    }
-  }
-
-  const result = await decodeByParserModules(input, options?.decodeOptions)
-  return {
-    html: applyHtmlLayout(result.html, options?.layoutOptions),
-    warnings: result.warnings
-  }
-}
-
-const replaceExtension = (filename: string, extension: string): string => {
-  const withoutExtension = filename.replace(/\.[^/.]+$/, '')
-  return `${withoutExtension || filename}.${extension}`
-}
-
-const readFileAsArrayBuffer = async (file: File): Promise<ArrayBuffer> => {
-  const fileWithArrayBuffer = file as File & { arrayBuffer?: () => Promise<ArrayBuffer> }
-  if (fileWithArrayBuffer.arrayBuffer) {
-    return fileWithArrayBuffer.arrayBuffer()
-  }
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      if (reader.result instanceof ArrayBuffer) {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('FileReader returned an unsupported result'))
-    })
-    reader.addEventListener('error', () => {
-      reject(reader.error ?? new Error('Failed to read file'))
-    })
-    reader.readAsArrayBuffer(file)
-  })
-}
-
-const convertPdfFileToHtml = async (
-  file: File,
-  options?: {
-    selectedPages?: number[]
-    decodeOptions?: HtmlDecodeOptions
-    layoutOptions?: HtmlLayoutOptions
-  }
-): Promise<ConversionResult[]> => {
-  const buffer = await readFileAsArrayBuffer(file)
-  const { html, warnings } = await convertPdfToHtml(new Uint8Array(buffer), options)
-  const mimeType = 'text/html;charset=utf-8'
-
-  return [
-    {
-      blob: new Blob([html], { type: mimeType }),
-      filename: replaceExtension(file.name, 'html'),
-      mimeType,
-      targetFormat: 'html',
-      warnings
-    }
-  ]
-}
-
-const convertPdfToHtmlAdapter = async (request: ConversionRequest): Promise<ConversionResult[]> => {
-  return convertPdfFileToHtml(request.file, {
-    selectedPages: request.options?.pdf?.selectedPages,
-    decodeOptions: request.options?.decode,
-    layoutOptions: request.options?.layout
-  })
-}
-
-const createE2EResult = async (request: ConversionRequest): Promise<ConversionResult[]> => {
-  await waitForE2EPaint()
-
-  if (request.file.name.includes('fail')) {
-    throw new Error('Fake E2E conversion failed')
-  }
-
-  if (request.target === 'html') {
-    if (request.source === 'pdf') {
-      return convertPdfFileToHtml(request.file)
-    }
-
-    const mimeType = 'text/html;charset=utf-8'
-    return [
-      {
-        blob: new Blob(['<html><body>fake html</body></html>'], { type: mimeType }),
-        filename: replaceExtension(request.file.name, 'html'),
-        mimeType,
-        targetFormat: 'html'
-      }
-    ]
-  }
-
-  if (request.source === 'html' && request.target === 'txt') {
-    return [
-      {
-        blob: new Blob(['fake extracted text'], { type: 'text/plain' }),
-        filename: replaceExtension(request.file.name, 'txt'),
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ]
-  }
-
-  if (
-    request.source === 'pdf' &&
-    (request.target === 'png' || request.target === 'jpg' || request.target === 'webp')
-  ) {
-    const selected = request.options?.pdf?.selectedPages ??
-      request.options?.pdf?.selectedImagePages ?? [1, 2]
-    const ext = request.target
-    const mimeType = `image/${request.target === 'jpg' ? 'jpeg' : request.target}`
-    return selected.map(pageNumber => ({
-      blob: new Blob([`fake ${request.target} ${pageNumber}`], { type: mimeType }),
-      filename: `fake-page-${String(pageNumber).padStart(3, '0')}.${ext}`,
-      mimeType,
-      targetFormat: request.target
-    }))
-  }
-
-  if (
-    request.source === 'image' &&
-    (request.target === 'png' || request.target === 'jpg' || request.target === 'webp')
-  ) {
-    const ext = request.target
-    const mimeType = `image/${request.target === 'jpg' ? 'jpeg' : request.target}`
-    return [
-      {
-        blob: new Blob([`fake ${request.target}`], { type: mimeType }),
-        filename: replaceExtension(request.file.name, ext),
-        mimeType,
-        targetFormat: request.target
-      }
-    ]
-  }
-
-  const fakeResults: Record<Exclude<TargetFormat, 'html'>, ConversionResult> = {
-    txt: {
-      blob: new Blob(['fake text'], { type: 'text/plain' }),
-      filename: 'fake.txt',
-      mimeType: 'text/plain',
-      targetFormat: 'txt'
-    },
-    png: {
-      blob: new Blob(['fake png'], { type: 'image/png' }),
-      filename: 'fake.png',
-      mimeType: 'image/png',
-      targetFormat: 'png'
-    },
-    jpg: {
-      blob: new Blob(['fake jpg'], { type: 'image/jpeg' }),
-      filename: 'fake.jpg',
-      mimeType: 'image/jpeg',
-      targetFormat: 'jpg'
-    },
-    webp: {
-      blob: new Blob(['fake webp'], { type: 'image/webp' }),
-      filename: 'fake.webp',
-      mimeType: 'image/webp',
-      targetFormat: 'webp'
-    },
-    pdf: {
-      blob: new Blob(['fake pdf'], { type: 'application/pdf' }),
-      filename: 'fake.pdf',
-      mimeType: 'application/pdf',
-      targetFormat: 'pdf'
-    }
-  }
-
-  return [fakeResults[request.target]]
-}
-
-type ConversionAdapter = (request: ConversionRequest) => Promise<ConversionResult[]>
-type ConversionAdapterMap = Record<SourceFormat, Partial<Record<TargetFormat, ConversionAdapter>>>
-
-const adapters: ConversionAdapterMap = {
-  pdf: {
-    txt: convertPdfToTxt,
-    png: convertPdfToImage,
-    jpg: convertPdfToImage,
-    webp: convertPdfToImage,
-    pdf: convertPdfToPdf,
-    html: convertPdfToHtmlAdapter
-  },
-  txt: {
-    png: convertTxtToImage,
-    html: convertTxtToHtml
-  },
-  image: {
-    pdf: convertImageToPdf,
-    html: convertImageToHtml,
-    txt: convertImageToTxt,
-    png: convertImageToImage,
-    jpg: convertImageToImage,
-    webp: convertImageToImage
-  },
-  html: {
-    txt: convertHtmlToTxt
-  }
+  const targetPageCount = options?.selectedPages?.length ?? input.byteLength
+  throw new Error(`Host PDF parsing is disabled for ${targetPageCount}; use parser iframe bridge.`)
 }
 
 export const convertFile = async (request: ConversionRequest): Promise<ConversionResult[]> => {
-  if (isE2E()) {
-    return createE2EResult(request)
-  }
-
-  const adapter = adapters[request.source][request.target]
-
-  if (!adapter) {
-    throw new UnsupportedConversionError(request.source, request.target)
-  }
-
-  return adapter(request)
+  throw createHostParserRuntimeError(request.source, request.target)
 }
