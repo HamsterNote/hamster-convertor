@@ -34,7 +34,10 @@
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
     "done": "Done",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "viewOptions": "View options",
+    "htmlConvertOptions": "HTML conversion options",
+    "continue": "Continue"
   },
   "table": {
     "fileName": "File name",
@@ -96,6 +99,7 @@
     "continuous": "Continuous",
     "actualWidth": "Actual Width",
     "fitWidth": "Fit Width",
+    "htmlWidthMode": "Width Mode",
     "pdfPages": {
       "title": "Select PDF pages",
       "selectedCount": "{{count}} pages selected",
@@ -117,6 +121,18 @@
     "deselectAll": "Deselect all",
     "cancel": "Cancel",
     "done": "Done"
+  },
+  "htmlOptionsModal": {
+    "title": "HTML conversion options",
+    "viewTitle": "HTML conversion options (read-only)",
+    "backgroundSection": "Background options",
+    "textControlSection": "Text controls",
+    "layoutSection": "Layout options",
+    "widthSection": "Width mode"
+  },
+  "confirmations": {
+    "title": "Please confirm",
+    "pdfTooManyPages": "\"{{fileName}}\" has {{pageCount}} pages. Conversion may take a long time. We recommend selecting a subset of pages. Continue anyway?"
   },
   "footer": {
     "copyright": "© {{year}} Hamster Document Converter",

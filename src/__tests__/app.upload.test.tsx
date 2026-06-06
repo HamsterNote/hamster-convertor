@@ -713,27 +713,42 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     const targetSelect = getFileTargetSelects()[0]
 
-    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
     expect(
-      screen.queryByRole('checkbox', { name: /exclude text from background/i })
+      screen.queryByRole('button', { name: /html conversion options/i })
     ).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /text control/i })).not.toBeInTheDocument()
 
     fireEvent.change(targetSelect, { target: { value: 'html' } })
 
-    expect(screen.getByRole('checkbox', { name: /include background/i })).toBeInTheDocument()
-    expect(
-      screen.getByRole('checkbox', { name: /exclude text from background/i })
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /text control/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /html conversion options/i })
+    const includeBackgroundCheckbox = screen.getByRole('checkbox', {
+      name: /include background/i
+    })
+    const excludeTextCheckbox = screen.getByRole('checkbox', {
+      name: /exclude text from background/i
+    })
+    const backgroundQualitySelect = screen.getByRole('combobox', {
+      name: /background quality/i
+    })
+
+    expect(dialog).toContainElement(includeBackgroundCheckbox)
+    expect(dialog).toContainElement(excludeTextCheckbox)
+    expect(dialog).toContainElement(backgroundQualitySelect)
+
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: /html conversion options/i })
+      ).not.toBeInTheDocument()
+    })
 
     fireEvent.change(targetSelect, { target: { value: 'txt' } })
 
-    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
     expect(
-      screen.queryByRole('checkbox', { name: /exclude text from background/i })
+      screen.queryByRole('button', { name: /html conversion options/i })
     ).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /text control/i })).not.toBeInTheDocument()
   })
 
   it('TDD-2: background options rendered inline for html target', async () => {
@@ -747,19 +762,17 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /html conversion options/i })
     const includeBackgroundCheckbox = screen.getByRole('checkbox', { name: /include background/i })
-    const excludeTextCheckbox = screen.getByRole('checkbox', {
-      name: /exclude text from background/i
-    })
     const backgroundQualitySelect = screen.getByRole('combobox', { name: /background quality/i })
 
-    const row = screen.getByRole('row', { name: /sample\.pdf/ })
-    expect(row).toContainElement(includeBackgroundCheckbox)
-    expect(row).toContainElement(excludeTextCheckbox)
-    expect(row).toContainElement(backgroundQualitySelect)
+    expect(dialog).toContainElement(includeBackgroundCheckbox)
+    expect(dialog).toContainElement(backgroundQualitySelect)
 
     expect(includeBackgroundCheckbox).toBeChecked()
-    expect(excludeTextCheckbox).toBeChecked()
+    expect(backgroundQualitySelect).toHaveValue('0.85')
   })
 
   it('TDD-3: text control button opens modal with settings', async () => {
@@ -773,17 +786,25 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /text control/i }))
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
 
-    expect(screen.getByRole('dialog', { name: /text control/i })).toBeInTheDocument()
+    const fontSizeInput = screen.getByRole('spinbutton', { name: /font size/i })
+    expect(screen.getByRole('dialog', { name: /html conversion options/i })).toContainElement(
+      fontSizeInput
+    )
 
-    fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
+    fireEvent.change(fontSizeInput, { target: { value: '18' } })
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /text control/i })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('dialog', { name: /html conversion options/i })
+      ).not.toBeInTheDocument()
     })
 
-    expect(screen.getByText(/text control configured/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
+    expect(screen.getByRole('spinbutton', { name: /font size/i })).toHaveValue(18)
   })
 
   it('TDD-4: row-scoped HTML options - changing one row does not affect another', async () => {
@@ -804,24 +825,25 @@ describe('app upload feedback', () => {
     fireEvent.change(selects[0], { target: { value: 'html' } })
     fireEvent.change(selects[1], { target: { value: 'html' } })
 
-    const includeBgCheckboxes = screen.getAllByRole('checkbox', { name: /include background/i })
-    expect(includeBgCheckboxes).toHaveLength(2)
-    expect(includeBgCheckboxes[0]).toBeChecked()
-    expect(includeBgCheckboxes[1]).toBeChecked()
+    const optionsButtons = screen.getAllByRole('button', { name: /html conversion options/i })
+    fireEvent.click(optionsButtons[0])
 
-    fireEvent.click(includeBgCheckboxes[0])
+    const firstRowIncludeBackground = screen.getByRole('checkbox', { name: /include background/i })
+    expect(firstRowIncludeBackground).toBeChecked()
 
-    const updatedCheckboxes = screen.getAllByRole('checkbox', { name: /include background/i })
-    expect(updatedCheckboxes[0]).not.toBeChecked()
-    expect(updatedCheckboxes[1]).toBeChecked()
-
-    const textControlBtns = screen.getAllByRole('button', { name: /text control/i })
-    fireEvent.click(textControlBtns[0])
-    fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
+    fireEvent.click(firstRowIncludeBackground)
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      const summaries = screen.getAllByText(/text control configured/i)
-      expect(summaries).toHaveLength(1)
+      expect(
+        screen.queryByRole('dialog', { name: /html conversion options/i })
+      ).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(optionsButtons[1])
+
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /include background/i })).toBeChecked()
     })
   })
 
@@ -846,16 +868,22 @@ describe('app upload feedback', () => {
 
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
     }) as HTMLSelectElement
-    changeNativeSelectValue(qualitySelect, '0.85')
+    changeNativeSelectValue(qualitySelect, '0.6')
 
-    fireEvent.click(screen.getByRole('button', { name: /text control/i }))
-    fireEvent.click(screen.getByRole('button', { name: /confirm text control/i }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: /font size/i }), {
+      target: { value: '18' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /text control/i })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('dialog', { name: /html conversion options/i })
+      ).not.toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
@@ -868,15 +896,18 @@ describe('app upload feedback', () => {
           options: expect.objectContaining({
             decode: {
               textControl: expect.objectContaining({
-                respectWhitespaces: true,
-                ignoreImages: false
+                fontSize: 18
               }),
               background: {
                 includeBackground: true,
                 excludeTextFromBackground: true,
-                backgroundQuality: 0.85
+                backgroundQuality: 0.6
               }
-            }
+            },
+            layout: expect.objectContaining({
+              mode: 'paginated',
+              widthMode: 'actual'
+            })
           })
         })
       )
@@ -894,17 +925,26 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
     }) as HTMLSelectElement
 
     expect(qualitySelect.value).toBe('0.85')
 
-    changeNativeSelectValue(qualitySelect, '1')
+    changeNativeSelectValue(qualitySelect, '0.6')
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(qualitySelect.value).toBe('1')
+      expect(
+        screen.queryByRole('dialog', { name: /html conversion options/i })
+      ).not.toBeInTheDocument()
     })
+
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
+    expect(screen.getByRole('combobox', { name: /background quality/i })).toHaveValue('0.6')
   })
 
   it('TDD-8: background quality options stay within html-parser contract', async () => {
@@ -917,6 +957,8 @@ describe('app upload feedback', () => {
 
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
 
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
@@ -937,12 +979,23 @@ describe('app upload feedback', () => {
 
     await screen.findByRole('row', { name: /notes\.txt/ })
 
-    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /text control/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /html conversion options/i })
+    ).not.toBeInTheDocument()
 
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    expect(screen.getByRole('checkbox', { name: /include background/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /text control/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /html conversion options/i })
+    const includeBackgroundCheckbox = screen.getByRole('checkbox', {
+      name: /include background/i
+    })
+    const backgroundQualitySelect = screen.getByRole('combobox', {
+      name: /background quality/i
+    })
+
+    expect(dialog).toContainElement(includeBackgroundCheckbox)
+    expect(dialog).toContainElement(backgroundQualitySelect)
   })
 })

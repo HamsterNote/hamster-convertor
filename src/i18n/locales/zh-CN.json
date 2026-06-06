@@ -34,7 +34,10 @@
     "selectAll": "全选",
     "deselectAll": "取消全选",
     "done": "完成",
-    "cancel": "取消"
+    "cancel": "取消",
+    "viewOptions": "查看选项",
+    "htmlConvertOptions": "HTML 转换选项",
+    "continue": "继续"
   },
   "table": {
     "fileName": "文件名",
@@ -96,6 +99,7 @@
     "continuous": "不分页",
     "actualWidth": "实际宽度",
     "fitWidth": "撑满宽度",
+    "htmlWidthMode": "宽度模式",
     "pdfPages": {
       "title": "选择 PDF 页面",
       "selectedCount": "已选择 {{count}} 页",
@@ -117,6 +121,18 @@
     "deselectAll": "取消全选",
     "cancel": "取消",
     "done": "完成"
+  },
+  "htmlOptionsModal": {
+    "title": "HTML 转换选项",
+    "viewTitle": "HTML 转换选项（只读）",
+    "backgroundSection": "背景选项",
+    "textControlSection": "文字控制",
+    "layoutSection": "布局选项",
+    "widthSection": "宽度模式"
+  },
+  "confirmations": {
+    "title": "请确认",
+    "pdfTooManyPages": "文件“{{fileName}}”有 {{pageCount}} 页，转换的持续时间可能很长，建议选择部分页数转换，仍要继续吗？"
   },
   "footer": {
     "copyright": "© {{year}} 仓鼠文档转换",

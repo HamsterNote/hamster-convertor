@@ -34,7 +34,10 @@
     "selectAll": "全選",
     "deselectAll": "取消全選",
     "done": "完成",
-    "cancel": "取消"
+    "cancel": "取消",
+    "viewOptions": "檢視選項",
+    "htmlConvertOptions": "HTML 轉換選項",
+    "continue": "繼續"
   },
   "table": {
     "fileName": "檔名",
@@ -96,6 +99,7 @@
     "continuous": "不分頁",
     "actualWidth": "實際寬度",
     "fitWidth": "撐滿寬度",
+    "htmlWidthMode": "寬度模式",
     "pdfPages": {
       "title": "選擇 PDF 頁面",
       "selectedCount": "已選擇 {{count}} 頁",
@@ -117,6 +121,18 @@
     "deselectAll": "取消全選",
     "cancel": "取消",
     "done": "完成"
+  },
+  "htmlOptionsModal": {
+    "title": "HTML 轉換選項",
+    "viewTitle": "HTML 轉換選項（唯讀）",
+    "backgroundSection": "背景選項",
+    "textControlSection": "文字控制",
+    "layoutSection": "佈局選項",
+    "widthSection": "寬度模式"
+  },
+  "confirmations": {
+    "title": "請確認",
+    "pdfTooManyPages": "檔案「{{fileName}}」有 {{pageCount}} 頁，轉換的持續時間可能很長，建議選擇部分頁數轉換，仍要繼續嗎？"
   },
   "footer": {
     "copyright": "© {{year}} 倉鼠文件轉換",

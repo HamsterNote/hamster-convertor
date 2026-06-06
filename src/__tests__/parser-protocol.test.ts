@@ -16,7 +16,7 @@ import {
   isParserBridgeConversionResultPayload,
   isParserBridgeError,
   isParserBridgeReadyMessage,
-  isParserBridgeConversionOptions,
+  isParserBridgeConversionOptions
 } from '../../packages/parser-protocol/src/index'
 
 describe('isParserBridgeRequest', () => {
@@ -27,7 +27,7 @@ describe('isParserBridgeRequest', () => {
       filename: 'test.pdf',
       sourceFormat: 'pdf',
       targetFormat: 'html',
-      buffer: new ArrayBuffer(8),
+      buffer: new ArrayBuffer(8)
     }
     expect(isParserBridgeRequest(valid)).toBe(true)
   })
@@ -38,7 +38,7 @@ describe('isParserBridgeRequest', () => {
       filename: 'test.pdf',
       sourceFormat: 'pdf',
       targetFormat: 'html',
-      buffer: new ArrayBuffer(8),
+      buffer: new ArrayBuffer(8)
     }
     expect(isParserBridgeRequest(invalid)).toBe(false)
   })
@@ -50,7 +50,7 @@ describe('isParserBridgeRequest', () => {
       filename: 'test.pdf',
       sourceFormat: 'pdf',
       targetFormat: 'html',
-      buffer: new ArrayBuffer(8),
+      buffer: new ArrayBuffer(8)
     }
     expect(isParserBridgeRequest(invalid)).toBe(false)
   })
@@ -62,7 +62,7 @@ describe('isParserBridgeRequest', () => {
       filename: 'test.pdf',
       sourceFormat: 'pdf',
       targetFormat: 'html',
-      buffer: new ArrayBuffer(8),
+      buffer: new ArrayBuffer(8)
     }
     expect(isParserBridgeRequest(invalid)).toBe(false)
   })
@@ -74,7 +74,7 @@ describe('isParserBridgeRequest', () => {
       filename: 'test.pdf',
       sourceFormat: 'pdf',
       targetFormat: 'html',
-      buffer: 'not-an-arraybuffer',
+      buffer: 'not-an-arraybuffer'
     }
     expect(isParserBridgeRequest(invalid)).toBe(false)
   })
@@ -91,14 +91,14 @@ describe('isParserBridgeCancelRequest', () => {
   it('接受有效的取消请求', () => {
     const valid = {
       requestId: 'req-001',
-      type: 'cancel',
+      type: 'cancel'
     }
     expect(isParserBridgeCancelRequest(valid)).toBe(true)
   })
 
   it('拒绝缺少 requestId 的取消请求', () => {
     const invalid = {
-      type: 'cancel',
+      type: 'cancel'
     }
     expect(isParserBridgeCancelRequest(invalid)).toBe(false)
   })
@@ -106,7 +106,7 @@ describe('isParserBridgeCancelRequest', () => {
   it('拒绝未知 type 的取消请求', () => {
     const invalid = {
       requestId: 'req-001',
-      type: 'unknown',
+      type: 'unknown'
     }
     expect(isParserBridgeCancelRequest(invalid)).toBe(false)
   })
@@ -118,7 +118,7 @@ describe('isParserBridgeProgress', () => {
       requestId: 'req-001',
       phase: 'encoding',
       percent: 50,
-      queueLength: 3,
+      queueLength: 3
     }
     expect(isParserBridgeProgress(valid)).toBe(true)
   })
@@ -133,7 +133,7 @@ describe('isParserBridgeProgress', () => {
       'packaging',
       'completed',
       'error',
-      'cancelled',
+      'cancelled'
     ]
 
     for (const phase of phases) {
@@ -141,7 +141,7 @@ describe('isParserBridgeProgress', () => {
         requestId: 'req-001',
         phase,
         percent: 0,
-        queueLength: 0,
+        queueLength: 0
       }
       expect(isParserBridgeProgress(valid)).toBe(true)
     }
@@ -152,7 +152,7 @@ describe('isParserBridgeProgress', () => {
       requestId: 'req-001',
       phase: 'invalid-phase',
       percent: 50,
-      queueLength: 3,
+      queueLength: 3
     }
     expect(isParserBridgeProgress(invalid)).toBe(false)
   })
@@ -161,7 +161,7 @@ describe('isParserBridgeProgress', () => {
     const invalid = {
       requestId: 'req-001',
       phase: 'encoding',
-      queueLength: 3,
+      queueLength: 3
     }
     expect(isParserBridgeProgress(invalid)).toBe(false)
   })
@@ -171,7 +171,7 @@ describe('isParserBridgeProgress', () => {
       requestId: 'req-001',
       phase: 'encoding',
       percent: 'fifty',
-      queueLength: 3,
+      queueLength: 3
     }
     expect(isParserBridgeProgress(invalid)).toBe(false)
   })
@@ -183,7 +183,7 @@ describe('isParserBridgeConversionResultPayload', () => {
       filename: 'output.html',
       mimeType: 'text/html',
       targetFormat: 'html',
-      buffer: new ArrayBuffer(16),
+      buffer: new ArrayBuffer(16)
     }
     expect(isParserBridgeConversionResultPayload(valid)).toBe(true)
   })
@@ -194,7 +194,7 @@ describe('isParserBridgeConversionResultPayload', () => {
       mimeType: 'text/html',
       targetFormat: 'html',
       buffer: new ArrayBuffer(16),
-      warnings: ['minor issue'],
+      warnings: ['minor issue']
     }
     expect(isParserBridgeConversionResultPayload(valid)).toBe(true)
   })
@@ -204,7 +204,7 @@ describe('isParserBridgeConversionResultPayload', () => {
       filename: 'output.html',
       mimeType: 'text/html',
       targetFormat: 'html',
-      buffer: 'not-an-arraybuffer',
+      buffer: 'not-an-arraybuffer'
     }
     expect(isParserBridgeConversionResultPayload(invalid)).toBe(false)
   })
@@ -214,7 +214,7 @@ describe('isParserBridgeConversionResultPayload', () => {
       filename: 'output.html',
       mimeType: 'text/html',
       targetFormat: 'html',
-      buffer: new Uint8Array(16),
+      buffer: new Uint8Array(16)
     }
     expect(isParserBridgeConversionResultPayload(invalid)).toBe(false)
   })
@@ -223,7 +223,7 @@ describe('isParserBridgeConversionResultPayload', () => {
     const invalid = {
       mimeType: 'text/html',
       targetFormat: 'html',
-      buffer: new ArrayBuffer(16),
+      buffer: new ArrayBuffer(16)
     }
     expect(isParserBridgeConversionResultPayload(invalid)).toBe(false)
   })
@@ -233,7 +233,7 @@ describe('isParserBridgeError', () => {
   it('接受有效的错误信息', () => {
     const valid = {
       code: 'CONVERT_FAILED',
-      message: '转换失败',
+      message: '转换失败'
     }
     expect(isParserBridgeError(valid)).toBe(true)
   })
@@ -242,21 +242,21 @@ describe('isParserBridgeError', () => {
     const valid = {
       code: 'CONVERT_FAILED',
       message: '转换失败',
-      details: { reason: 'invalid format' },
+      details: { reason: 'invalid format' }
     }
     expect(isParserBridgeError(valid)).toBe(true)
   })
 
   it('拒绝缺少 code 的错误信息', () => {
     const invalid = {
-      message: '转换失败',
+      message: '转换失败'
     }
     expect(isParserBridgeError(invalid)).toBe(false)
   })
 
   it('拒绝缺少 message 的错误信息', () => {
     const invalid = {
-      code: 'CONVERT_FAILED',
+      code: 'CONVERT_FAILED'
     }
     expect(isParserBridgeError(invalid)).toBe(false)
   })
@@ -271,8 +271,8 @@ describe('isParserBridgeResponse', () => {
         filename: 'output.html',
         mimeType: 'text/html',
         targetFormat: 'html',
-        buffer: new ArrayBuffer(16),
-      },
+        buffer: new ArrayBuffer(16)
+      }
     }
     expect(isParserBridgeResponse(valid)).toBe(true)
   })
@@ -283,8 +283,8 @@ describe('isParserBridgeResponse', () => {
       type: 'convert:error',
       error: {
         code: 'CONVERT_FAILED',
-        message: '转换失败',
-      },
+        message: '转换失败'
+      }
     }
     expect(isParserBridgeResponse(valid)).toBe(true)
   })
@@ -297,8 +297,8 @@ describe('isParserBridgeResponse', () => {
         requestId: 'req-001',
         phase: 'encoding',
         percent: 50,
-        queueLength: 3,
-      },
+        queueLength: 3
+      }
     }
     expect(isParserBridgeResponse(valid)).toBe(true)
   })
@@ -306,7 +306,7 @@ describe('isParserBridgeResponse', () => {
   it('拒绝未知 type 的响应', () => {
     const invalid = {
       requestId: 'req-001',
-      type: 'unknown',
+      type: 'unknown'
     }
     expect(isParserBridgeResponse(invalid)).toBe(false)
   })
@@ -318,8 +318,8 @@ describe('isParserBridgeResponse', () => {
         filename: 'output.html',
         mimeType: 'text/html',
         targetFormat: 'html',
-        buffer: new ArrayBuffer(16),
-      },
+        buffer: new ArrayBuffer(16)
+      }
     }
     expect(isParserBridgeResponse(invalid)).toBe(false)
   })
@@ -332,8 +332,8 @@ describe('isParserBridgeResponse', () => {
         filename: 'output.html',
         mimeType: 'text/html',
         targetFormat: 'html',
-        buffer: 'not-an-arraybuffer', // 非 ArrayBuffer
-      },
+        buffer: 'not-an-arraybuffer' // 非 ArrayBuffer
+      }
     }
     expect(isParserBridgeResponse(invalid)).toBe(false)
   })
@@ -344,8 +344,8 @@ describe('isParserBridgeResponse', () => {
       type: 'convert:error',
       error: {
         code: 123, // 非字符串
-        message: '转换失败',
-      },
+        message: '转换失败'
+      }
     }
     expect(isParserBridgeResponse(invalid)).toBe(false)
   })
@@ -358,8 +358,8 @@ describe('isParserBridgeResponse', () => {
         requestId: 'req-001',
         phase: 'invalid-phase', // 无效阶段
         percent: 50,
-        queueLength: 3,
-      },
+        queueLength: 3
+      }
     }
     expect(isParserBridgeResponse(invalid)).toBe(false)
   })
@@ -368,14 +368,14 @@ describe('isParserBridgeResponse', () => {
 describe('isParserBridgeReadyMessage', () => {
   it('接受有效的就绪消息', () => {
     const valid = {
-      type: 'ready',
+      type: 'ready'
     }
     expect(isParserBridgeReadyMessage(valid)).toBe(true)
   })
 
   it('拒绝未知 type 的就绪消息', () => {
     const invalid = {
-      type: 'not-ready',
+      type: 'not-ready'
     }
     expect(isParserBridgeReadyMessage(invalid)).toBe(false)
   })
@@ -398,15 +398,15 @@ describe('isParserBridgeConversionOptions', () => {
       pageLoadTimeoutMs: 5000,
       textControl: {
         fontSize: 14,
-        lineHeight: 1.5,
+        lineHeight: 1.5
       },
       background: {
-        includeBackground: true,
+        includeBackground: true
       },
       render: {
         scale: 2,
-        views: ['TEXT' as const],
-      },
+        views: ['TEXT' as const]
+      }
     }
     expect(isParserBridgeConversionOptions(valid)).toBe(true)
   })

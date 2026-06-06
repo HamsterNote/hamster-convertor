@@ -5,7 +5,8 @@ import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
 import FullscreenLoading from './components/FullscreenLoading'
 import Header from './components/Header'
-import HtmlDecodeOptionsModal, { type DecodeTextControl } from './components/HtmlDecodeOptionsModal'
+import { ConfirmModal } from './components/ConfirmModal'
+import HtmlOptionsModal, { type HtmlOptionsValue } from './components/HtmlOptionsModal'
 import { ParserIframeBridge, type ParserIframeBridgeRef } from './components/ParserIframeBridge'
 import PdfPageSelectorModal from './components/PdfPageSelectorModal'
 import {
@@ -17,7 +18,9 @@ import {
   type TargetFormat
 } from './lib/converter'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
+import { truncateMiddle } from './lib/filename'
 import { convertViaBridge } from './lib/parser-bridge/proxy'
+import { getPdfPageCount } from './lib/pdf-utils'
 
 type BackgroundDecodeOptions = NonNullable<HtmlDecodeOptions['background']>
 
@@ -41,13 +44,6 @@ const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
   backgroundQuality: 0.85,
   excludeTextFromBackground: true
 }
-
-const HTML_BACKGROUND_QUALITY_OPTIONS = [
-  { value: 0.3, labelKey: 'options.backgroundQualityLow' },
-  { value: 0.6, labelKey: 'options.backgroundQualityMedium' },
-  { value: 0.85, labelKey: 'options.backgroundQualityHigh' },
-  { value: 1, labelKey: 'options.backgroundQualityUltra' }
-] as const
 
 const createDefaultHtmlOptions = (): NonNullable<ConversionOptions['html']> => ({
   background: { ...DEFAULT_HTML_BACKGROUND_OPTIONS },
@@ -176,6 +172,12 @@ function App() {
     null
   )
   const [activeHtmlOptionsItemId, setActiveHtmlOptionsItemId] = useState<string | null>(null)
+  const [htmlOptionsReadOnly, setHtmlOptionsReadOnly] = useState(false)
+  const [confirmModal, setConfirmModal] = useState<{
+    message: string
+    onConfirm: () => void
+    onCancel: () => void
+  } | null>(null)
 
   const activePdfItem = activePdfPageSelectorItemId
     ? items.find(it => it.id === activePdfPageSelectorItemId)
@@ -294,79 +296,18 @@ function App() {
     )
   }
 
-  const changeHtmlBackgroundOption = <Key extends keyof BackgroundDecodeOptions>(
-    id: string,
-    key: Key,
-    value: BackgroundDecodeOptions[Key]
-  ) => {
+  const applyHtmlOptions = (id: string, next: HtmlOptionsValue) => {
     setItems(prev =>
       prev.map(it => {
         if (it.id !== id) return it
-        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
-        const background = {
-          ...DEFAULT_HTML_BACKGROUND_OPTIONS,
-          ...htmlOptions.background,
-          [key]: value
-        }
-        return {
-          ...it,
-          conversionOptions: {
-            ...it.conversionOptions,
-            html: { ...htmlOptions, background }
-          }
-        }
-      })
-    )
-  }
-
-  const changeHtmlTextControl = (id: string, textControl: DecodeTextControl | undefined) => {
-    setItems(prev =>
-      prev.map(it => {
-        if (it.id !== id) return it
-        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
-        return {
-          ...it,
-          conversionOptions: {
-            ...it.conversionOptions,
-            html: { ...htmlOptions, textControl }
-          }
-        }
-      })
-    )
-  }
-
-  const changeHtmlLayoutMode = (id: string, mode: 'paginated' | 'continuous') => {
-    setItems(prev =>
-      prev.map(it => {
-        if (it.id !== id) return it
-        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
         return {
           ...it,
           conversionOptions: {
             ...it.conversionOptions,
             html: {
-              ...htmlOptions,
-              htmlLayout: mode === 'continuous' ? { mode, widthMode: 'actual' } : { mode }
-            }
-          }
-        }
-      })
-    )
-  }
-
-  const changeHtmlLayoutWidthMode = (id: string, widthMode: 'actual' | 'fit') => {
-    setItems(prev =>
-      prev.map(it => {
-        if (it.id !== id) return it
-        const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
-        const currentLayout = htmlOptions.htmlLayout ?? { mode: 'continuous' as const }
-        return {
-          ...it,
-          conversionOptions: {
-            ...it.conversionOptions,
-            html: {
-              ...htmlOptions,
-              htmlLayout: { ...currentLayout, widthMode }
+              textControl: next.textControl,
+              background: next.background,
+              htmlLayout: next.htmlLayout
             }
           }
         }
@@ -400,6 +341,76 @@ function App() {
     )
   }
 
+  const confirmLargePdfsBeforeConvert = async (ids: string[]): Promise<boolean> => {
+    const pdfItems = itemsRef.current.filter(it => ids.includes(it.id) && it.source === 'pdf')
+    for (const pdfItem of pdfItems) {
+      const explicitSelectionCount = pdfItem.conversionOptions.pdf.selectedPages?.length
+      if (explicitSelectionCount !== undefined && explicitSelectionCount <= 20) continue
+      let pageCount: number
+      try {
+        pageCount = await getPdfPageCount(pdfItem.file)
+      } catch (error) {
+        log.warn('PDF page count check failed', { fileName: pdfItem.file.name, error })
+        continue
+      }
+      if (pageCount <= 20) continue
+      const proceed = await new Promise<boolean>(resolve => {
+        setConfirmModal({
+          message: t('confirmations.pdfTooManyPages', {
+            fileName: pdfItem.file.name,
+            pageCount
+          }),
+          onConfirm: () => {
+            setConfirmModal(null)
+            resolve(true)
+          },
+          onCancel: () => {
+            setConfirmModal(null)
+            resolve(false)
+          }
+        })
+      })
+      if (!proceed) return false
+    }
+    return true
+  }
+
+  const convertSingleItem = async (id: string): Promise<void> => {
+    const current = itemsRef.current.find(it => it.id === id)
+    if (!current) return
+    if (!getSupportedTargets(current.source).includes(current.target)) {
+      markFailed(id, t('errors.unsupportedConversion'))
+      return
+    }
+    if (current.source === 'pdf' && hasExplicitlyEmptySelectedPages(current)) {
+      markFailed(id, t('errors.noPagesSelected'))
+      return
+    }
+    markConverting(id)
+    try {
+      const bridge = getRequiredBridge(bridgeRef.current)
+      const htmlBackground = {
+        ...DEFAULT_HTML_BACKGROUND_OPTIONS,
+        ...current.conversionOptions.html?.background
+      }
+      const htmlOptions = current.conversionOptions.html
+        ? {
+            textControl: current.conversionOptions.html.textControl,
+            background: htmlBackground
+          }
+        : undefined
+      const result = await convertViaBridge(bridge, current.file, current.source, current.target, {
+        pdf: current.conversionOptions.pdf,
+        decode: htmlOptions,
+        layout: current.conversionOptions.html?.htmlLayout
+      })
+      markDone(id, [result])
+    } catch (error) {
+      log.warn('Conversion failed', { id, fileName: current.file.name, error })
+      markFailed(id, t(`errors.${getConversionErrorKey(error)}` as const))
+    }
+  }
+
   const convertAll = async () => {
     const isRunning = itemsRef.current.some(it => isRunningStatus(it.status))
     if (isRunning) return
@@ -409,58 +420,15 @@ function App() {
       .map(i => i.id)
     if (idsToConvert.length === 0) return
 
+    const userConfirmed = await confirmLargePdfsBeforeConvert(idsToConvert)
+    if (!userConfirmed) return
+
     setIsConvertingAll(true)
     setItems(prev => prev.map(queueItem))
 
     try {
       for (const id of idsToConvert) {
-        const current = itemsRef.current.find(it => it.id === id)
-        if (!current) continue
-        if (!getSupportedTargets(current.source).includes(current.target)) {
-          markFailed(id, t('errors.unsupportedConversion'))
-          continue
-        }
-
-        if (current.source === 'pdf' && hasExplicitlyEmptySelectedPages(current)) {
-          markFailed(id, t('errors.noPagesSelected'))
-          continue
-        }
-
-        markConverting(id)
-
-        try {
-          const bridge = getRequiredBridge(bridgeRef.current)
-
-          const htmlBackground = {
-            ...DEFAULT_HTML_BACKGROUND_OPTIONS,
-            ...current.conversionOptions.html?.background
-          }
-          const htmlOptions = current.conversionOptions.html
-            ? {
-                textControl: current.conversionOptions.html.textControl,
-                background: htmlBackground
-              }
-            : undefined
-          const result = await convertViaBridge(
-            bridge,
-            current.file,
-            current.source,
-            current.target,
-            {
-              pdf: current.conversionOptions.pdf,
-              decode: htmlOptions,
-              layout: current.conversionOptions.html?.htmlLayout
-            }
-          )
-          markDone(id, [result])
-        } catch (error) {
-          log.warn('Conversion failed', {
-            id,
-            fileName: current.file.name,
-            error
-          })
-          markFailed(id, t(`errors.${getConversionErrorKey(error)}` as const))
-        }
+        await convertSingleItem(id)
       }
     } finally {
       setIsConvertingAll(false)
@@ -499,12 +467,6 @@ function App() {
     } finally {
       setIsPreparingDownload(false)
     }
-  }
-
-  const getTextControlSummary = (textControl?: DecodeTextControl): string => {
-    if (!textControl || Object.keys(textControl).length === 0)
-      return t('options.textControlsDefault')
-    return t('options.textControlConfigured')
   }
 
   return (
@@ -571,186 +533,85 @@ function App() {
                       it.status === 'converting' ||
                       it.status === 'done' ||
                       isPreparingDownload
-                    const htmlOptions = it.conversionOptions.html ?? createDefaultHtmlOptions()
-                    const htmlBackground = {
-                      ...DEFAULT_HTML_BACKGROUND_OPTIONS,
-                      ...htmlOptions.background
-                    }
-                    const htmlLayout = htmlOptions.htmlLayout ?? { mode: 'paginated' as const }
                     return (
                       <tr key={it.id}>
-                        <td>{it.file.name}</td>
+                        <td>
+                          <span className="file-table__filename" title={it.file.name}>
+                            {truncateMiddle(it.file.name)}
+                          </span>
+                        </td>
                         <td>{it.source}</td>
                         <td>
-                          <select
-                            className="file-table select"
-                            value={it.target}
-                            onChange={e => changeTarget(it.id, e.target.value as TargetFormat)}
-                            disabled={
-                              it.status === 'converting' ||
-                              it.status === 'queued' ||
-                              it.status === 'done' ||
-                              isPreparingDownload
-                            }
-                          >
-                            {targets.map(target => (
-                              <option key={target} value={target}>
-                                {t(`formats.targets.${target}`)}
-                              </option>
-                            ))}
-                          </select>
-                          {it.source === 'pdf' && it.target === 'pdf' && (
-                            <label className="file-table ocr-label">
-                              <input
-                                type="checkbox"
-                                checked={it.conversionOptions.pdf.ocr}
-                                onChange={e => changeOcrOption(it.id, e.target.checked)}
-                                disabled={
-                                  it.status === 'queued' ||
-                                  it.status === 'converting' ||
-                                  it.status === 'done' ||
-                                  isPreparingDownload
-                                }
-                              />
-                              {t('options.ocr')}
-                            </label>
-                          )}
-                          {it.source === 'pdf' && it.status !== 'done' && (
-                            <div>
+                          <div className="file-table__target-controls">
+                            <select
+                              className="file-table select"
+                              value={it.target}
+                              onChange={e => changeTarget(it.id, e.target.value as TargetFormat)}
+                              disabled={isOptionsDisabled}
+                            >
+                              {targets.map(target => (
+                                <option key={target} value={target}>
+                                  {t(`formats.targets.${target}`)}
+                                </option>
+                              ))}
+                            </select>
+                            {it.source === 'pdf' && it.target === 'pdf' && (
+                              <label className="file-table ocr-label">
+                                <input
+                                  type="checkbox"
+                                  checked={it.conversionOptions.pdf.ocr}
+                                  onChange={e => changeOcrOption(it.id, e.target.checked)}
+                                  disabled={isOptionsDisabled}
+                                />
+                                {t('options.ocr')}
+                              </label>
+                            )}
+                            {it.source === 'pdf' && it.status !== 'done' && (
+                              <div>
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost page-selector-btn"
+                                  onClick={() => setActivePdfPageSelectorItemId(it.id)}
+                                  disabled={isPreparingDownload}
+                                >
+                                  {t('actions.selectPages')}
+                                </button>
+                                {it.conversionOptions.pdf.selectedPages !== undefined && (
+                                  <div className="selected-pages-summary">
+                                    {t('options.pdfPages.selectedCount', {
+                                      count: it.conversionOptions.pdf.selectedPages.length
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {it.target === 'html' && it.status === 'done' && (
                               <button
                                 type="button"
-                                className="btn btn--ghost page-selector-btn"
-                                onClick={() => setActivePdfPageSelectorItemId(it.id)}
+                                className="btn btn--ghost"
+                                onClick={() => {
+                                  setActiveHtmlOptionsItemId(it.id)
+                                  setHtmlOptionsReadOnly(true)
+                                }}
                                 disabled={isPreparingDownload}
                               >
-                                {t('actions.selectPages')}
+                                {t('actions.viewOptions')}
                               </button>
-                              {it.conversionOptions.pdf.selectedPages !== undefined && (
-                                <div className="selected-pages-summary">
-                                  {t('options.pdfPages.selectedCount', {
-                                    count: it.conversionOptions.pdf.selectedPages.length
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {it.target === 'html' && (
-                            <div className="html-row-options">
-                              <div className="html-row-options__title">
-                                {t('options.htmlBackground')}
-                              </div>
-                              <label className="html-row-options__check">
-                                <input
-                                  type="checkbox"
-                                  checked={htmlBackground.includeBackground}
-                                  onChange={event =>
-                                    changeHtmlBackgroundOption(
-                                      it.id,
-                                      'includeBackground',
-                                      event.target.checked
-                                    )
-                                  }
-                                  disabled={isOptionsDisabled}
-                                />
-                                <span>{t('options.includeBackground')}</span>
-                              </label>
-                              <label className="html-row-options__quality">
-                                <span>{t('options.backgroundQuality')}</span>
-                                <select
-                                  value={String(htmlBackground.backgroundQuality)}
-                                  onChange={event =>
-                                    changeHtmlBackgroundOption(
-                                      it.id,
-                                      'backgroundQuality',
-                                      Number(event.target.value)
-                                    )
-                                  }
-                                  disabled={isOptionsDisabled}
-                                  aria-label={t('options.backgroundQuality')}
-                                >
-                                  {HTML_BACKGROUND_QUALITY_OPTIONS.map(option => (
-                                    <option key={option.value} value={String(option.value)}>
-                                      {t(option.labelKey)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <label className="html-row-options__check">
-                                <input
-                                  type="checkbox"
-                                  checked={htmlBackground.excludeTextFromBackground}
-                                  onChange={event =>
-                                    changeHtmlBackgroundOption(
-                                      it.id,
-                                      'excludeTextFromBackground',
-                                      event.target.checked
-                                    )
-                                  }
-                                  disabled={isOptionsDisabled}
-                                />
-                                <span>{t('options.excludeTextFromBackground')}</span>
-                              </label>
+                            )}
+                            {it.target === 'html' && it.status !== 'done' && (
                               <button
                                 type="button"
-                                className="btn btn--ghost html-row-options__text-button"
-                                onClick={() => setActiveHtmlOptionsItemId(it.id)}
+                                className="btn btn--ghost"
+                                onClick={() => {
+                                  setActiveHtmlOptionsItemId(it.id)
+                                  setHtmlOptionsReadOnly(false)
+                                }}
                                 disabled={isOptionsDisabled}
                               >
-                                <span>{t('options.textControls')}</span>
-                                <small>{getTextControlSummary(htmlOptions.textControl)}</small>
+                                {t('actions.htmlConvertOptions')}
                               </button>
-                              <div className="html-row-options__title">
-                                {t('options.htmlLayout')}
-                              </div>
-                              <label className="html-row-options__check">
-                                <input
-                                  type="radio"
-                                  name={`html-layout-${it.id}`}
-                                  checked={htmlLayout.mode === 'paginated'}
-                                  onChange={() => changeHtmlLayoutMode(it.id, 'paginated')}
-                                  disabled={isOptionsDisabled}
-                                />
-                                <span>{t('options.paginated')}</span>
-                              </label>
-                              <label className="html-row-options__check">
-                                <input
-                                  type="radio"
-                                  name={`html-layout-${it.id}`}
-                                  checked={htmlLayout.mode === 'continuous'}
-                                  onChange={() => changeHtmlLayoutMode(it.id, 'continuous')}
-                                  disabled={isOptionsDisabled}
-                                />
-                                <span>{t('options.continuous')}</span>
-                              </label>
-                              {htmlLayout.mode === 'continuous' && (
-                                <>
-                                  <div className="html-row-options__title">
-                                    {t('options.htmlWidthMode')}
-                                  </div>
-                                  <label className="html-row-options__check">
-                                    <input
-                                      type="radio"
-                                      name={`html-width-mode-${it.id}`}
-                                      checked={(htmlLayout.widthMode ?? 'actual') === 'actual'}
-                                      onChange={() => changeHtmlLayoutWidthMode(it.id, 'actual')}
-                                      disabled={isOptionsDisabled}
-                                    />
-                                    <span>{t('options.actualWidth')}</span>
-                                  </label>
-                                  <label className="html-row-options__check">
-                                    <input
-                                      type="radio"
-                                      name={`html-width-mode-${it.id}`}
-                                      checked={htmlLayout.widthMode === 'fit'}
-                                      onChange={() => changeHtmlLayoutWidthMode(it.id, 'fit')}
-                                      disabled={isOptionsDisabled}
-                                    />
-                                    <span>{t('options.fitWidth')}</span>
-                                  </label>
-                                </>
-                              )}
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                         <td className={`status status--${it.status}`}>
                           {t(`status.${it.status}` as const)}
@@ -871,14 +732,32 @@ function App() {
         />
       )}
       {activeHtmlOptionsItem && (
-        <HtmlDecodeOptionsModal
+        <HtmlOptionsModal
           open
-          textControl={activeHtmlOptionsItem.conversionOptions.html?.textControl}
+          readOnly={htmlOptionsReadOnly}
+          options={{
+            textControl: activeHtmlOptionsItem.conversionOptions.html?.textControl,
+            background: {
+              ...DEFAULT_HTML_BACKGROUND_OPTIONS,
+              ...activeHtmlOptionsItem.conversionOptions.html?.background
+            },
+            htmlLayout: activeHtmlOptionsItem.conversionOptions.html?.htmlLayout ?? {
+              mode: 'paginated'
+            }
+          }}
           onCancel={() => setActiveHtmlOptionsItemId(null)}
-          onConfirm={textControl => {
-            changeHtmlTextControl(activeHtmlOptionsItem.id, textControl)
+          onConfirm={next => {
+            applyHtmlOptions(activeHtmlOptionsItem.id, next)
             setActiveHtmlOptionsItemId(null)
           }}
+        />
+      )}
+      {confirmModal && (
+        <ConfirmModal
+          open
+          message={confirmModal.message}
+          onCancel={confirmModal.onCancel}
+          onConfirm={confirmModal.onConfirm}
         />
       )}
     </div>

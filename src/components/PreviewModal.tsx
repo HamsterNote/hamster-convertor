@@ -39,7 +39,7 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
     objectUrlRef.current = url
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreviewUrl(url)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setIsLoading(true)
 
     return () => {
@@ -53,7 +53,7 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
       revokeCurrentUrl()
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreviewUrl(null)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+
       setIsLoading(true)
     }
   }, [open, revokeCurrentUrl])

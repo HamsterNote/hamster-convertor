@@ -27,9 +27,17 @@ const createSimpleMockBridge = (
     targetFormat: string
     buffer: ArrayBuffer
     options?: Record<string, unknown>
-  }) => { filename: string; mimeType: string; targetFormat: string; buffer: ArrayBuffer; warnings?: string[] } | Error
+  }) =>
+    | {
+        filename: string
+        mimeType: string
+        targetFormat: string
+        buffer: ArrayBuffer
+        warnings?: string[]
+      }
+    | Error
 ): ParserIframeBridgeRef => ({
-  convert: vi.fn(async (request) => {
+  convert: vi.fn(async request => {
     const result = onConvert(request)
     if (result instanceof Error) {
       throw result
@@ -46,7 +54,7 @@ describe('convertViaBridge integration', () => {
   })
 
   it('completes full conversion round-trip returning blob with correct fields', async () => {
-    const bridge = createSimpleMockBridge((request) => ({
+    const bridge = createSimpleMockBridge(request => ({
       filename: request.filename.replace(/\.pdf$/i, '.html'),
       mimeType: 'text/html;charset=utf-8',
       targetFormat: 'html',
@@ -80,14 +88,12 @@ describe('convertViaBridge integration', () => {
     })
 
     const file = createTestFile('bad.pdf', 'corrupted')
-    await expect(convertViaBridge(bridge, file, 'pdf', 'html')).rejects.toThrow(
-      'CONVERSION_FAILED'
-    )
+    await expect(convertViaBridge(bridge, file, 'pdf', 'html')).rejects.toThrow('CONVERSION_FAILED')
   })
 
   it('passes options through to bridge request', async () => {
     let capturedOptions: Record<string, unknown> | undefined
-    const bridge = createSimpleMockBridge((request) => {
+    const bridge = createSimpleMockBridge(request => {
       capturedOptions = request.options
       return {
         filename: 'options.html',
@@ -141,7 +147,7 @@ describe('convertViaBridge integration', () => {
 
   it('generates unique requestIds for concurrent calls', async () => {
     const capturedRequestIds: string[] = []
-    const bridge = createSimpleMockBridge((request) => {
+    const bridge = createSimpleMockBridge(request => {
       capturedRequestIds.push(request.requestId)
       return {
         filename: `${request.filename}.html`,
@@ -169,7 +175,7 @@ describe('convertViaBridge integration', () => {
     const content = 'PDF binary content here'
     let capturedBuffer: ArrayBuffer | undefined
 
-    const bridge = createSimpleMockBridge((request) => {
+    const bridge = createSimpleMockBridge(request => {
       capturedBuffer = request.buffer
       return {
         filename: 'reader.html',

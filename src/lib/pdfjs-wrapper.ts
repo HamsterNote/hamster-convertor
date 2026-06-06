@@ -14,21 +14,31 @@ interface CMapParams {
 // 包装 getDocument，自动注入 CMap 选项解决中文乱码
 // 关键：显式设置 useWorkerFetch: true 绕过自动检测（自动检测要求 cMapUrl + standardFontDataUrl + wasmUrl 全部提供）
 const wrappedGetDocument = (src?: GetDocumentSrc) => {
-  if (src && typeof src === 'object' && !Array.isArray(src) && !(src instanceof URL) && !(src instanceof Uint8Array) && !(src instanceof ArrayBuffer)) {
+  if (
+    src &&
+    typeof src === 'object' &&
+    !Array.isArray(src) &&
+    !(src instanceof URL) &&
+    !(src instanceof Uint8Array) &&
+    !(src instanceof ArrayBuffer)
+  ) {
     const params = src as CMapParams
-    
+
     if (!params.cMapUrl) {
-      console.log('[pdfjs-wrapper] Injecting CMap options:', { cMapUrl: '/cmaps/', cMapPacked: true, useWorkerFetch: true })
+      console.log('[pdfjs-wrapper] Injecting CMap options:', {
+        cMapUrl: '/cmaps/',
+        cMapPacked: true,
+        useWorkerFetch: true
+      })
       return originalGetDocument({
         ...params,
         cMapUrl: '/cmaps/',
         cMapPacked: true,
-        useWorkerFetch: true,  // 强制 Worker 直接获取 CMap，绕过自动检测
+        useWorkerFetch: true // 强制 Worker 直接获取 CMap，绕过自动检测
       } as unknown as GetDocumentSrc)
     }
   }
-  
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
   return originalGetDocument(src!)
 }
 
