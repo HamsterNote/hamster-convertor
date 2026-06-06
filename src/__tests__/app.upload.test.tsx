@@ -1,20 +1,46 @@
+import type { ParserBridgeConversionResultPayload } from '@hamster-note/parser-protocol'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
+import type { ParserIframeBridgeRef } from '../components/ParserIframeBridge'
 import i18n from '../i18n'
-import type { ConversionResult } from '../lib/converter'
+
+const bridgeMocks = vi.hoisted<{
+  convert: ReturnType<typeof vi.fn<ParserIframeBridgeRef['convert']>>
+  getProgress: ReturnType<typeof vi.fn<ParserIframeBridgeRef['getProgress']>>
+  cancel: ReturnType<typeof vi.fn<ParserIframeBridgeRef['cancel']>>
+}>(() => ({
+  convert: vi.fn<ParserIframeBridgeRef['convert']>(),
+  getProgress: vi.fn<ParserIframeBridgeRef['getProgress']>(() => null),
+  cancel: vi.fn<ParserIframeBridgeRef['cancel']>(() => Promise.resolve())
+}))
 
 vi.mock('../lib/converter', () => ({
-  convertFile: vi.fn(),
   getSupportedTargets: vi.fn((source: string) => {
     const targets: Record<string, string[]> = {
       pdf: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
       txt: ['png', 'html'],
-      image: ['pdf', 'txt', 'png', 'jpg', 'webp']
+      image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
+      html: ['txt']
     }
     return targets[source] ?? ['txt']
   })
 }))
+
+vi.mock('../components/ParserIframeBridge', async () => {
+  const { forwardRef, useImperativeHandle } = await vi.importActual<typeof import('react')>('react')
+
+  return {
+    ParserIframeBridge: forwardRef<ParserIframeBridgeRef>((_props, ref) => {
+      useImperativeHandle(ref, () => ({
+        convert: bridgeMocks.convert,
+        getProgress: bridgeMocks.getProgress,
+        cancel: bridgeMocks.cancel
+      }))
+      return <div data-testid="parser-iframe-bridge" />
+    })
+  }
+})
 
 vi.mock('../lib/download', () => ({
   downloadBlobFile: vi.fn(),
@@ -71,11 +97,36 @@ const changeNativeSelectValue = (select: HTMLSelectElement, value: string) => {
   select.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
+const textToArrayBuffer = (text: string): ArrayBuffer =>
+  new TextEncoder().encode(text).buffer.slice(0) as ArrayBuffer
+
+const createBridgeResult = ({
+  contents = 'fake',
+  filename = 'result.txt',
+  mimeType = 'text/plain',
+  targetFormat = 'txt'
+}: {
+  contents?: string
+  filename?: string
+  mimeType?: string
+  targetFormat?: string
+} = {}): ParserBridgeConversionResultPayload => ({
+  filename,
+  mimeType,
+  targetFormat,
+  buffer: textToArrayBuffer(contents)
+})
+
 describe('app upload feedback', () => {
   beforeEach(async () => {
     window.localStorage.setItem('i18nextLng', 'en')
     await i18n.changeLanguage('en')
     vi.clearAllMocks()
+    bridgeMocks.convert.mockReset()
+    bridgeMocks.getProgress.mockReset()
+    bridgeMocks.cancel.mockReset()
+    bridgeMocks.getProgress.mockReturnValue(null)
+    bridgeMocks.cancel.mockResolvedValue()
   })
 
   afterEach(() => {
@@ -137,15 +188,7 @@ describe('app upload feedback', () => {
   })
 
   it('done target lock: target select is disabled for completed rows', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['fake'], { type: 'text/plain' }),
-        filename: 'result.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+    bridgeMocks.convert.mockResolvedValue(createBridgeResult())
 
     window.localStorage.setItem('i18nextLng', 'en')
 
@@ -264,8 +307,7 @@ describe('app upload feedback', () => {
   })
 
   it('failed row select remains enabled', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockRejectedValue(new Error('conversion failed'))
+    bridgeMocks.convert.mockRejectedValue(new Error('conversion failed'))
 
     window.localStorage.setItem('i18nextLng', 'en')
 
@@ -288,6 +330,29 @@ describe('app upload feedback', () => {
     const table = screen.getByRole('table')
     const tableSelects = table.querySelectorAll('select.file-table.select')
     expect(tableSelects[0]).toBeEnabled()
+  })
+
+  it('maps bridge OCR_REQUIRED errors to the existing i18n message', async () => {
+    bridgeMocks.convert.mockRejectedValue(
+      Object.assign(new Error('ocr required'), { code: 'OCR_REQUIRED' })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: {
+        files: [new File(['hello'], 'scan.pdf', { type: 'application/pdf' })]
+      }
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Scanned PDF requires OCR; text-layer extraction not available')
+      ).toBeInTheDocument()
+    })
   })
 
   it('row-scoped OCR: toggling one row does not affect another', async () => {
@@ -324,15 +389,7 @@ describe('app upload feedback', () => {
   })
 
   it('duplicate same-name upload creates independent rows with separate states', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['fake'], { type: 'text/plain' }),
-        filename: 'result.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+    bridgeMocks.convert.mockResolvedValue(createBridgeResult())
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -367,12 +424,11 @@ describe('app upload feedback', () => {
   })
 
   it('shows full-screen loading during convert-all and hides on completion', async () => {
-    const { convertFile } = await import('../lib/converter')
-    let resolveConversion: ((value: ConversionResult[]) => void) | undefined
-    const conversionPromise = new Promise<ConversionResult[]>(resolve => {
+    let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
+    const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
       resolveConversion = resolve
     })
-    vi.mocked(convertFile).mockReturnValue(conversionPromise)
+    bridgeMocks.convert.mockReturnValue(conversionPromise)
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -387,14 +443,7 @@ describe('app upload feedback', () => {
       expect(screen.getByRole('status')).toBeInTheDocument()
     })
 
-    resolveConversion?.([
-      {
-        blob: new Blob(['fake'], { type: 'text/plain' }),
-        filename: 'result.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+    resolveConversion?.(createBridgeResult())
 
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
@@ -402,12 +451,14 @@ describe('app upload feedback', () => {
   })
 
   it('shows full-screen loading during convert-all and hides on failure', async () => {
-    const { convertFile } = await import('../lib/converter')
     let rejectConversion: ((error: Error) => void) | undefined
-    const conversionPromise = new Promise<ConversionResult[]>((_, reject) => {
+    const conversionPromise = new Promise<ParserBridgeConversionResultPayload>((_, reject) => {
       rejectConversion = reject
     })
-    vi.mocked(convertFile).mockReturnValue(conversionPromise)
+    // Attach a no-op catch so vitest does not flag the rejection as unhandled;
+    // App.tsx convertAll() catches it via its own try/catch.
+    void conversionPromise.catch(() => {})
+    bridgeMocks.convert.mockReturnValue(conversionPromise)
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -484,16 +535,10 @@ describe('app upload feedback', () => {
     expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
   })
 
-  it('confirms selected PDF image pages and passes them to convertFile', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['fake'], { type: 'image/png' }),
-        filename: 'page-001.png',
-        mimeType: 'image/png',
-        targetFormat: 'png'
-      }
-    ])
+  it('confirms selected PDF image pages and passes them to the bridge', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({ filename: 'page-001.png', mimeType: 'image/png', targetFormat: 'png' })
+    )
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -511,10 +556,10 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
 
     await waitFor(() => {
-      expect(convertFile).toHaveBeenCalledWith(
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: 'pdf',
-          target: 'png',
+          sourceFormat: 'pdf',
+          targetFormat: 'png',
           options: expect.objectContaining({
             pdf: expect.objectContaining({ selectedPages: [1, 3] })
           })
@@ -523,16 +568,9 @@ describe('app upload feedback', () => {
     })
   })
 
-  it('shows delete button for completed rows', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['fake'], { type: 'text/plain' }),
-        filename: 'result.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+  it('reconstructs bridge output Blob for row downloads', async () => {
+    const { downloadBlobFile } = await import('../lib/download')
+    bridgeMocks.convert.mockResolvedValue(createBridgeResult())
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -549,18 +587,24 @@ describe('app upload feedback', () => {
 
     expect(screen.getAllByRole('button', { name: 'Download' })).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Download' })[0])
+
+    await waitFor(() => {
+      expect(downloadBlobFile).toHaveBeenCalledTimes(1)
+    })
+
+    const downloadResult = vi.mocked(downloadBlobFile).mock.calls[0]?.[0]
+    if (!downloadResult) throw new Error('Expected a reconstructed bridge download result')
+
+    expect(downloadResult.filename).toBe('result.txt')
+    expect(downloadResult.blob).toBeInstanceOf(Blob)
+    expect(downloadResult.blob.type).toBe('text/plain')
+    expect(downloadResult.blob.size).toBe(4)
   })
 
   it('removes a completed row when delete is clicked', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['fake'], { type: 'text/plain' }),
-        filename: 'result.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+    bridgeMocks.convert.mockResolvedValue(createBridgeResult())
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -583,12 +627,11 @@ describe('app upload feedback', () => {
   })
 
   it('disables delete button while converting', async () => {
-    const { convertFile } = await import('../lib/converter')
-    let resolveConversion: ((value: ConversionResult[]) => void) | undefined
-    const conversionPromise = new Promise<ConversionResult[]>(resolve => {
+    let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
+    const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
       resolveConversion = resolve
     })
-    vi.mocked(convertFile).mockReturnValue(conversionPromise)
+    bridgeMocks.convert.mockReturnValue(conversionPromise)
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -603,34 +646,20 @@ describe('app upload feedback', () => {
       expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
     })
 
-    resolveConversion?.([
-      {
-        blob: new Blob(['fake'], { type: 'text/plain' }),
-        filename: 'result.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+    resolveConversion?.(createBridgeResult())
   })
 
   it('shows full-screen loading during async download preparation', async () => {
-    const { convertFile } = await import('../lib/converter')
     const { downloadResultArchive } = await import('../lib/download')
     let resolveDownload: (() => void) | undefined
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['first'], { type: 'text/plain' }),
-        filename: 'first.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      },
-      {
-        blob: new Blob(['second'], { type: 'text/plain' }),
-        filename: 'second.txt',
-        mimeType: 'text/plain',
-        targetFormat: 'txt'
-      }
-    ])
+    const bridgeResults = [
+      createBridgeResult({ contents: 'first', filename: 'first.txt' }),
+      createBridgeResult({ contents: 'second', filename: 'second.txt' })
+    ]
+    bridgeMocks.convert
+      .mockResolvedValueOnce(bridgeResults[0]!)
+      .mockResolvedValueOnce(bridgeResults[1]!)
+      .mockResolvedValue(bridgeResults[1]!)
     vi.mocked(downloadResultArchive).mockReturnValue(
       new Promise<void>(resolve => {
         resolveDownload = resolve
@@ -640,18 +669,25 @@ describe('app upload feedback', () => {
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
     fireEvent.change(input as HTMLInputElement, {
-      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+      target: {
+        files: [
+          new File(['hello'], 'notes-a.txt', { type: 'text/plain' }),
+          new File(['world'], 'notes-b.txt', { type: 'text/plain' })
+        ]
+      }
     })
 
-    await screen.findByRole('row', { name: /notes\.txt/ })
+    await screen.findByRole('row', { name: /notes-a\.txt/ })
+    await screen.findByRole('row', { name: /notes-b\.txt/ })
     fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
 
     await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument()
+      expect(screen.getAllByText('Done')).toHaveLength(2)
     })
 
-    const rowDownloadButton = screen.getAllByRole('button', { name: 'Download' })[0]
-    fireEvent.click(rowDownloadButton)
+    const downloadButtons = screen.getAllByRole('button', { name: 'Download' })
+    const archiveDownloadButton = downloadButtons[downloadButtons.length - 1]
+    fireEvent.click(archiveDownloadButton)
 
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent('Preparing download...')
@@ -723,7 +759,7 @@ describe('app upload feedback', () => {
     expect(row).toContainElement(backgroundQualitySelect)
 
     expect(includeBackgroundCheckbox).toBeChecked()
-    expect(excludeTextCheckbox).not.toBeChecked()
+    expect(excludeTextCheckbox).toBeChecked()
   })
 
   it('TDD-3: text control button opens modal with settings', async () => {
@@ -789,16 +825,15 @@ describe('app upload feedback', () => {
     })
   })
 
-  it('TDD-5: convertFile receives options.html with decode options', async () => {
-    const { convertFile } = await import('../lib/converter')
-    vi.mocked(convertFile).mockResolvedValue([
-      {
-        blob: new Blob(['<html></html>'], { type: 'text/html' }),
+  it('TDD-5: bridge receives HTML decode options', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: '<html></html>',
         filename: 'sample.html',
         mimeType: 'text/html',
         targetFormat: 'html'
-      }
-    ])
+      })
+    )
 
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -810,8 +845,6 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
 
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
-
-    fireEvent.click(screen.getByRole('checkbox', { name: /exclude text from background/i }))
 
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
@@ -828,10 +861,10 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
 
     await waitFor(() => {
-      expect(convertFile).toHaveBeenCalledWith(
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: 'pdf',
-          target: 'html',
+          sourceFormat: 'pdf',
+          targetFormat: 'html',
           options: expect.objectContaining({
             decode: {
               textControl: expect.objectContaining({
@@ -865,7 +898,7 @@ describe('app upload feedback', () => {
       name: /background quality/i
     }) as HTMLSelectElement
 
-    expect(qualitySelect.value).toBe('0.3')
+    expect(qualitySelect.value).toBe('0.85')
 
     changeNativeSelectValue(qualitySelect, '1')
 

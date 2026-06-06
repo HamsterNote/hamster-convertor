@@ -6,17 +6,18 @@ import Footer from './components/Footer'
 import FullscreenLoading from './components/FullscreenLoading'
 import Header from './components/Header'
 import HtmlDecodeOptionsModal, { type DecodeTextControl } from './components/HtmlDecodeOptionsModal'
+import { ParserIframeBridge, type ParserIframeBridgeRef } from './components/ParserIframeBridge'
 import PdfPageSelectorModal from './components/PdfPageSelectorModal'
 import {
   type ConversionResult,
   type ConversionWarning,
-  convertFile,
   getSupportedTargets,
   type HtmlDecodeOptions,
   type SourceFormat,
   type TargetFormat
 } from './lib/converter'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
+import { convertViaBridge } from './lib/parser-bridge/proxy'
 
 type BackgroundDecodeOptions = NonNullable<HtmlDecodeOptions['background']>
 
@@ -37,8 +38,8 @@ type ConversionOptions = {
 
 const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
   includeBackground: true,
-  backgroundQuality: 0.3,
-  excludeTextFromBackground: false
+  backgroundQuality: 0.85,
+  excludeTextFromBackground: true
 }
 
 const HTML_BACKGROUND_QUALITY_OPTIONS = [
@@ -154,12 +155,21 @@ const getConversionErrorKey = (error: unknown): ConversionErrorKey => {
   return 'conversionFailed'
 }
 
+const getRequiredBridge = (bridge: ParserIframeBridgeRef | null): ParserIframeBridgeRef => {
+  if (!bridge) {
+    throw new Error('Parser bridge is unavailable')
+  }
+
+  return bridge
+}
+
 function App() {
   const { t } = useTranslation()
   const [items, setItems] = useState<FileItem[]>([])
   const [rejectedFileNames, setRejectedFileNames] = useState<string[]>([])
   const itemsRef = useRef<FileItem[]>(items)
   const addFilesInputRef = useRef<HTMLInputElement>(null)
+  const bridgeRef = useRef<ParserIframeBridgeRef>(null)
   const [isConvertingAll, setIsConvertingAll] = useState(false)
   const [isPreparingDownload, setIsPreparingDownload] = useState(false)
   const [activePdfPageSelectorItemId, setActivePdfPageSelectorItemId] = useState<string | null>(
@@ -419,6 +429,8 @@ function App() {
         markConverting(id)
 
         try {
+          const bridge = getRequiredBridge(bridgeRef.current)
+
           const htmlBackground = {
             ...DEFAULT_HTML_BACKGROUND_OPTIONS,
             ...current.conversionOptions.html?.background
@@ -429,17 +441,18 @@ function App() {
                 background: htmlBackground
               }
             : undefined
-          const results = await convertFile({
-            file: current.file,
-            source: current.source,
-            target: current.target,
-            options: {
+          const result = await convertViaBridge(
+            bridge,
+            current.file,
+            current.source,
+            current.target,
+            {
               pdf: current.conversionOptions.pdf,
               decode: htmlOptions,
               layout: current.conversionOptions.html?.htmlLayout
             }
-          })
-          markDone(id, results)
+          )
+          markDone(id, [result])
         } catch (error) {
           log.warn('Conversion failed', {
             id,
@@ -500,6 +513,7 @@ function App() {
         visible={isConvertingAll || isPreparingDownload}
         label={isPreparingDownload ? t('loading.preparingDownload') : t('loading.converting')}
       />
+      <ParserIframeBridge ref={bridgeRef} />
       <Header />
 
       <main className="container">
