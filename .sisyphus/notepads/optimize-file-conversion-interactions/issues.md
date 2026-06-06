@@ -1,1 +1,0 @@
-- 2026-04-30: `yarn build` is blocked by pre-existing TypeScript `BlobPart` errors in `src/__tests__/convert.integration.test.ts`; `yarn playwright test e2e/app.spec.ts` is blocked because Chromium is not installed under `.cache/ms-playwright`.
