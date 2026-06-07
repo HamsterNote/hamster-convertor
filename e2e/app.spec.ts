@@ -462,15 +462,25 @@ test.describe('converter app', () => {
     await page.locator('.nav__select').selectOption('zh-CN')
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
 
+    const row = rowForFile(page, 'sample.pdf')
     const targetSelect = targetSelectForRow(page, 'sample.pdf')
     await targetSelect.selectOption('pdf')
 
-    const ocrCheckbox = page.getByRole('checkbox', { name: '是否进行 OCR' })
+    // OCR checkbox is now inside the Settings modal
+    await row.getByRole('button', { name: '设置' }).click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await expect(dialog).toBeVisible()
+
+    const ocrCheckbox = dialog.getByRole('checkbox', { name: '是否进行 OCR' })
     await expect(ocrCheckbox).toBeVisible()
     await expect(ocrCheckbox).not.toBeChecked()
 
     await ocrCheckbox.check()
     await expect(ocrCheckbox).toBeChecked()
+
+    // Close the Settings modal
+    await dialog.getByRole('button', { name: '完成' }).click()
+    await expect(dialog).toBeHidden()
 
     await page.getByRole('button', { name: '全部转换' }).click()
 
@@ -488,11 +498,24 @@ test.describe('converter app', () => {
     await page.locator('.nav__select').selectOption('zh-CN')
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
 
+    const row = rowForFile(page, 'sample.pdf')
     await targetSelectForRow(page, 'sample.pdf').selectOption('pdf')
-    await expect(page.getByRole('checkbox', { name: '是否进行 OCR' })).toBeVisible()
+
+    // OCR checkbox is inside the Settings modal — open it to verify visibility
+    await row.getByRole('button', { name: '设置' }).click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('checkbox', { name: '是否进行 OCR' })).toBeVisible()
+    await dialog.getByRole('button', { name: '完成' }).click()
+    await expect(dialog).toBeHidden()
 
     await targetSelectForRow(page, 'sample.pdf').selectOption('txt')
-    await expect(page.getByRole('checkbox', { name: '是否进行 OCR' })).toBeHidden()
+
+    // Re-open Settings — OCR section should be absent for TXT target
+    await row.getByRole('button', { name: '设置' }).click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('checkbox', { name: '是否进行 OCR' })).toBeHidden()
+    await dialog.getByRole('button', { name: '完成' }).click()
   })
 
   test('shows feedback when selected files are unsupported', async ({ page }) => {
@@ -531,7 +554,8 @@ test.describe('converter app', () => {
       'txt',
       'png',
       'jpg',
-      'webp'
+      'webp',
+      'html'
     ])
   })
 
@@ -602,7 +626,7 @@ test.describe('converter app', () => {
 
     const htmlRow = rowForFile(page, 'sample.html')
     await expect(targetSelectForRow(page, 'sample.html')).toHaveValue('txt')
-    await expect(htmlRow.getByRole('button', { name: 'Settings' })).toHaveCount(0)
+    await expect(htmlRow.getByRole('button', { name: 'Settings' })).toBeDisabled()
     await expect(htmlRow.getByRole('button', { name: 'Remove' })).toBeEnabled()
   })
 
