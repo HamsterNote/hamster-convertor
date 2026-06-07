@@ -374,6 +374,39 @@ export const convertImageToPdf = async (
   try {
     const dimensions = await loadImageDimensions(objectUrl)
     const { jsPDF } = (await import('jspdf')) as JsPdfModule
+    const imageToPdfOptions = request.options?.imageToPdf
+
+    if (imageToPdfOptions) {
+      // Cover-fit: scale to fill content box, crop overflow, center
+      const maxMargin = Math.min(dimensions.width, dimensions.height) / 2
+      const marginPt = Math.min(Math.max(0, imageToPdfOptions.marginPt), maxMargin)
+      const pageWidth = dimensions.width
+      const pageHeight = dimensions.height
+      const contentBoxWidth = pageWidth - marginPt * 2
+      const contentBoxHeight = pageHeight - marginPt * 2
+      const scale = Math.max(
+        contentBoxWidth / dimensions.width,
+        contentBoxHeight / dimensions.height
+      )
+      const drawWidth = dimensions.width * scale
+      const drawHeight = dimensions.height * scale
+      const x = marginPt + (contentBoxWidth - drawWidth) / 2
+      const y = marginPt + (contentBoxHeight - drawHeight) / 2
+
+      const doc = new jsPDF({ unit: 'px', format: [pageWidth, pageHeight] })
+      doc.addImage(objectUrl, x, y, drawWidth, drawHeight)
+      const blob = doc.output('blob')
+      return [
+        {
+          buffer: await blobToArrayBuffer(blob),
+          filename: replaceExtension(request.filename, 'pdf'),
+          mimeType: 'application/pdf',
+          targetFormat: 'pdf'
+        }
+      ]
+    }
+
+    // Legacy path: image-derived dimensions, draw at origin filling entire page
     const doc = new jsPDF({ unit: 'px', format: [dimensions.width, dimensions.height] })
     doc.addImage(objectUrl, 0, 0, dimensions.width, dimensions.height)
     const blob = doc.output('blob')
@@ -456,21 +489,44 @@ export const convertImageToImage = async (
 
   try {
     const image = await loadImage(objectUrl)
+    const imageOptions = request.options?.image
+
+    let targetWidth = image.naturalWidth
+    let targetHeight = image.naturalHeight
+
+    if (imageOptions?.maxWidth || imageOptions?.maxHeight) {
+      const maxW = imageOptions.maxWidth ?? Infinity
+      const maxH = imageOptions.maxHeight ?? Infinity
+
+      if (imageOptions.keepAspectRatio) {
+        const scale = Math.min(maxW / targetWidth, maxH / targetHeight, 1)
+        targetWidth = Math.round(targetWidth * scale)
+        targetHeight = Math.round(targetHeight * scale)
+      } else {
+        targetWidth = Math.min(targetWidth, maxW)
+        targetHeight = Math.min(targetHeight, maxH)
+      }
+    }
+
     const canvas = document.createElement('canvas')
-    canvas.width = image.naturalWidth
-    canvas.height = image.naturalHeight
+    canvas.width = targetWidth
+    canvas.height = targetHeight
     const ctx = canvas.getContext('2d')
     if (!ctx) {
       throw new Error('Failed to get 2d context')
     }
-    ctx.drawImage(image, 0, 0)
+    ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
 
     const targetFormat = request.targetFormat as ConcreteImageTarget
     if (!['png', 'jpg', 'webp'].includes(targetFormat)) {
       throw new Error(`Unsupported image conversion target: ${targetFormat}`)
     }
 
-    const { blob, mimeType } = await encodeCanvasToImage(canvas, targetFormat)
+    const { blob, mimeType } = await encodeCanvasToImage(
+      canvas,
+      targetFormat,
+      imageOptions?.quality
+    )
     return [
       {
         buffer: await blobToArrayBuffer(blob),

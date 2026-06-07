@@ -2,25 +2,36 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ConversionResult } from '../lib/converter'
 
+type PreviewTab = {
+  label: string
+  result: ConversionResult
+}
+
 type PreviewModalProps = {
   open: boolean
-  result: ConversionResult
+  results: ConversionResult[]
+  initialIndex?: number
   onClose: () => void
 }
 
-/**
- * 全屏预览模态框组件
- * 使用 iframe 内嵌显示转换结果，支持 HTML、图片、PDF、文本等格式
- * 通过 URL.createObjectURL 创建 blob 链接，关闭时自动释放
- */
-export default function PreviewModal({ open, result, onClose }: PreviewModalProps) {
+export type { PreviewTab }
+
+export default function PreviewModal({
+  open,
+  results,
+  initialIndex = 0,
+  onClose
+}: PreviewModalProps) {
   const { t } = useTranslation()
+  const [activeIndex, setActiveIndex] = useState(initialIndex)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const objectUrlRef = useRef<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 释放 object URL 的工具函数
+  const activeResult = results[activeIndex]
+
   const revokeCurrentUrl = useCallback(() => {
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current)
@@ -28,37 +39,46 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
     }
   }, [])
 
-  // 当 result 变化时，创建新的 object URL
+  const loadResult = useCallback(
+    (result: ConversionResult) => {
+      revokeCurrentUrl()
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current)
+      }
+      const url = URL.createObjectURL(result.blob)
+      objectUrlRef.current = url
+      setPreviewUrl(url)
+      setIsLoading(true)
+      // PDF blobs in a sandbox="" iframe never fire onLoad in Chromium
+      // because the built-in PDF viewer is blocked. Use a timeout fallback
+      // so the spinner does not block indefinitely.
+      loadTimeoutRef.current = setTimeout(() => {
+        setIsLoading(false)
+      }, 800)
+    },
+    [revokeCurrentUrl]
+  )
+
   useEffect(() => {
-    if (!result) {
-      return
-    }
+    if (!open || !activeResult) return
 
-    // 创建 blob URL 用于 iframe 预览
-    const url = URL.createObjectURL(result.blob)
-    objectUrlRef.current = url
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPreviewUrl(url)
-
-    setIsLoading(true)
+    loadResult(activeResult)
 
     return () => {
       revokeCurrentUrl()
     }
-  }, [result, revokeCurrentUrl])
+  }, [open, activeResult, loadResult, revokeCurrentUrl])
 
-  // 当 modal 关闭时清理状态
   useEffect(() => {
     if (!open) {
       revokeCurrentUrl()
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPreviewUrl(null)
-
       setIsLoading(true)
     }
   }, [open, revokeCurrentUrl])
 
-  // 处理 ESC 键关闭
   useEffect(() => {
     if (!open) return
 
@@ -72,18 +92,37 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open, onClose])
 
-  // iframe 加载完成回调
+  // Cleanup load timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const handleIframeLoad = () => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current)
+      loadTimeoutRef.current = null
+    }
     setIsLoading(false)
   }
 
-  if (!open) return null
+  const handleTabClick = (index: number) => {
+    if (index === activeIndex) return
+    setActiveIndex(index)
+  }
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose()
     }
   }
+
+  if (!open || results.length === 0) return null
+
+  const showTabs = results.length > 1
 
   return (
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
@@ -96,11 +135,27 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
         className="preview-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={t('preview.title', { filename: result.filename })}
+        aria-label={t('preview.title', { filename: activeResult?.filename ?? '' })}
       >
-        {/* 标题栏 */}
         <div className="preview-modal__header">
-          <h2 className="preview-modal__title">{result.filename}</h2>
+          {showTabs ? (
+            <div className="preview-modal__tabs" role="tablist">
+              {results.map((result, index) => (
+                <button
+                  key={result.filename + index}
+                  type="button"
+                  role="tab"
+                  aria-selected={index === activeIndex}
+                  className={`preview-modal__tab${index === activeIndex ? ' preview-modal__tab--active' : ''}`}
+                  onClick={() => handleTabClick(index)}
+                >
+                  {result.filename}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <h2 className="preview-modal__title">{activeResult?.filename}</h2>
+          )}
           <button
             type="button"
             className="preview-modal__close"
@@ -111,7 +166,6 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
           </button>
         </div>
 
-        {/* 内容区域 */}
         <div className="preview-modal__body">
           {isLoading && (
             <div className="preview-modal__loading">
@@ -119,14 +173,14 @@ export default function PreviewModal({ open, result, onClose }: PreviewModalProp
               <span>{t('preview.loading')}</span>
             </div>
           )}
-          {previewUrl && (
+          {previewUrl && activeResult && (
             <iframe
               ref={iframeRef}
               className="preview-modal__iframe"
               src={previewUrl}
-              title={result.filename}
+              title={activeResult.filename}
               onLoad={handleIframeLoad}
-              sandbox="allow-same-origin"
+              sandbox=""
               style={{ display: isLoading ? 'none' : 'block' }}
             />
           )}

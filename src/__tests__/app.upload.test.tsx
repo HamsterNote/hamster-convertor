@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import type { ParserIframeBridgeRef } from '../components/ParserIframeBridge'
+import { convertViaBridge } from '../lib/parser-bridge/proxy'
 import i18n from '../i18n'
 
 const bridgeMocks = vi.hoisted<{
@@ -46,6 +47,16 @@ vi.mock('../lib/download', () => ({
   downloadBlobFile: vi.fn(),
   downloadResultArchive: vi.fn()
 }))
+
+vi.mock('../lib/parser-bridge/proxy', async () => {
+  const actual = await vi.importActual<typeof import('../lib/parser-bridge/proxy')>(
+    '../lib/parser-bridge/proxy'
+  )
+  return {
+    ...actual,
+    convertViaBridge: vi.fn(actual.convertViaBridge)
+  }
+})
 
 vi.mock('../components/PdfPageSelectorModal', () => ({
   default: ({ open, onConfirm }: { open: boolean; onConfirm: (pages: number[]) => void }) =>
@@ -127,6 +138,8 @@ describe('app upload feedback', () => {
     bridgeMocks.cancel.mockReset()
     bridgeMocks.getProgress.mockReturnValue(null)
     bridgeMocks.cancel.mockResolvedValue()
+    URL.createObjectURL = vi.fn(() => 'blob:mock')
+    URL.revokeObjectURL = vi.fn()
   })
 
   afterEach(() => {
@@ -231,7 +244,7 @@ describe('app upload feedback', () => {
     expect(selects[0]).toBeEnabled()
   })
 
-  it('OCR checkbox visible for pdf target rows with zh-CN locale', async () => {
+  it('Settings button replaces inline OCR controls for pdf target rows', async () => {
     window.localStorage.setItem('i18nextLng', 'zh-CN')
     await i18n.changeLanguage('zh-CN')
 
@@ -245,28 +258,27 @@ describe('app upload feedback', () => {
     })
 
     await screen.findByRole('row', { name: /notes\.pdf/ })
+
+    expect(screen.queryByRole('checkbox', { name: '是否进行 OCR' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '设置' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }))
+
+    const dialog = screen.getByRole('dialog', { name: /设置/i })
     const ocrCheckbox = screen.getByRole('checkbox', { name: '是否进行 OCR' })
-    expect(ocrCheckbox).toBeInTheDocument()
-  })
-
-  it('OCR checkbox defaults unchecked', async () => {
-    window.localStorage.setItem('i18nextLng', 'zh-CN')
-    await i18n.changeLanguage('zh-CN')
-
-    const { container } = render(<App />)
-    const input = container.querySelector('.dropzone + input[type="file"]')
-
-    fireEvent.change(input as HTMLInputElement, {
-      target: {
-        files: [new File(['hello'], 'notes.pdf', { type: 'application/pdf' })]
-      }
-    })
-
-    const ocrCheckbox = await screen.findByRole('checkbox', { name: '是否进行 OCR' })
+    expect(dialog).toContainElement(ocrCheckbox)
     expect(ocrCheckbox).not.toBeChecked()
+
+    fireEvent.click(ocrCheckbox)
+    expect(ocrCheckbox).toBeChecked()
+
+    fireEvent.click(screen.getByRole('button', { name: /完成/i }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /设置/i })).not.toBeInTheDocument()
+    })
   })
 
-  it('non-pdf targets do not expose OCR checkbox', async () => {
+  it('non-pdf targets do not expose inline OCR controls', async () => {
     window.localStorage.setItem('i18nextLng', 'zh-CN')
     await i18n.changeLanguage('zh-CN')
 
@@ -280,30 +292,7 @@ describe('app upload feedback', () => {
     })
 
     await screen.findByRole('row', { name: /photo\.png/ })
-    const ocrCheckboxes = screen.queryAllByRole('checkbox', { name: '是否进行 OCR' })
-    expect(ocrCheckboxes).toHaveLength(0)
-  })
-
-  it('image source with pdf target does not expose OCR checkbox', async () => {
-    window.localStorage.setItem('i18nextLng', 'zh-CN')
-    await i18n.changeLanguage('zh-CN')
-
-    const { container } = render(<App />)
-    const input = container.querySelector('.dropzone + input[type="file"]')
-
-    fireEvent.change(input as HTMLInputElement, {
-      target: {
-        files: [new File(['fake'], 'photo.png', { type: 'image/png' })]
-      }
-    })
-
-    await screen.findByRole('row', { name: /photo\.png/ })
-
-    const selects = screen.getAllByRole('combobox')
-    fireEvent.change(selects[0], { target: { value: 'pdf' } })
-
-    const ocrCheckboxes = screen.queryAllByRole('checkbox', { name: '是否进行 OCR' })
-    expect(ocrCheckboxes).toHaveLength(0)
+    expect(screen.queryByRole('checkbox', { name: '是否进行 OCR' })).not.toBeInTheDocument()
   })
 
   it('failed row select remains enabled', async () => {
@@ -355,7 +344,7 @@ describe('app upload feedback', () => {
     })
   })
 
-  it('row-scoped OCR: toggling one row does not affect another', async () => {
+  it('row-scoped OCR via Settings: toggling one row does not affect another', async () => {
     window.localStorage.setItem('i18nextLng', 'zh-CN')
     await i18n.changeLanguage('zh-CN')
 
@@ -376,16 +365,28 @@ describe('app upload feedback', () => {
 
     await screen.findByRole('row', { name: /b\.pdf/ })
 
-    const ocrCheckboxes = screen.getAllByRole('checkbox', { name: '是否进行 OCR' })
-    expect(ocrCheckboxes).toHaveLength(2)
-    expect(ocrCheckboxes[0]).not.toBeChecked()
-    expect(ocrCheckboxes[1]).not.toBeChecked()
+    const settingsButtons = screen.getAllByRole('button', { name: '设置' })
+    expect(settingsButtons).toHaveLength(2)
 
-    fireEvent.click(ocrCheckboxes[0])
+    fireEvent.click(settingsButtons[0])
+    const firstOcr = screen.getByRole('checkbox', { name: '是否进行 OCR' })
+    expect(firstOcr).not.toBeChecked()
+    fireEvent.click(firstOcr)
+    expect(firstOcr).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: /完成/i }))
 
-    const updatedCheckboxes = screen.getAllByRole('checkbox', { name: '是否进行 OCR' })
-    expect(updatedCheckboxes[0]).toBeChecked()
-    expect(updatedCheckboxes[1]).not.toBeChecked()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /设置/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(settingsButtons[1])
+    const secondOcr = screen.getByRole('checkbox', { name: '是否进行 OCR' })
+    expect(secondOcr).not.toBeChecked()
+
+    fireEvent.click(screen.getByRole('button', { name: /完成/i }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /设置/i })).not.toBeInTheDocument()
+    })
   })
 
   it('duplicate same-name upload creates independent rows with separate states', async () => {
@@ -457,7 +458,7 @@ describe('app upload feedback', () => {
     })
     // Attach a no-op catch so vitest does not flag the rejection as unhandled;
     // App.tsx convertAll() catches it via its own try/catch.
-    void conversionPromise.catch(() => {})
+    conversionPromise.catch(() => {}).catch(() => {})
     bridgeMocks.convert.mockReturnValue(conversionPromise)
 
     const { container } = render(<App />)
@@ -511,31 +512,7 @@ describe('app upload feedback', () => {
     expect(svgOptions).toContain('txt')
   })
 
-  it('shows page-select button for all PDF source targets', async () => {
-    const { container } = render(<App />)
-    const input = container.querySelector('.dropzone + input[type="file"]')
-    fireEvent.change(input as HTMLInputElement, {
-      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
-    })
-
-    await screen.findByRole('row', { name: /sample\.pdf/ })
-    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
-
-    const tableSelects = getFileTargetSelects()
-    fireEvent.change(tableSelects[0], { target: { value: 'png' } })
-    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
-
-    fireEvent.change(tableSelects[0], { target: { value: 'jpg' } })
-    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
-
-    fireEvent.change(tableSelects[0], { target: { value: 'webp' } })
-    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
-
-    fireEvent.change(tableSelects[0], { target: { value: 'txt' } })
-    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
-  })
-
-  it('confirms selected PDF image pages and passes them to the bridge', async () => {
+  it('selects PDF pages via Settings handoff and passes them to the bridge', async () => {
     bridgeMocks.convert.mockResolvedValue(
       createBridgeResult({ filename: 'page-001.png', mimeType: 'image/png', targetFormat: 'png' })
     )
@@ -548,10 +525,29 @@ describe('app upload feedback', () => {
 
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'png' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: 'Select pages' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
+
     fireEvent.click(screen.getByRole('button', { name: 'Confirm test pages' }))
 
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Select Pages' })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByText('2 pages selected')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
 
@@ -566,6 +562,71 @@ describe('app upload feedback', () => {
         })
       )
     })
+  })
+
+  it('disables Settings button when no settings sections apply', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['<p>hi</p>'], 'index.html', { type: 'text/html' })] }
+    })
+
+    await screen.findByRole('row', { name: /index\.html/ })
+    const settingsButton = screen.getByRole('button', { name: /settings/i })
+    expect(settingsButton).toBeInTheDocument()
+    expect(settingsButton).toBeDisabled()
+  })
+
+  it('opens Settings read-only for done rows', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: '<html></html>',
+        filename: 'notes.html',
+        mimeType: 'text/html',
+        targetFormat: 'html'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'notes.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('dialog', { name: /settings \(read-only\)/i })).toBeInTheDocument()
+
+    const includeBackgroundCheckbox = screen.getByRole('checkbox', { name: /include background/i })
+    expect(includeBackgroundCheckbox).toBeDisabled()
+  })
+
+  it('target cell contains only the target select after migration', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    const row = screen.getByRole('row', { name: /sample\.pdf/ })
+    const targetCell = row.querySelector('td:nth-child(3)')
+
+    expect(targetCell?.querySelectorAll('select')).toHaveLength(1)
+    expect(targetCell?.querySelectorAll('button')).toHaveLength(0)
+    expect(targetCell?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0)
   })
 
   it('reconstructs bridge output Blob for row downloads', async () => {
@@ -713,15 +774,28 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     const targetSelect = getFileTargetSelects()[0]
 
-    expect(
-      screen.queryByRole('button', { name: /html conversion options/i })
-    ).not.toBeInTheDocument()
+    // pdf→txt has pdfPages section, so Settings button exists even though target is not html
+    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    // No html options in the modal for non-html target
+    expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /background quality/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
 
     fireEvent.change(targetSelect, { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
-    const dialog = screen.getByRole('dialog', { name: /html conversion options/i })
+    // Html options ARE present after switching to html target
+    const dialog = screen.getByRole('dialog', { name: /settings/i })
     const includeBackgroundCheckbox = screen.getByRole('checkbox', {
       name: /include background/i
     })
@@ -739,16 +813,8 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole('dialog', { name: /html conversion options/i })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
     })
-
-    fireEvent.change(targetSelect, { target: { value: 'txt' } })
-
-    expect(
-      screen.queryByRole('button', { name: /html conversion options/i })
-    ).not.toBeInTheDocument()
   })
 
   it('TDD-2: background options rendered inline for html target', async () => {
@@ -762,9 +828,9 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
-    const dialog = screen.getByRole('dialog', { name: /html conversion options/i })
+    const dialog = screen.getByRole('dialog', { name: /settings/i })
     const includeBackgroundCheckbox = screen.getByRole('checkbox', { name: /include background/i })
     const backgroundQualitySelect = screen.getByRole('combobox', { name: /background quality/i })
 
@@ -786,23 +852,19 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     const fontSizeInput = screen.getByRole('spinbutton', { name: /font size/i })
-    expect(screen.getByRole('dialog', { name: /html conversion options/i })).toContainElement(
-      fontSizeInput
-    )
+    expect(screen.getByRole('dialog', { name: /settings/i })).toContainElement(fontSizeInput)
 
     fireEvent.change(fontSizeInput, { target: { value: '18' } })
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole('dialog', { name: /html conversion options/i })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     expect(screen.getByRole('spinbutton', { name: /font size/i })).toHaveValue(18)
   })
@@ -825,7 +887,7 @@ describe('app upload feedback', () => {
     fireEvent.change(selects[0], { target: { value: 'html' } })
     fireEvent.change(selects[1], { target: { value: 'html' } })
 
-    const optionsButtons = screen.getAllByRole('button', { name: /html conversion options/i })
+    const optionsButtons = screen.getAllByRole('button', { name: /settings/i })
     fireEvent.click(optionsButtons[0])
 
     const firstRowIncludeBackground = screen.getByRole('checkbox', { name: /include background/i })
@@ -835,9 +897,7 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole('dialog', { name: /html conversion options/i })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
     })
 
     fireEvent.click(optionsButtons[1])
@@ -868,7 +928,7 @@ describe('app upload feedback', () => {
 
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
@@ -881,9 +941,7 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole('dialog', { name: /html conversion options/i })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
@@ -925,7 +983,7 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
@@ -937,12 +995,10 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole('dialog', { name: /html conversion options/i })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     expect(screen.getByRole('combobox', { name: /background quality/i })).toHaveValue('0.6')
   })
@@ -958,7 +1014,7 @@ describe('app upload feedback', () => {
     await screen.findByRole('row', { name: /sample\.pdf/ })
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     const qualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
@@ -979,15 +1035,28 @@ describe('app upload feedback', () => {
 
     await screen.findByRole('row', { name: /notes\.txt/ })
 
-    expect(
-      screen.queryByRole('button', { name: /html conversion options/i })
-    ).not.toBeInTheDocument()
+    // txt→png has imageTarget section, so Settings button exists even though target is not html
+    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    // No html options in the modal for non-html target
+    expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /include background/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /background quality/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
 
     fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /html conversion options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
-    const dialog = screen.getByRole('dialog', { name: /html conversion options/i })
+    // Html options ARE present after switching to html target
+    const dialog = screen.getByRole('dialog', { name: /settings/i })
     const includeBackgroundCheckbox = screen.getByRole('checkbox', {
       name: /include background/i
     })
@@ -997,5 +1066,247 @@ describe('app upload feedback', () => {
 
     expect(dialog).toContainElement(includeBackgroundCheckbox)
     expect(dialog).toContainElement(backgroundQualitySelect)
+  })
+
+  it('TDD-image-1: bridge receives image options with defaults when converting image to image', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'png-bytes',
+        filename: 'photo.png',
+        mimeType: 'image/png',
+        targetFormat: 'png'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['jpg'], 'photo.jpg', { type: 'image/jpeg' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.jpg/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'png' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'image',
+          targetFormat: 'png',
+          options: expect.objectContaining({
+            image: expect.objectContaining({
+              quality: 0.92,
+              keepAspectRatio: true
+            })
+          })
+        })
+      )
+    })
+  })
+
+  it('TDD-image-2: bridge receives imageToPdf options when converting image to pdf', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'pdf-bytes',
+        filename: 'photo.pdf',
+        mimeType: 'application/pdf',
+        targetFormat: 'pdf'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['jpg'], 'photo.jpg', { type: 'image/jpeg' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.jpg/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'pdf' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'image',
+          targetFormat: 'pdf',
+          options: expect.objectContaining({
+            imageToPdf: expect.objectContaining({
+              marginPt: 24,
+              fit: 'cover',
+              pageMode: 'auto'
+            })
+          })
+        })
+      )
+    })
+  })
+
+  it('TDD-image-3: image options quality stays within 0.1-1.0 canonical range', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'png-bytes',
+        filename: 'photo.png',
+        mimeType: 'image/png',
+        targetFormat: 'png'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['jpg'], 'photo.jpg', { type: 'image/jpeg' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.jpg/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'png' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      const call = bridgeMocks.convert.mock.calls[0]?.[0]
+      const quality = call?.options?.image?.quality
+      expect(quality).toBeGreaterThanOrEqual(0.1)
+      expect(quality).toBeLessThanOrEqual(1.0)
+    })
+  })
+
+  it('TDD-preview-1: Preview button appears after conversion and opens modal iframe', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: '<html><body>hello</body></html>',
+        filename: 'notes.html',
+        mimeType: 'text/html',
+        targetFormat: 'html'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    const previewButton = screen.getByRole('button', { name: 'Preview' })
+    expect(previewButton).toBeEnabled()
+
+    fireEvent.click(previewButton)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTitle('notes.html')).toBeInTheDocument()
+  })
+
+  it('TDD-preview-2: multi-output mock result displays tabs in preview modal', async () => {
+    vi.mocked(convertViaBridge).mockResolvedValueOnce([
+      {
+        filename: 'page-001.png',
+        mimeType: 'image/png',
+        targetFormat: 'png',
+        blob: new Blob(['png1'], { type: 'image/png' })
+      },
+      {
+        filename: 'page-002.png',
+        mimeType: 'image/png',
+        targetFormat: 'png',
+        blob: new Blob(['png2'], { type: 'image/png' })
+      }
+    ] as never)
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pdf'], 'report.pdf', { type: 'application/pdf' })] }
+    })
+
+    await screen.findByRole('row', { name: /report\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'png' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(2)
+    expect(tabs[0]).toHaveTextContent('page-001.png')
+    expect(tabs[1]).toHaveTextContent('page-002.png')
+  })
+
+  it('TDD-preview-3: unsupported done output disables Preview with localized label', async () => {
+    vi.mocked(convertViaBridge).mockResolvedValueOnce({
+      filename: 'result.md',
+      mimeType: 'text/markdown',
+      targetFormat: 'md',
+      blob: new Blob(['# hello'], { type: 'text/markdown' })
+    } as never)
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    const previewButton = screen.getByRole('button', {
+      name: 'Preview not available for this format'
+    })
+    expect(previewButton).toBeDisabled()
+    expect(previewButton).toHaveAttribute('title', 'Preview not available for this format')
+  })
+
+  it('TDD-preview-4: row download still works after preview integration', async () => {
+    const { downloadBlobFile } = await import('../lib/download')
+    bridgeMocks.convert.mockResolvedValue(createBridgeResult())
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Download' })[0])
+
+    await waitFor(() => {
+      expect(downloadBlobFile).toHaveBeenCalledTimes(1)
+    })
   })
 })

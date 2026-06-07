@@ -37,7 +37,10 @@
     "cancel": "取消",
     "viewOptions": "查看选项",
     "htmlConvertOptions": "HTML 转换选项",
-    "continue": "继续"
+    "continue": "继续",
+    "settings": "设置",
+    "preview": "预览",
+    "previewUnsupported": "该格式不支持预览"
   },
   "table": {
     "fileName": "文件名",
@@ -112,6 +115,11 @@
     "count": "{{count}} 个输出",
     "count_one": "1 个输出"
   },
+  "preview": {
+    "title": "预览：{{filename}}",
+    "close": "关闭预览",
+    "loading": "正在加载预览..."
+  },
   "pdfPageSelector": {
     "title": "选择页面",
     "loading": "正在加载预览...",
@@ -129,6 +137,30 @@
     "textControlSection": "文字控制",
     "layoutSection": "布局选项",
     "widthSection": "宽度模式"
+  },
+  "settingsModal": {
+    "title": "设置",
+    "viewTitle": "设置（只读）",
+    "pdfPagesTitle": "PDF 页面",
+    "pdfOcrTitle": "PDF OCR",
+    "htmlOptionsTitle": "HTML 选项",
+    "imageOptionsTitle": "图片选项",
+    "imageToPdfTitle": "图片转 PDF 选项",
+    "maxWidth": "最大宽度",
+    "maxHeight": "最大高度",
+    "keepAspectRatio": "保持宽高比",
+    "quality": "质量",
+    "margin": "边距 (pt)",
+    "fit": "适应方式",
+    "fitCover": "覆盖",
+    "fitContain": "包含",
+    "pageMode": "页面模式",
+    "pageModeAuto": "自动",
+    "pageModeSingle": "单页",
+    "pageModeMulti": "多页",
+    "estimate": "估算",
+    "reset": "重置",
+    "heuristicEstimate": "启发式估算：实际输出大小可能因内容而异"
   },
   "confirmations": {
     "title": "请确认",

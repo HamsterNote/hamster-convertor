@@ -51,6 +51,15 @@ const filePayload = (name: string, mimeType: string, content: string) => ({
   buffer: Buffer.from(content)
 })
 
+const validPngPayload = (name = 'photo.png') => ({
+  name,
+  mimeType: 'image/png',
+  buffer: Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    'base64'
+  )
+})
+
 const fixturePath = (name: string): string => path.join(process.cwd(), 'e2e', 'fixtures', name)
 
 const samplePdf = () => ({
@@ -77,6 +86,25 @@ const loadingOverlay = (page: Page): Locator => page.locator('.fullscreen-loadin
 const waitForBridgeReady = async (page: Page): Promise<void> => {
   await expect.poll(async () => parserReadyMessages(page)).not.toHaveLength(0)
   await page.waitForTimeout(500)
+}
+
+const routeMultiOutputProxy = async (page: Page): Promise<void> => {
+  await page.route('**/src/lib/parser-bridge/proxy.ts*', async route => {
+    await route.fulfill({
+      contentType: 'application/javascript',
+      body: [
+        'export async function convertViaBridge(_bridge, file, _sourceFormat, targetFormat) {',
+        "  const baseName = file.name.replace(/\\.[^/.]+$/, '') || file.name",
+        '  return [1, 2].map(pageNumber => ({',
+        "    filename: baseName + '-page-' + String(pageNumber).padStart(3, '0') + '.' + targetFormat,",
+        "    mimeType: 'image/' + targetFormat,",
+        '    targetFormat,',
+        "    blob: new Blob(['preview-page-' + pageNumber], { type: 'image/' + targetFormat })",
+        '  }))',
+        '}'
+      ].join('\n')
+    })
+  })
 }
 
 const activeProgressPhases = ['reading', 'encoding', 'decoding', 'rendering', 'packaging']
@@ -507,6 +535,77 @@ test.describe('converter app', () => {
     ])
   })
 
+  test('opens image to PDF settings, edits margin, converts, and previews result', async ({
+    page
+  }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(validPngPayload())
+
+    const imageRow = rowForFile(page, 'photo.png')
+    const settingsButton = imageRow.getByRole('button', { name: 'Settings' })
+    await expect(settingsButton).toBeEnabled()
+
+    await settingsButton.click()
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+    await expect(settingsDialog).toBeVisible()
+    await expect(settingsDialog).toContainText('Image to PDF Options')
+
+    await settingsDialog.getByLabel('Margin (pt)').fill('12')
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
+
+    await settingsButton.click()
+    await expect(settingsDialog.getByLabel('Margin (pt)')).toHaveValue('12')
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    await expect(imageRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+    await imageRow.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.locator('.preview-modal')).toBeVisible()
+    await expect(page.locator('.preview-modal__iframe')).toBeVisible()
+  })
+
+  test('opens PDF to PNG preview tabs for multi-output conversion', async ({ page }) => {
+    await routeMultiOutputProxy(page)
+    await page.reload()
+    await waitForBridgeReady(page)
+
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+    await targetSelectForRow(page, 'sample.pdf').selectOption('png')
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+    await expect(pdfRow.locator('.status')).toContainText('2 outputs')
+
+    await pdfRow.getByRole('button', { name: 'Preview' }).click()
+
+    const tabs = page.getByRole('tab')
+    await expect(tabs).toHaveCount(2)
+    await expect(tabs.nth(0)).toHaveText('sample-page-001.png')
+    await expect(tabs.nth(1)).toHaveText('sample-page-002.png')
+    await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true')
+
+    await tabs.nth(1).click()
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('keeps Settings unavailable for HTML to TXT fallback', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('sample.html', 'text/html', '<h1>Test</h1>'))
+
+    const htmlRow = rowForFile(page, 'sample.html')
+    await expect(targetSelectForRow(page, 'sample.html')).toHaveValue('txt')
+    await expect(htmlRow.getByRole('button', { name: 'Settings' })).toHaveCount(0)
+    await expect(htmlRow.getByRole('button', { name: 'Remove' })).toBeEnabled()
+  })
+
   test('converts a single file to Done status', async ({ page }) => {
     await page
       .locator(dropzoneFileInput)
@@ -549,6 +648,27 @@ test.describe('converter app', () => {
 
     await txtRow.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['notes.html'])
+  })
+
+  test('converts TXT to HTML and opens row preview modal', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
+
+    await targetSelectForRow(page, 'notes.txt').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const txtRow = rowForFile(page, 'notes.txt')
+    await expect(txtRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+
+    await txtRow.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.locator('.preview-modal')).toBeVisible()
+    await expect(page.locator('.preview-modal__iframe')).toBeVisible()
+
+    await page.locator('.preview-modal__close').click()
+    await expect(page.locator('.preview-modal')).toBeHidden()
   })
 
   test('converts HTML to TXT and downloads', async ({ page }) => {

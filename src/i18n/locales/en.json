@@ -37,7 +37,10 @@
     "cancel": "Cancel",
     "viewOptions": "View options",
     "htmlConvertOptions": "HTML conversion options",
-    "continue": "Continue"
+    "continue": "Continue",
+    "settings": "Settings",
+    "preview": "Preview",
+    "previewUnsupported": "Preview not available for this format"
   },
   "table": {
     "fileName": "File name",
@@ -112,6 +115,11 @@
     "count": "{{count}} outputs",
     "count_one": "1 output"
   },
+  "preview": {
+    "title": "Preview: {{filename}}",
+    "close": "Close preview",
+    "loading": "Loading preview..."
+  },
   "pdfPageSelector": {
     "title": "Select Pages",
     "loading": "Loading previews...",
@@ -129,6 +137,30 @@
     "textControlSection": "Text controls",
     "layoutSection": "Layout options",
     "widthSection": "Width mode"
+  },
+  "settingsModal": {
+    "title": "Settings",
+    "viewTitle": "Settings (read-only)",
+    "pdfPagesTitle": "PDF Pages",
+    "pdfOcrTitle": "PDF OCR",
+    "htmlOptionsTitle": "HTML Options",
+    "imageOptionsTitle": "Image Options",
+    "imageToPdfTitle": "Image to PDF Options",
+    "maxWidth": "Max width",
+    "maxHeight": "Max height",
+    "keepAspectRatio": "Keep aspect ratio",
+    "quality": "Quality",
+    "margin": "Margin (pt)",
+    "fit": "Fit",
+    "fitCover": "Cover",
+    "fitContain": "Contain",
+    "pageMode": "Page mode",
+    "pageModeAuto": "Auto",
+    "pageModeSingle": "Single",
+    "pageModeMulti": "Multi",
+    "estimate": "Estimate",
+    "reset": "Reset",
+    "heuristicEstimate": "Heuristic estimate: actual output size may vary based on content"
   },
   "confirmations": {
     "title": "Please confirm",

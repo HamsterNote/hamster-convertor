@@ -6,7 +6,10 @@ import Footer from './components/Footer'
 import FullscreenLoading from './components/FullscreenLoading'
 import Header from './components/Header'
 import { ConfirmModal } from './components/ConfirmModal'
-import HtmlOptionsModal, { type HtmlOptionsValue } from './components/HtmlOptionsModal'
+import SettingsModal, {
+  getSettingsSections,
+  type SettingsOptions
+} from './components/SettingsModal'
 import { ParserIframeBridge, type ParserIframeBridgeRef } from './components/ParserIframeBridge'
 import PdfPageSelectorModal from './components/PdfPageSelectorModal'
 import {
@@ -21,6 +24,8 @@ import { downloadBlobFile, downloadResultArchive } from './lib/download'
 import { truncateMiddle } from './lib/filename'
 import { convertViaBridge } from './lib/parser-bridge/proxy'
 import { getPdfPageCount } from './lib/pdf-utils'
+import { getPreviewableOutputs } from './lib/preview'
+import PreviewModal from './components/PreviewModal'
 
 type BackgroundDecodeOptions = NonNullable<HtmlDecodeOptions['background']>
 
@@ -37,12 +42,34 @@ type ConversionOptions = {
       widthMode?: 'actual' | 'fit'
     }
   }
+  image?: {
+    quality: number
+    maxWidth?: number
+    maxHeight?: number
+    keepAspectRatio: boolean
+  }
+  imageToPdf?: {
+    marginPt: number
+    fit: 'cover'
+    pageMode: 'auto'
+  }
 }
 
 const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
   includeBackground: true,
   backgroundQuality: 0.85,
   excludeTextFromBackground: true
+}
+
+const DEFAULT_IMAGE_OPTIONS: NonNullable<ConversionOptions['image']> = {
+  quality: 0.92,
+  keepAspectRatio: true
+}
+
+const DEFAULT_IMAGE_TO_PDF_OPTIONS: NonNullable<ConversionOptions['imageToPdf']> = {
+  marginPt: 24,
+  fit: 'cover',
+  pageMode: 'auto'
 }
 
 const createDefaultHtmlOptions = (): NonNullable<ConversionOptions['html']> => ({
@@ -171,19 +198,22 @@ function App() {
   const [activePdfPageSelectorItemId, setActivePdfPageSelectorItemId] = useState<string | null>(
     null
   )
-  const [activeHtmlOptionsItemId, setActiveHtmlOptionsItemId] = useState<string | null>(null)
-  const [htmlOptionsReadOnly, setHtmlOptionsReadOnly] = useState(false)
+  const [activeSettingsItemId, setActiveSettingsItemId] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
     message: string
     onConfirm: () => void
     onCancel: () => void
   } | null>(null)
+  const [activePreviewItemId, setActivePreviewItemId] = useState<string | null>(null)
 
   const activePdfItem = activePdfPageSelectorItemId
     ? items.find(it => it.id === activePdfPageSelectorItemId)
     : undefined
-  const activeHtmlOptionsItem = activeHtmlOptionsItemId
-    ? items.find(it => it.id === activeHtmlOptionsItemId)
+  const activeSettingsItem = activeSettingsItemId
+    ? items.find(it => it.id === activeSettingsItemId)
+    : undefined
+  const activePreviewItem = activePreviewItemId
+    ? items.find(it => it.id === activePreviewItemId)
     : undefined
 
   useEffect(() => {
@@ -264,22 +294,6 @@ function App() {
     )
   }
 
-  const changeOcrOption = (id: string, ocr: boolean) => {
-    setItems(prev =>
-      prev.map(it =>
-        it.id === id
-          ? {
-              ...it,
-              conversionOptions: {
-                ...it.conversionOptions,
-                pdf: { ...it.conversionOptions.pdf, ocr }
-              }
-            }
-          : it
-      )
-    )
-  }
-
   const changeSelectedPages = (id: string, selectedPages: number[] | undefined) => {
     setItems(prev =>
       prev.map(it =>
@@ -296,21 +310,33 @@ function App() {
     )
   }
 
-  const applyHtmlOptions = (id: string, next: HtmlOptionsValue) => {
+  const applySettingsOptions = (id: string, next: SettingsOptions) => {
     setItems(prev =>
       prev.map(it => {
         if (it.id !== id) return it
-        return {
-          ...it,
-          conversionOptions: {
-            ...it.conversionOptions,
-            html: {
-              textControl: next.textControl,
-              background: next.background,
-              htmlLayout: next.htmlLayout
-            }
+        const conversionOptions: ConversionOptions = { ...it.conversionOptions }
+        if (next.pdf) {
+          conversionOptions.pdf = { ...next.pdf }
+        }
+        if (next.html) {
+          conversionOptions.html = { ...next.html }
+        }
+        if (next.image) {
+          conversionOptions.image = {
+            quality: next.image.quality ?? DEFAULT_IMAGE_OPTIONS.quality,
+            maxWidth: next.image.maxWidth,
+            maxHeight: next.image.maxHeight,
+            keepAspectRatio: next.image.keepAspectRatio ?? DEFAULT_IMAGE_OPTIONS.keepAspectRatio
           }
         }
+        if (next.imageToPdf) {
+          conversionOptions.imageToPdf = {
+            marginPt: next.imageToPdf.margin ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.marginPt,
+            fit: next.imageToPdf.fit ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.fit,
+            pageMode: next.imageToPdf.pageMode ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.pageMode
+          }
+        }
+        return { ...it, conversionOptions }
       })
     )
   }
@@ -399,12 +425,20 @@ function App() {
             background: htmlBackground
           }
         : undefined
+      const imageOptions = current.conversionOptions.image ?? DEFAULT_IMAGE_OPTIONS
+      const imageToPdfOptions =
+        current.source === 'image' && current.target === 'pdf'
+          ? (current.conversionOptions.imageToPdf ?? DEFAULT_IMAGE_TO_PDF_OPTIONS)
+          : undefined
       const result = await convertViaBridge(bridge, current.file, current.source, current.target, {
         pdf: current.conversionOptions.pdf,
         decode: htmlOptions,
-        layout: current.conversionOptions.html?.htmlLayout
+        layout: current.conversionOptions.html?.htmlLayout,
+        image: imageOptions,
+        imageToPdf: imageToPdfOptions
       })
-      markDone(id, [result])
+      const results = Array.isArray(result) ? result : [result]
+      markDone(id, results)
     } catch (error) {
       log.warn('Conversion failed', { id, fileName: current.file.name, error })
       markFailed(id, t(`errors.${getConversionErrorKey(error)}` as const))
@@ -528,10 +562,22 @@ function App() {
                       }
                       return true
                     })
+                    const previewableOutputs = getPreviewableOutputs(it.outputs || [])
+                    const canPreview = it.status === 'done' && previewableOutputs.length > 0
                     const isOptionsDisabled =
                       it.status === 'queued' ||
                       it.status === 'converting' ||
                       it.status === 'done' ||
+                      isPreparingDownload
+                    const settingsSections = getSettingsSections(
+                      it.source,
+                      it.target,
+                      it.file.name,
+                      it.status
+                    )
+                    const settingsDisabled =
+                      settingsSections.length === 0 ||
+                      isRunningStatus(it.status) ||
                       isPreparingDownload
                     return (
                       <tr key={it.id}>
@@ -555,62 +601,6 @@ function App() {
                                 </option>
                               ))}
                             </select>
-                            {it.source === 'pdf' && it.target === 'pdf' && (
-                              <label className="file-table ocr-label">
-                                <input
-                                  type="checkbox"
-                                  checked={it.conversionOptions.pdf.ocr}
-                                  onChange={e => changeOcrOption(it.id, e.target.checked)}
-                                  disabled={isOptionsDisabled}
-                                />
-                                {t('options.ocr')}
-                              </label>
-                            )}
-                            {it.source === 'pdf' && it.status !== 'done' && (
-                              <div>
-                                <button
-                                  type="button"
-                                  className="btn btn--ghost page-selector-btn"
-                                  onClick={() => setActivePdfPageSelectorItemId(it.id)}
-                                  disabled={isPreparingDownload}
-                                >
-                                  {t('actions.selectPages')}
-                                </button>
-                                {it.conversionOptions.pdf.selectedPages !== undefined && (
-                                  <div className="selected-pages-summary">
-                                    {t('options.pdfPages.selectedCount', {
-                                      count: it.conversionOptions.pdf.selectedPages.length
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {it.target === 'html' && it.status === 'done' && (
-                              <button
-                                type="button"
-                                className="btn btn--ghost"
-                                onClick={() => {
-                                  setActiveHtmlOptionsItemId(it.id)
-                                  setHtmlOptionsReadOnly(true)
-                                }}
-                                disabled={isPreparingDownload}
-                              >
-                                {t('actions.viewOptions')}
-                              </button>
-                            )}
-                            {it.target === 'html' && it.status !== 'done' && (
-                              <button
-                                type="button"
-                                className="btn btn--ghost"
-                                onClick={() => {
-                                  setActiveHtmlOptionsItemId(it.id)
-                                  setHtmlOptionsReadOnly(false)
-                                }}
-                                disabled={isOptionsDisabled}
-                              >
-                                {t('actions.htmlConvertOptions')}
-                              </button>
-                            )}
                           </div>
                         </td>
                         <td className={`status status--${it.status}`}>
@@ -638,16 +628,42 @@ function App() {
                         <td>
                           <div className="row-actions">
                             {it.status === 'done' && (
-                              <button
-                                type="button"
-                                className="btn btn--ghost"
-                                onClick={() => handleRowDownload(it)}
-                                aria-label={t('actions.download')}
-                                disabled={isPreparingDownload}
-                              >
-                                ↓
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost"
+                                  onClick={() => setActivePreviewItemId(it.id)}
+                                  aria-label={
+                                    canPreview
+                                      ? t('actions.preview')
+                                      : t('actions.previewUnsupported')
+                                  }
+                                  title={canPreview ? undefined : t('actions.previewUnsupported')}
+                                  disabled={!canPreview || isPreparingDownload}
+                                >
+                                  {canPreview ? '👁' : '⊘'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost"
+                                  onClick={() => handleRowDownload(it)}
+                                  aria-label={t('actions.download')}
+                                  disabled={isPreparingDownload}
+                                >
+                                  ↓
+                                </button>
+                              </>
                             )}
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              onClick={() => setActiveSettingsItemId(it.id)}
+                              aria-label={t('actions.settings')}
+                              title={t('actions.settings')}
+                              disabled={settingsDisabled}
+                            >
+                              ⚙
+                            </button>
                             <button
                               type="button"
                               className="btn btn--ghost"
@@ -731,33 +747,51 @@ function App() {
           }}
         />
       )}
-      {activeHtmlOptionsItem && (
-        <HtmlOptionsModal
-          open
-          readOnly={htmlOptionsReadOnly}
-          options={{
-            textControl: activeHtmlOptionsItem.conversionOptions.html?.textControl,
-            background: {
-              ...DEFAULT_HTML_BACKGROUND_OPTIONS,
-              ...activeHtmlOptionsItem.conversionOptions.html?.background
-            },
-            htmlLayout: activeHtmlOptionsItem.conversionOptions.html?.htmlLayout ?? {
-              mode: 'paginated'
-            }
-          }}
-          onCancel={() => setActiveHtmlOptionsItemId(null)}
-          onConfirm={next => {
-            applyHtmlOptions(activeHtmlOptionsItem.id, next)
-            setActiveHtmlOptionsItemId(null)
-          }}
-        />
-      )}
+
       {confirmModal && (
         <ConfirmModal
           open
           message={confirmModal.message}
           onCancel={confirmModal.onCancel}
           onConfirm={confirmModal.onConfirm}
+        />
+      )}
+      {activePreviewItem && (
+        <PreviewModal
+          open
+          results={getPreviewableOutputs(activePreviewItem.outputs || [])}
+          onClose={() => setActivePreviewItemId(null)}
+        />
+      )}
+      {activeSettingsItem && (
+        <SettingsModal
+          open
+          source={activeSettingsItem.source}
+          target={activeSettingsItem.target}
+          fileName={activeSettingsItem.file.name}
+          status={activeSettingsItem.status}
+          options={{
+            pdf: activeSettingsItem.conversionOptions.pdf,
+            html: activeSettingsItem.conversionOptions.html,
+            image: activeSettingsItem.conversionOptions.image,
+            imageToPdf: activeSettingsItem.conversionOptions.imageToPdf
+              ? {
+                  margin: activeSettingsItem.conversionOptions.imageToPdf.marginPt,
+                  fit: activeSettingsItem.conversionOptions.imageToPdf.fit,
+                  pageMode: activeSettingsItem.conversionOptions.imageToPdf.pageMode
+                }
+              : undefined
+          }}
+          readOnly={activeSettingsItem.status === 'done'}
+          onCancel={() => setActiveSettingsItemId(null)}
+          onConfirm={next => {
+            applySettingsOptions(activeSettingsItem.id, next)
+            setActiveSettingsItemId(null)
+          }}
+          onOpenPdfPageSelector={() => {
+            setActiveSettingsItemId(null)
+            setActivePdfPageSelectorItemId(activeSettingsItem.id)
+          }}
         />
       )}
     </div>

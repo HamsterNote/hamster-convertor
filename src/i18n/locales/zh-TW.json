@@ -37,7 +37,10 @@
     "cancel": "取消",
     "viewOptions": "檢視選項",
     "htmlConvertOptions": "HTML 轉換選項",
-    "continue": "繼續"
+    "continue": "繼續",
+    "settings": "設定",
+    "preview": "預覽",
+    "previewUnsupported": "該格式不支援預覽"
   },
   "table": {
     "fileName": "檔名",
@@ -112,6 +115,11 @@
     "count": "{{count}} 個輸出",
     "count_one": "1 個輸出"
   },
+  "preview": {
+    "title": "預覽：{{filename}}",
+    "close": "關閉預覽",
+    "loading": "正在載入預覽..."
+  },
   "pdfPageSelector": {
     "title": "選擇頁面",
     "loading": "正在載入預覽...",
@@ -129,6 +137,30 @@
     "textControlSection": "文字控制",
     "layoutSection": "佈局選項",
     "widthSection": "寬度模式"
+  },
+  "settingsModal": {
+    "title": "設定",
+    "viewTitle": "設定（唯讀）",
+    "pdfPagesTitle": "PDF 頁面",
+    "pdfOcrTitle": "PDF OCR",
+    "htmlOptionsTitle": "HTML 選項",
+    "imageOptionsTitle": "圖片選項",
+    "imageToPdfTitle": "圖片轉 PDF 選項",
+    "maxWidth": "最大寬度",
+    "maxHeight": "最大高度",
+    "keepAspectRatio": "保持寬高比",
+    "quality": "品質",
+    "margin": "邊距 (pt)",
+    "fit": "適應方式",
+    "fitCover": "覆蓋",
+    "fitContain": "包含",
+    "pageMode": "頁面模式",
+    "pageModeAuto": "自動",
+    "pageModeSingle": "單頁",
+    "pageModeMulti": "多頁",
+    "estimate": "估算",
+    "reset": "重設",
+    "heuristicEstimate": "啟發式估算：實際輸出大小可能因內容而異"
   },
   "confirmations": {
     "title": "請確認",

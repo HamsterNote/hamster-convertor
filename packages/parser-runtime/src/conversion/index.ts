@@ -18,6 +18,19 @@ export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
 
 export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
+export type ImageOptions = {
+  quality: number
+  maxWidth?: number
+  maxHeight?: number
+  keepAspectRatio: boolean
+}
+
+export type ImageToPdfOptions = {
+  marginPt: number
+  fit: 'cover'
+  pageMode: 'auto'
+}
+
 export type ConversionOptions = {
   pdf?: {
     ocr?: boolean
@@ -26,6 +39,8 @@ export type ConversionOptions = {
   }
   decode?: HtmlDecodeOptions
   layout?: HtmlLayoutOptions
+  image?: ImageOptions
+  imageToPdf?: ImageToPdfOptions
 }
 
 export type ConversionRequest = {

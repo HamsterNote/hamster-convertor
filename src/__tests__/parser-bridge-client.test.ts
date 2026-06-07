@@ -245,11 +245,9 @@ describe('createBridgeClient', () => {
   })
 
   it('dispose removes message listener from port', () => {
+    const removeListenerSpy = vi.spyOn(port, 'removeEventListener')
     client.dispose()
-
-    // dispose 后再 dispatch 不应有反应
-    port.dispatch(makeResult('req-after-dispose'))
-    // 无 throw、无 pending 变化即通过
+    expect(removeListenerSpy).toHaveBeenCalled()
   })
 
   it('sendConvert after dispose rejects immediately', async () => {

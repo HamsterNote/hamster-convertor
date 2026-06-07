@@ -66,6 +66,17 @@ export type ConversionRequest = {
     }
     decode?: HtmlDecodeOptions
     layout?: HtmlLayoutOptions
+    image?: {
+      quality: number
+      maxWidth?: number
+      maxHeight?: number
+      keepAspectRatio: boolean
+    }
+    imageToPdf?: {
+      marginPt: number
+      fit: 'cover'
+      pageMode: 'auto'
+    }
   }
 }
 

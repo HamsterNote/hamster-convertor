@@ -287,10 +287,20 @@ const createWhiteBackgroundCanvas = (sourceCanvas: HTMLCanvasElement): HTMLCanva
 
 export const encodeCanvasToImage = (
   canvas: HTMLCanvasElement,
-  target: ConcreteImageTarget
+  target: ConcreteImageTarget,
+  quality?: number
 ): Promise<EncodeCanvasResult> => {
   const config = imageConfigs[target]
   const canvasToEncode = target === 'jpg' ? createWhiteBackgroundCanvas(canvas) : canvas
+
+  let effectiveQuality: number | undefined
+  if (target !== 'png') {
+    if (quality != null) {
+      effectiveQuality = Math.max(0.1, Math.min(1.0, quality))
+    } else {
+      effectiveQuality = config.quality
+    }
+  }
 
   return new Promise((resolve, reject) => {
     canvasToEncode.toBlob(
@@ -302,7 +312,7 @@ export const encodeCanvasToImage = (
         resolve({ blob, extension: config.extension, mimeType: config.mimeType })
       },
       config.mimeType,
-      config.quality
+      effectiveQuality
     )
   })
 }
