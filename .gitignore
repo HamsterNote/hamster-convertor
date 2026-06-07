@@ -43,5 +43,11 @@ test-results/
 .opencode/
 .specify/
 
+# OpenCode 工作流产出（计划、证据、笔记等）
+.omo/
+
+# Yalc 本地包管理
+.yalc/
+
 # ts 增量编译
 *.tsbuildinfo
