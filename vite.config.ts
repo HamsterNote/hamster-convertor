@@ -52,7 +52,8 @@ const interceptPdfjsImportPlugin = (): Plugin => ({
   transform(code, id) {
     const isPdfParserModule = id.includes('@hamster-note/pdf-parser') || id.includes('/PdfParser/')
     const isRuntimeModule = id.includes('packages/parser-runtime/src/conversion/adapters')
-    const needsIntercept = (isPdfParserModule || isRuntimeModule) && code.includes('import("pdfjs-dist")')
+    const needsIntercept =
+      (isPdfParserModule || isRuntimeModule) && code.includes('import("pdfjs-dist")')
     if (!needsIntercept) {
       return null
     }
@@ -134,11 +135,7 @@ const parserRuntimeDevServerPlugin = (): Plugin => ({
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    interceptPdfjsImportPlugin(),
-    parserRuntimeDevServerPlugin(),
-    react()
-  ],
+  plugins: [interceptPdfjsImportPlugin(), parserRuntimeDevServerPlugin(), react()],
   resolve: {
     alias: {
       ...localDevAlias,

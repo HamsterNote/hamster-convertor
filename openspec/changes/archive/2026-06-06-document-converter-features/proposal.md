@@ -17,6 +17,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 ## What Changes
 
 ### 1. HTML Parser Support (`add-html-parser`)
+
 - Integrated `@hamster-note/html-parser` into the converter adapter architecture
 - Added `html` as a supported `SourceFormat`
 - Implemented PDF→HTML, TXT→HTML, and HTML→TXT conversion paths
@@ -25,6 +26,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 - Added i18n labels for HTML target format across all locales (zh-CN, zh-TW, en)
 
 ### 2. Conversion UI Optimizations (`conversion-ui-optimizations`)
+
 - Created reusable `FullscreenLoading` component with accessibility support
 - Implemented PDF page selector modal with thumbnail previews
 - Added pre-conversion PDF page selection for PDF→image conversions
@@ -33,6 +35,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 - Integrated page selection state into conversion options
 
 ### 3. File Conversion Interactions (`optimize-file-conversion-interactions`)
+
 - Disabled target selection for completed (`done`) rows
 - Added per-row OCR checkbox for PDF target files
 - Implemented PDF→PDF conversion path with optional OCR text embedding
@@ -41,6 +44,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 - Extended `ConversionOptions` with `{ pdf: { ocr: boolean } }`
 
 ### 4. PDF Image Format Conversion (`pdf-image-format-conversion`)
+
 - Replaced generic `image` target with concrete `png`, `jpg`, `webp` targets
 - Implemented PDF→PNG/JPG/WEBP conversion with page selection support
 - Implemented raster image→PNG/JPG/WEBP conversion (excluding SVG/GIF)
@@ -71,6 +75,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 ## Impact
 
 ### Affected Components
+
 - `src/App.tsx` - Main UI logic, file list, conversion flow, state management
 - `src/lib/converter.ts` - Conversion routing, types, adapter registration
 - `src/lib/converter/pdf-adapters.ts` - PDF conversion adapters
@@ -82,6 +87,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 - `src/styles/global.css` - Component styles for modal, loading, row actions
 
 ### Test Coverage
+
 - Vitest unit tests for converter contracts, adapters, and integration
 - React Testing Library tests for App component behavior
 - Playwright E2E tests for full user workflows (written, environment-limited execution)
@@ -89,6 +95,7 @@ The Hamster Document Converter project needed several key enhancements to improv
 - Zero lint warnings (ESLint with `--max-warnings=0`)
 
 ### Architecture Changes
+
 - Extended `SourceFormat` from `'pdf' | 'txt' | 'image'` to include `'html'`
 - Extended `TargetFormat` to include concrete image formats
 - Added `ConversionOptions` type with `selectedImagePages` and `ocr` fields

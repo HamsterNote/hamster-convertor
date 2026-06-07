@@ -56,15 +56,15 @@ scripts, but this is a conscious relaxation from full sandbox isolation.
 Full type definitions live in `packages/parser-protocol/src/index.ts`.
 Brief reference:
 
-| Direction | Message Type             | Payload                                     |
-|-----------|--------------------------|---------------------------------------------|
-| iframe→host | `ready`                | none                                        |
-| host→iframe | `parser-bridge:connect` | MessagePort transfer                        |
-| host→iframe | `convert`              | ParserBridgeRequest (requestId, filename, sourceFormat, targetFormat, buffer, options) |
-| iframe→host | `convert:result`       | ParserBridgeConversionResultPayload (filename, mimeType, targetFormat, buffer, warnings) |
-| iframe→host | `convert:error`        | BridgeError (code, message, details)        |
-| iframe→host | `progress`             | ParserBridgeProgress (requestId, phase, percent, queueLength, message) |
-| host→iframe | `cancel`               | ParserBridgeCancelRequest (requestId)       |
+| Direction   | Message Type            | Payload                                                                                  |
+| ----------- | ----------------------- | ---------------------------------------------------------------------------------------- |
+| iframe→host | `ready`                 | none                                                                                     |
+| host→iframe | `parser-bridge:connect` | MessagePort transfer                                                                     |
+| host→iframe | `convert`               | ParserBridgeRequest (requestId, filename, sourceFormat, targetFormat, buffer, options)   |
+| iframe→host | `convert:result`        | ParserBridgeConversionResultPayload (filename, mimeType, targetFormat, buffer, warnings) |
+| iframe→host | `convert:error`         | BridgeError (code, message, details)                                                     |
+| iframe→host | `progress`              | ParserBridgeProgress (requestId, phase, percent, queueLength, message)                   |
+| host→iframe | `cancel`                | ParserBridgeCancelRequest (requestId)                                                    |
 
 Progress phases: `queued (0%)` → `reading (15%)` → `encoding (35%)` →
 `decoding (55%)` → `rendering (75%)` → `packaging (90%)` → `completed (100%)`.
@@ -72,17 +72,20 @@ Progress phases: `queued (0%)` → `reading (15%)` → `encoding (35%)` →
 ## Queue and Cancel Semantics
 
 ### FIFO Queue
+
 - Requests are queued in FIFO order. At most one active task per iframe.
 - The server holds a single `activeTask` reference and a `queue[]` array.
 - `processNext()` is a serial async loop: dequeue → run stages → run
   conversion → emit result → dequeue next.
 
 ### Queued Cancel
+
 - Immediate removal from `queue[]`.
 - Emits `cancelled` progress for the removed request.
 - Always returns success; the task never enters the conversion pipeline.
 
 ### Active Cancel
+
 - Records the requestId in `cancelledActiveRequestIds`.
 - Best-effort: the server checks the cancelled set at each stage boundary
   (between `reading`/`encoding`/`decoding`/`rendering`/`packaging`).
@@ -93,6 +96,7 @@ Progress phases: `queued (0%)` → `reading (15%)` → `encoding (35%)` →
   discarded as a "late result."
 
 ### Late Results After Cancel
+
 - The client marks cancelled requests with a `cancelled` flag.
 - Incoming `convert:result` or `convert:error` for cancelled requestIds
   are removed from the pending Map and ignored.
@@ -100,6 +104,7 @@ Progress phases: `queued (0%)` → `reading (15%)` → `encoding (35%)` →
   and logs a warning instead of posting a result.
 
 ### Error Codes
+
 - `IFRAME_LOAD_TIMEOUT` — iframe did not emit `ready` within 30s.
 - `BRIDGE_DISPOSED` — bridge unmounted before request completed.
 - `DUPLICATE_REQUEST_ID` — requestId already in flight.
@@ -118,17 +123,19 @@ function MyComponent() {
   return (
     <>
       <ParserIframeBridge ref={bridgeRef} />
-      <button onClick={() => {
-        bridgeRef.current?.convert({
-          requestId: generateRequestId(),
-          type: 'convert',
-          filename: 'doc.pdf',
-          sourceFormat: 'pdf',
-          targetFormat: 'html',
-          buffer: fileArrayBuffer,
-          options: { pdf: { ocr: true } }
-        })
-      }}>
+      <button
+        onClick={() => {
+          bridgeRef.current?.convert({
+            requestId: generateRequestId(),
+            type: 'convert',
+            filename: 'doc.pdf',
+            sourceFormat: 'pdf',
+            targetFormat: 'html',
+            buffer: fileArrayBuffer,
+            options: { pdf: { ocr: true } }
+          })
+        }}
+      >
         Convert
       </button>
     </>
@@ -138,41 +145,42 @@ function MyComponent() {
 
 ### Ref Methods
 
-| Method | Signature | Behavior |
-|--------|-----------|----------|
-| `convert` | `(request) => Promise<ConversionResultPayload>` | Sends a convert request, returns result or rejects with BridgeError |
-| `getProgress` | `() => ParserBridgeProgress \| null` | Returns the last known progress for the active request, or null |
-| `cancel` | `(requestId: string) => Promise<void>` | Sends cancel, rejects the client-side promise immediately |
+| Method        | Signature                                       | Behavior                                                            |
+| ------------- | ----------------------------------------------- | ------------------------------------------------------------------- |
+| `convert`     | `(request) => Promise<ConversionResultPayload>` | Sends a convert request, returns result or rejects with BridgeError |
+| `getProgress` | `() => ParserBridgeProgress \| null`            | Returns the last known progress for the active request, or null     |
+| `cancel`      | `(requestId: string) => Promise<void>`          | Sends cancel, rejects the client-side promise immediately           |
 
 ## Build / Dev / Test Commands
 
 ### Root (host + runtime)
 
-| Command | Description |
-|---------|-------------|
-| `yarn build` | Builds parser runtime then host app |
-| `yarn build:parser-runtime` | Builds iframe runtime standalone |
-| `yarn dev` | Dev server on port 5073 |
-| `yarn preview` | Preview production build on port 5073 |
-| `yarn lint` | ESLint (zero warning target) |
-| `yarn format` | Prettier formatting |
-| `yarn test:run` | Vitest unit + integration tests |
-| `yarn test:e2e` | Playwright E2E tests |
-| `yarn test:e2e:headed` | Playwright E2E with visible browser |
-| `yarn test:e2e:install` | Install Chromium for Playwright |
+| Command                     | Description                           |
+| --------------------------- | ------------------------------------- |
+| `yarn build`                | Builds parser runtime then host app   |
+| `yarn build:parser-runtime` | Builds iframe runtime standalone      |
+| `yarn dev`                  | Dev server on port 5073               |
+| `yarn preview`              | Preview production build on port 5073 |
+| `yarn lint`                 | ESLint (zero warning target)          |
+| `yarn format`               | Prettier formatting                   |
+| `yarn test:run`             | Vitest unit + integration tests       |
+| `yarn test:e2e`             | Playwright E2E tests                  |
+| `yarn test:e2e:headed`      | Playwright E2E with visible browser   |
+| `yarn test:e2e:install`     | Install Chromium for Playwright       |
 
 ### Inside `packages/parser-runtime/`
 
-| Command | Description |
-|---------|-------------|
-| `yarn build` | Build iframe runtime to root `dist/parser-runtime/` |
-| `yarn dev` | Dev server on port 5174 (for testing iframe in isolation) |
+| Command      | Description                                               |
+| ------------ | --------------------------------------------------------- |
+| `yarn build` | Build iframe runtime to root `dist/parser-runtime/`       |
+| `yarn dev`   | Dev server on port 5174 (for testing iframe in isolation) |
 
 The runtime is served at `/parser-runtime/index.html` under the host's base
 path. The `getParserRuntimeUrl()` helper in `src/lib/parser-bridge/url.ts`
 handles Vite dev, production, and GitHub Pages base-path variants.
 
 ### Platform Note (Playwright Chromium)
+
 `yarn test:e2e` requires Chromium installed via `yarn test:e2e:install`.
 On platforms where `playwright install` cannot resolve system dependencies
 (notably `ubuntu26.04-x64`), E2E tests are skipped with a documented

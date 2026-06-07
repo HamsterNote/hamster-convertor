@@ -20,6 +20,7 @@ The Hamster Document Converter is a Vite + React + TypeScript frontend for docum
 ### Existing Architecture
 
 The converter uses a dispatcher pattern:
+
 1. `convertFile()` receives `ConversionRequest` with source, target, file, options
 2. Looks up adapter in `adapters[source][target]` map
 3. Adapter performs actual conversion and returns `ConversionResult[]`
@@ -55,16 +56,19 @@ The converter uses a dispatcher pattern:
 
 **Decision**: Move PDF→HTML from `convertFile()` special-case into `adapters.pdf.html` adapter behavior.
 
-**Rationale**: 
+**Rationale**:
+
 - Unified routing makes the converter more maintainable
 - All conversions follow the same adapter lookup pattern
 - Easier to test and extend
 
 **Alternatives Considered**:
+
 - Keep special-case in `convertFile()`: Rejected because it creates inconsistency in the routing model
 - Create separate HTML conversion pipeline: Rejected because it duplicates existing infrastructure
 
 **Not Chosen Because**:
+
 - Special-case approach was the original implementation but created technical debt
 - Separate pipeline would require duplicating error handling, progress tracking, and result formatting
 
@@ -73,11 +77,13 @@ The converter uses a dispatcher pattern:
 **Decision**: Branch `createE2EResult()` on both `source` and `target` for HTML workflows.
 
 **Rationale**:
+
 - HTML-target downloads need to preserve uploaded filename extensions
 - Different source formats need different fake output behaviors
 - Source-aware branching keeps test assertions deterministic
 
 **Alternatives Considered**:
+
 - Single generic fake result: Rejected because it wouldn't allow filename extension assertions
 - Real parser calls in E2E: Rejected because it adds latency and potential flakiness
 
@@ -86,11 +92,13 @@ The converter uses a dispatcher pattern:
 **Decision**: Use `doc.setTextColor(255,255,255)` + `doc.setFontSize(1)` + `doc.text(text, 16, 16)` as MVP OCR text placement.
 
 **Rationale**:
+
 - jsPDF opacity APIs are unreliable across versions
 - White text on white/light background is effectively invisible but selectable
 - Simple placement avoids complex coordinate reconstruction
 
 **Alternatives Considered**:
+
 - Precise coordinate reconstruction from image parser: Rejected as too complex for MVP
 - Visible text overlay: Rejected because it would obscure the original page image
 - Server-side OCR with coordinate mapping: Rejected because it requires backend infrastructure
@@ -100,11 +108,13 @@ The converter uses a dispatcher pattern:
 **Decision**: Create page shell entries immediately when `numPages` is known, then use IntersectionObserver for lazy thumbnail rendering.
 
 **Rationale**:
+
 - Users can select/deselect pages before thumbnails load
 - Reduces perceived loading time
 - All pages are selectable from the start
 
 **Alternatives Considered**:
+
 - Eager thumbnail loading: Rejected because it blocks modal interaction for large PDFs
 - `<img loading="lazy">` only: Rejected because actual `pdfDocument.getPage()`/render must be lazy, not just image loading
 
@@ -113,11 +123,13 @@ The converter uses a dispatcher pattern:
 **Decision**: Replace user-facing `image` target with `png`, `jpg`, `webp` targets.
 
 **Rationale**:
+
 - Users get precise format control
 - Enables image-to-image conversion
 - Matches common user expectations for format conversion tools
 
 **Alternatives Considered**:
+
 - Keep generic "image" + secondary format selector: Rejected because it adds UI complexity
 - Add all formats including BMP: Rejected because canvas doesn't reliably encode `image/bmp`
 
@@ -130,6 +142,7 @@ The converter uses a dispatcher pattern:
 **Impact**: E2E tests are written and syntactically correct but cannot be executed in this environment.
 
 **Mitigation**:
+
 - E2E test code is reviewed manually for correctness
 - Unit tests provide comprehensive coverage
 - CI/CD pipeline on supported OS can run E2E tests
@@ -143,6 +156,7 @@ The converter uses a dispatcher pattern:
 **Impact**: Memory leak in long-running sessions with many PDF modal interactions.
 
 **Mitigation**:
+
 - Added `isMountedRef` checks in IntersectionObserver callback
 - Revoke blob URLs if component unmounts during `renderPageThumbnail`
 - Disconnect observers and revoke URLs on modal close/unmount
@@ -156,6 +170,7 @@ The converter uses a dispatcher pattern:
 **Impact**: TypeScript compilation errors and potential runtime bugs.
 
 **Mitigation**:
+
 - Updated all target comparisons across codebase
 - Added runtime validation in adapters to reject unsupported targets
 - Fixed getContext mock cast in tests
@@ -169,6 +184,7 @@ The converter uses a dispatcher pattern:
 **Impact**: Accessibility concerns for keyboard users.
 
 **Mitigation**:
+
 - Modal has `role="dialog"` and `aria-modal="true"`
 - Keyboard-accessible buttons
 - Pre-existing issue noted as out of scope for this work
@@ -182,6 +198,7 @@ The converter uses a dispatcher pattern:
 **Impact**: Conversion fails with `EMPTY_OCR` error code.
 
 **Mitigation**:
+
 - Throw `EmptyOcrError` with code `EMPTY_OCR`
 - UI maps to `errors.emptyOcr` localized message
 - User can uncheck OCR to get plain PDF copy
@@ -193,6 +210,7 @@ The converter uses a dispatcher pattern:
 ### No Breaking Changes
 
 All changes are additive or backward-compatible:
+
 - HTML source support is new functionality
 - Loading overlays are new UI components
 - PDF page selection is an optional enhancement
@@ -210,12 +228,14 @@ All changes are additive or backward-compatible:
 ## Testing Strategy
 
 ### Unit Tests (Vitest)
+
 - Converter contract tests: routing, supported targets, error handling
 - Adapter tests: PDF, TXT, image adapter behaviors
 - Integration tests: end-to-end conversion with mocks
 - App component tests: upload, conversion, state management
 
 ### E2E Tests (Playwright)
+
 - Full user workflows: upload → convert → download
 - Language switching and i18n verification
 - PDF page selection flow
@@ -223,6 +243,7 @@ All changes are additive or backward-compatible:
 - Row deletion behavior
 
 ### QA Evidence
+
 - Command outputs saved as `.txt` evidence files
 - Screenshot evidence for UI behavior (where environment supports)
 - Lint and build verification with zero warnings
