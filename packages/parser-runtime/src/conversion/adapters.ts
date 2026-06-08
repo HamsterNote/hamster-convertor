@@ -1,5 +1,6 @@
 import type { IntermediateDocument } from '@hamster-note/types'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import { stripExifCategories } from './exif'
 import type { ConversionRequest, ConversionResult } from './index'
 import {
   appendBeforeExtension,
@@ -7,8 +8,9 @@ import {
   blobToArrayBuffer,
   bufferToBlob,
   bufferToText,
-  encodeCanvasToImage,
+  type ConcreteImageTarget,
   EmptyOcrError,
+  encodeCanvasToImage,
   extractIntermediateText,
   extractOcrText,
   extractPdfPages,
@@ -17,8 +19,7 @@ import {
   replaceExtension,
   stripExtension,
   textToBlob,
-  UnsupportedImageFormatError,
-  type ConcreteImageTarget
+  UnsupportedImageFormatError
 } from './utils'
 
 type PdfParserModule = typeof import('@hamster-note/pdf-parser')
@@ -36,17 +37,87 @@ type TextItem = { str: string }
 type TextContent = { items: TextItem[] }
 type PdfPage = {
   getTextContent: (options: { includeMarkedContent: boolean }) => Promise<TextContent>
-  getViewport: (options: { scale: number }) => { width: number; height: number }
+  getViewport: (options: { scale: number }) => {
+    width: number
+    height: number
+  }
   render: (options: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => {
     promise: Promise<void>
   }
 }
-type PdfDocument = { numPages: number; getPage: (pageNumber: number) => Promise<PdfPage> }
+type PdfDocument = {
+  numPages: number
+  getPage: (pageNumber: number) => Promise<PdfPage>
+}
 type PdfJsModule = {
   GlobalWorkerOptions?: { workerSrc?: string }
-  getDocument: (options: { data: Uint8Array }) => { promise: Promise<PdfDocument> }
+  getDocument: (options: { data: Uint8Array }) => {
+    promise: Promise<PdfDocument>
+  }
 }
 type ImageDimensions = { height: number; width: number }
+type ImageOptions = NonNullable<NonNullable<ConversionRequest['options']>['image']>
+type ImageToPdfOptions = NonNullable<NonNullable<ConversionRequest['options']>['imageToPdf']>
+type PdfPageBox = { height: number; width: number }
+
+const A4_PORTRAIT_PT: PdfPageBox = { width: 595.28, height: 841.89 }
+const A4_LANDSCAPE_PT: PdfPageBox = { width: 841.89, height: 595.28 }
+const DEFAULT_IMAGE_TO_PDF_OPTIONS: ImageToPdfOptions = {
+  marginPt: 0,
+  fit: 'cover',
+  pageMode: 'auto',
+  rotationDeg: 0,
+  scalePercent: 100
+}
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error('Failed to read image blob as data URL'))
+    })
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('FileReader failed')))
+    reader.readAsDataURL(blob)
+  })
+
+const dataUrlToArrayBuffer = (dataUrl: string): ArrayBuffer => {
+  const separatorIndex = dataUrl.indexOf(',')
+  if (separatorIndex === -1) {
+    return new TextEncoder().encode(dataUrl).buffer
+  }
+
+  const metadata = dataUrl.slice(0, separatorIndex)
+  const payload = dataUrl.slice(separatorIndex + 1)
+  const binary = metadata.toLowerCase().endsWith(';base64')
+    ? atob(payload)
+    : decodeURIComponent(payload)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  return bytes.buffer
+}
+
+const imageBlobToOutputBuffer = async (
+  blob: Blob,
+  request: ConversionRequest,
+  targetFormat: ConcreteImageTarget
+): Promise<ArrayBuffer> => {
+  const removeExif = request.options?.image?.removeExif
+  if (targetFormat !== 'jpg' || !removeExif?.enabled || removeExif.categories.length === 0) {
+    return blobToArrayBuffer(blob)
+  }
+
+  const dataUrl = await blobToDataUrl(blob)
+  return dataUrlToArrayBuffer(stripExifCategories(dataUrl, removeExif.categories))
+}
 
 export class OcrRequiredError extends Error {
   readonly code = 'OCR_REQUIRED'
@@ -84,7 +155,9 @@ const extractTextWithPdfJs = async (arrayBuffer: ArrayBuffer): Promise<string> =
   const pages = await Promise.all(
     Array.from({ length: pdfDocument.numPages }, async (_, index) => {
       const page = await pdfDocument.getPage(index + 1)
-      const textContent = await page.getTextContent({ includeMarkedContent: false })
+      const textContent = await page.getTextContent({
+        includeMarkedContent: false
+      })
       return textContent.items.map(item => item.str).join(' ')
     })
   )
@@ -117,6 +190,54 @@ const loadImage = (url: string): Promise<HTMLImageElement> =>
 const loadImageDimensions = async (url: string): Promise<ImageDimensions> => {
   const image = await loadImage(url)
   return { height: image.naturalHeight, width: image.naturalWidth }
+}
+
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
+
+const getRotatedImageDimensions = (
+  dimensions: ImageDimensions,
+  rotationDeg: ImageToPdfOptions['rotationDeg']
+): ImageDimensions =>
+  rotationDeg === 90 || rotationDeg === 270
+    ? { width: dimensions.height, height: dimensions.width }
+    : dimensions
+
+const getImageToPdfPageBox = (
+  dimensions: ImageDimensions,
+  pageMode: ImageToPdfOptions['pageMode']
+): PdfPageBox => {
+  if (pageMode === 'single') {
+    return A4_PORTRAIT_PT
+  }
+
+  return dimensions.width > dimensions.height ? A4_LANDSCAPE_PT : A4_PORTRAIT_PT
+}
+
+const getImageToPdfDrawBox = (
+  dimensions: ImageDimensions,
+  pageBox: PdfPageBox,
+  options: ImageToPdfOptions
+): { drawHeight: number; drawWidth: number; x: number; y: number } => {
+  const marginPt = clampNumber(options.marginPt, 0, Math.min(pageBox.width, pageBox.height) / 2)
+  const usableWidth = pageBox.width - marginPt * 2
+  const usableHeight = pageBox.height - marginPt * 2
+  const fitScale =
+    options.fit === 'contain'
+      ? Math.min(usableWidth / dimensions.width, usableHeight / dimensions.height)
+      : Math.max(usableWidth / dimensions.width, usableHeight / dimensions.height)
+  const coverClampedWidth = Math.min(dimensions.width * fitScale, usableWidth)
+  const coverClampedHeight = Math.min(dimensions.height * fitScale, usableHeight)
+  const scaleMultiplier = clampNumber(options.scalePercent, 10, 300) / 100
+  const drawWidth = Math.min(coverClampedWidth * scaleMultiplier, usableWidth)
+  const drawHeight = Math.min(coverClampedHeight * scaleMultiplier, usableHeight)
+
+  return {
+    drawHeight,
+    drawWidth,
+    x: marginPt + (usableWidth - drawWidth) / 2,
+    y: marginPt + (usableHeight - drawHeight) / 2
+  }
 }
 
 const getSelectedPdfBuffer = async (
@@ -216,7 +337,7 @@ export const convertPdfToImage = async (
         targetFormat as ConcreteImageTarget
       )
       return {
-        buffer: await blobToArrayBuffer(blob),
+        buffer: await imageBlobToOutputBuffer(blob, request, targetFormat as ConcreteImageTarget),
         filename: `${stripExtension(request.filename)}-page-${String(pageNumber).padStart(3, '0')}${extension}`,
         mimeType,
         targetFormat
@@ -308,7 +429,10 @@ const createOcrPdf = async (
   const pageNumbers = getSelectedPdfPageNumbers(pdfDocument.numPages, selectedPages)
   const firstPage = await pdfDocument.getPage(pageNumbers[0])
   const firstViewport = firstPage.getViewport({ scale: 2 })
-  const doc = new jsPDF({ unit: 'px', format: [firstViewport.width, firstViewport.height] })
+  const doc = new jsPDF({
+    unit: 'px',
+    format: [firstViewport.width, firstViewport.height]
+  })
   let hasText = false
   let isFirst = true
 
@@ -374,41 +498,29 @@ export const convertImageToPdf = async (
   try {
     const dimensions = await loadImageDimensions(objectUrl)
     const { jsPDF } = (await import('jspdf')) as JsPdfModule
-    const imageToPdfOptions = request.options?.imageToPdf
+    const imageToPdfOptions = request.options?.imageToPdf ?? DEFAULT_IMAGE_TO_PDF_OPTIONS
+    const effectiveDimensions = getRotatedImageDimensions(dimensions, imageToPdfOptions.rotationDeg)
+    const pageBox = getImageToPdfPageBox(effectiveDimensions, imageToPdfOptions.pageMode)
+    const { drawHeight, drawWidth, x, y } = getImageToPdfDrawBox(
+      effectiveDimensions,
+      pageBox,
+      imageToPdfOptions
+    )
 
-    if (imageToPdfOptions) {
-      // Cover-fit: scale to fill content box, crop overflow, center
-      const maxMargin = Math.min(dimensions.width, dimensions.height) / 2
-      const marginPt = Math.min(Math.max(0, imageToPdfOptions.marginPt), maxMargin)
-      const pageWidth = dimensions.width
-      const pageHeight = dimensions.height
-      const contentBoxWidth = pageWidth - marginPt * 2
-      const contentBoxHeight = pageHeight - marginPt * 2
-      const scale = Math.max(
-        contentBoxWidth / dimensions.width,
-        contentBoxHeight / dimensions.height
-      )
-      const drawWidth = dimensions.width * scale
-      const drawHeight = dimensions.height * scale
-      const x = marginPt + (contentBoxWidth - drawWidth) / 2
-      const y = marginPt + (contentBoxHeight - drawHeight) / 2
-
-      const doc = new jsPDF({ unit: 'px', format: [pageWidth, pageHeight] })
-      doc.addImage(objectUrl, x, y, drawWidth, drawHeight)
-      const blob = doc.output('blob')
-      return [
-        {
-          buffer: await blobToArrayBuffer(blob),
-          filename: replaceExtension(request.filename, 'pdf'),
-          mimeType: 'application/pdf',
-          targetFormat: 'pdf'
-        }
-      ]
-    }
-
-    // Legacy path: image-derived dimensions, draw at origin filling entire page
-    const doc = new jsPDF({ unit: 'px', format: [dimensions.width, dimensions.height] })
-    doc.addImage(objectUrl, 0, 0, dimensions.width, dimensions.height)
+    const doc = new jsPDF({
+      unit: 'pt',
+      format: [pageBox.width, pageBox.height]
+    })
+    doc.addImage(
+      objectUrl,
+      x,
+      y,
+      drawWidth,
+      drawHeight,
+      undefined,
+      undefined,
+      imageToPdfOptions.rotationDeg
+    )
     const blob = doc.output('blob')
     return [
       {
@@ -476,6 +588,35 @@ export const convertImageToHtml = async (
   ]
 }
 
+const calculateImageTargetSize = (
+  naturalWidth: number,
+  naturalHeight: number,
+  imageOptions: ImageOptions | undefined
+): { width: number; height: number } => {
+  const maxWidth = imageOptions?.maxWidth
+  const maxHeight = imageOptions?.maxHeight
+
+  if (!maxWidth && !maxHeight) {
+    return { width: naturalWidth, height: naturalHeight }
+  }
+
+  const boundedMaxWidth = maxWidth ?? Infinity
+  const boundedMaxHeight = maxHeight ?? Infinity
+
+  if (imageOptions?.keepAspectRatio !== false) {
+    const scale = Math.min(boundedMaxWidth / naturalWidth, boundedMaxHeight / naturalHeight, 1)
+    return {
+      width: Math.max(1, Math.round(naturalWidth * scale)),
+      height: Math.max(1, Math.round(naturalHeight * scale))
+    }
+  }
+
+  return {
+    width: Math.max(1, Math.round(Math.min(naturalWidth, boundedMaxWidth))),
+    height: Math.max(1, Math.round(Math.min(naturalHeight, boundedMaxHeight)))
+  }
+}
+
 export const convertImageToImage = async (
   request: ConversionRequest
 ): Promise<ConversionResult[]> => {
@@ -490,23 +631,11 @@ export const convertImageToImage = async (
   try {
     const image = await loadImage(objectUrl)
     const imageOptions = request.options?.image
-
-    let targetWidth = image.naturalWidth
-    let targetHeight = image.naturalHeight
-
-    if (imageOptions?.maxWidth || imageOptions?.maxHeight) {
-      const maxW = imageOptions.maxWidth ?? Infinity
-      const maxH = imageOptions.maxHeight ?? Infinity
-
-      if (imageOptions.keepAspectRatio) {
-        const scale = Math.min(maxW / targetWidth, maxH / targetHeight, 1)
-        targetWidth = Math.round(targetWidth * scale)
-        targetHeight = Math.round(targetHeight * scale)
-      } else {
-        targetWidth = Math.min(targetWidth, maxW)
-        targetHeight = Math.min(targetHeight, maxH)
-      }
-    }
+    const { width: targetWidth, height: targetHeight } = calculateImageTargetSize(
+      image.naturalWidth,
+      image.naturalHeight,
+      imageOptions
+    )
 
     const canvas = document.createElement('canvas')
     canvas.width = targetWidth
@@ -529,7 +658,7 @@ export const convertImageToImage = async (
     )
     return [
       {
-        buffer: await blobToArrayBuffer(blob),
+        buffer: await imageBlobToOutputBuffer(blob, request, targetFormat),
         filename: replaceExtension(request.filename, targetFormat),
         mimeType,
         targetFormat
@@ -618,13 +747,22 @@ export const convertTxtToImage = async (
     ctx.fillText(line, padding, padding + (index + 1) * lineHeight)
   })
 
-  const { blob, mimeType } = await encodeCanvasToImage(canvas, 'png')
+  const targetFormat = request.targetFormat as ConcreteImageTarget
+  if (!['png', 'jpg', 'webp'].includes(targetFormat)) {
+    throw new Error(`Unsupported text image target: ${targetFormat}`)
+  }
+
+  const { blob, mimeType } = await encodeCanvasToImage(
+    canvas,
+    targetFormat,
+    request.options?.image?.quality
+  )
   return [
     {
-      buffer: await blobToArrayBuffer(blob),
-      filename: replaceExtension(request.filename, 'png'),
+      buffer: await imageBlobToOutputBuffer(blob, request, targetFormat),
+      filename: replaceExtension(request.filename, targetFormat),
       mimeType,
-      targetFormat: 'png',
+      targetFormat,
       warnings: warnings.length > 0 ? warnings : undefined
     }
   ]

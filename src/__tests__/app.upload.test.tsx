@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import type { ParserIframeBridgeRef } from '../components/ParserIframeBridge'
-import { convertViaBridge } from '../lib/parser-bridge/proxy'
 import i18n from '../i18n'
+import { convertViaBridge } from '../lib/parser-bridge/proxy'
 
 const bridgeMocks = vi.hoisted<{
   convert: ReturnType<typeof vi.fn<ParserIframeBridgeRef['convert']>>
@@ -58,15 +58,17 @@ vi.mock('../lib/parser-bridge/proxy', async () => {
   }
 })
 
-vi.mock('../components/PdfPageSelectorModal', () => ({
-  default: ({ open, onConfirm }: { open: boolean; onConfirm: (pages: number[]) => void }) =>
-    open ? (
-      <div role="dialog" aria-label="Select Pages">
-        <button type="button" onClick={() => onConfirm([1, 3])}>
-          Confirm test pages
-        </button>
-      </div>
-    ) : null
+vi.mock('../hooks/usePdfPageList', () => ({
+  usePdfPageList: vi.fn(() => ({
+    pageShells: [
+      { pageNumber: 1, thumbnailUrl: null, status: 'loaded' },
+      { pageNumber: 2, thumbnailUrl: null, status: 'loaded' },
+      { pageNumber: 3, thumbnailUrl: null, status: 'loaded' }
+    ],
+    loading: false,
+    error: null,
+    gridRef: { current: null }
+  }))
 }))
 
 vi.mock('../components/TextControlModal', () => ({
@@ -529,19 +531,8 @@ describe('app upload feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select pages' }))
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm test pages' }))
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Select Pages' })).not.toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Page 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Page 3' }))
     expect(screen.getByText('2 pages selected')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
@@ -680,7 +671,10 @@ describe('app upload feedback', () => {
       expect(screen.getByText('Done')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    const removeButton = screen.getByRole('button', { name: 'Remove' })
+    expect(removeButton).toHaveClass('row-action-btn')
+
+    fireEvent.click(removeButton)
 
     await waitFor(() => {
       expect(screen.queryByRole('row', { name: /notes\.txt/ })).not.toBeInTheDocument()
@@ -713,14 +707,12 @@ describe('app upload feedback', () => {
   it('shows full-screen loading during async download preparation', async () => {
     const { downloadResultArchive } = await import('../lib/download')
     let resolveDownload: (() => void) | undefined
-    const bridgeResults = [
-      createBridgeResult({ contents: 'first', filename: 'first.txt' }),
-      createBridgeResult({ contents: 'second', filename: 'second.txt' })
-    ]
+    const firstBridgeResult = createBridgeResult({ contents: 'first', filename: 'first.txt' })
+    const secondBridgeResult = createBridgeResult({ contents: 'second', filename: 'second.txt' })
     bridgeMocks.convert
-      .mockResolvedValueOnce(bridgeResults[0]!)
-      .mockResolvedValueOnce(bridgeResults[1]!)
-      .mockResolvedValue(bridgeResults[1]!)
+      .mockResolvedValueOnce(firstBridgeResult)
+      .mockResolvedValueOnce(secondBridgeResult)
+      .mockResolvedValue(secondBridgeResult)
     vi.mocked(downloadResultArchive).mockReturnValue(
       new Promise<void>(resolve => {
         resolveDownload = resolve
@@ -1106,6 +1098,142 @@ describe('app upload feedback', () => {
     })
   })
 
+  it('passes configured image max dimensions to the bridge', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'png-bytes',
+        filename: 'photo.png',
+        mimeType: 'image/png',
+        targetFormat: 'png'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['jpg'], 'photo.jpg', { type: 'image/jpeg' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.jpg/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'png' } })
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max width' }), {
+      target: { value: '200' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max height' }), {
+      target: { value: '120' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'image',
+          targetFormat: 'png',
+          options: expect.objectContaining({
+            image: expect.objectContaining({
+              maxWidth: 200,
+              maxHeight: 120,
+              keepAspectRatio: true
+            })
+          })
+        })
+      )
+    })
+  })
+
+  it('passes settings-driven EXIF removal categories to the bridge', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'jpg-bytes',
+        filename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        targetFormat: 'jpg'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['jpg'], 'photo.jpg', { type: 'image/jpeg' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.jpg/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'jpg' } })
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Remove EXIF metadata' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Camera and lens' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Date and time' }))
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'image',
+          targetFormat: 'jpg',
+          options: expect.objectContaining({
+            image: expect.objectContaining({
+              removeExif: {
+                enabled: true,
+                categories: ['camera', 'datetime']
+              }
+            })
+          })
+        })
+      )
+    })
+  })
+
+  it('passes settings-driven image-to-PDF rotation and scale to the bridge', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'pdf-bytes',
+        filename: 'photo.pdf',
+        mimeType: 'application/pdf',
+        targetFormat: 'pdf'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['png'], 'photo.png', { type: 'image/png' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.png/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'pdf' } })
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '90' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Scale (%)' }), {
+      target: { value: '150' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'image',
+          targetFormat: 'pdf',
+          options: expect.objectContaining({
+            imageToPdf: expect.objectContaining({
+              rotationDeg: 90,
+              scalePercent: 150
+            })
+          })
+        })
+      )
+    })
+  })
+
   it('TDD-image-2: bridge receives imageToPdf options when converting image to pdf', async () => {
     bridgeMocks.convert.mockResolvedValue(
       createBridgeResult({
@@ -1201,6 +1329,8 @@ describe('app upload feedback', () => {
 
     const previewButton = screen.getByRole('button', { name: 'Preview' })
     expect(previewButton).toBeEnabled()
+    expect(previewButton).toHaveClass('row-action-btn')
+    expect(previewButton).toHaveTextContent('🔍')
 
     fireEvent.click(previewButton)
 
@@ -1281,6 +1411,8 @@ describe('app upload feedback', () => {
     })
     expect(previewButton).toBeDisabled()
     expect(previewButton).toHaveAttribute('title', 'Preview not available for this format')
+    expect(previewButton).toHaveClass('row-action-btn')
+    expect(previewButton).toHaveTextContent('⊘')
   })
 
   it('TDD-preview-4: row download still works after preview integration', async () => {
@@ -1303,7 +1435,10 @@ describe('app upload feedback', () => {
 
     expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Download' })[0])
+    const downloadButton = screen.getAllByRole('button', { name: 'Download' })[0]
+    expect(downloadButton).toHaveClass('row-action-btn')
+
+    fireEvent.click(downloadButton)
 
     await waitFor(() => {
       expect(downloadBlobFile).toHaveBeenCalledTimes(1)

@@ -1,23 +1,36 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
 import SettingsModal, { getSettingsSections } from './SettingsModal'
 
+vi.mock('../hooks/usePdfPageList', () => ({
+  usePdfPageList: vi.fn(() => ({
+    pageShells: [
+      { pageNumber: 1, thumbnailUrl: null, status: 'loaded' },
+      { pageNumber: 2, thumbnailUrl: null, status: 'loaded' }
+    ],
+    loading: false,
+    error: null,
+    gridRef: { current: null }
+  }))
+}))
+
+const mockFile = new File(['pdf content'], 'test.pdf', { type: 'application/pdf' })
+
 describe('SettingsModal', () => {
   const onCancel = vi.fn()
   const onConfirm = vi.fn()
-  const onOpenPdfPageSelector = vi.fn()
 
   const defaultProps = {
     open: true,
     source: 'pdf' as const,
     target: 'html' as const,
     fileName: 'test.pdf',
+    file: mockFile,
     status: 'ready' as const,
     readOnly: false,
     onCancel,
-    onConfirm,
-    onOpenPdfPageSelector
+    onConfirm
   }
 
   beforeEach(async () => {
@@ -40,10 +53,22 @@ describe('SettingsModal', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('renders PDF pages section when source is pdf', () => {
+  it('renders PDF pages section with inline selector when source is pdf', () => {
     render(<SettingsModal {...defaultProps} />)
     expect(screen.getByText('PDF Pages')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Select pages' })).toBeInTheDocument()
+    const stickyHeader = screen
+      .getByText('PDF Pages')
+      .closest('.pdf-page-selector-inline__sticky-header')
+    expect(stickyHeader).toBeInTheDocument()
+    expect(within(stickyHeader as HTMLElement).getByText('0 pages selected')).toBeInTheDocument()
+    // Inline selector renders page cards
+    expect(screen.getByRole('button', { name: 'Page 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Page 2' })).toBeInTheDocument()
+    // Select all / deselect all controls
+    expect(screen.getByRole('button', { name: 'Select all' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deselect all' })).toBeInTheDocument()
+    // Collapse button
+    expect(screen.getByRole('button', { name: /collapse|expand/i })).toBeInTheDocument()
   })
 
   it('renders PDF OCR section when source is pdf and target is pdf', () => {
@@ -95,10 +120,98 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('spinbutton', { name: 'Margin (pt)' })).toBeInTheDocument()
   })
 
-  it('calls onOpenPdfPageSelector when select pages button is clicked', () => {
+  it('toggles PDF page selection via inline selector', () => {
     render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Select pages' }))
-    expect(onOpenPdfPageSelector).toHaveBeenCalledTimes(1)
+    const page1Btn = screen.getByRole('button', { name: 'Page 1' })
+    expect(page1Btn).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(page1Btn)
+    expect(page1Btn).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('select all button is disabled when all pages are selected', () => {
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    const selectAllBtn = screen.getByRole('button', { name: 'Select all' })
+    expect(selectAllBtn).not.toBeDisabled()
+    fireEvent.click(selectAllBtn)
+    expect(selectAllBtn).toBeDisabled()
+  })
+
+  it('deselect all button is disabled when no pages are selected', () => {
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    const deselectAllBtn = screen.getByRole('button', { name: 'Deselect all' })
+    expect(deselectAllBtn).toBeDisabled()
+  })
+
+  it('collapses and expands inline PDF selector', () => {
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    const collapseBtn = screen.getByRole('button', { name: 'Collapse' })
+    fireEvent.click(collapseBtn)
+    // When collapsed, page cards should not be visible
+    expect(screen.queryByRole('button', { name: 'Page 1' })).not.toBeInTheDocument()
+    const expandBtn = screen.getByRole('button', { name: 'Expand' })
+    fireEvent.click(expandBtn)
+    // When expanded, page cards should be visible again
+    expect(screen.getByRole('button', { name: 'Page 1' })).toBeInTheDocument()
+  })
+
+  it('persists image-to-PDF rotation and scale when confirmed and reopened', () => {
+    const { rerender } = render(<SettingsModal {...defaultProps} source="image" target="pdf" />)
+
+    fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '90' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Scale (%)' }), {
+      target: { value: '150' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    const confirmedOptions = onConfirm.mock.calls[0]?.[0]
+    expect(confirmedOptions).toEqual(
+      expect.objectContaining({
+        imageToPdf: expect.objectContaining({
+          rotationDeg: 90,
+          scalePercent: 150
+        })
+      })
+    )
+
+    rerender(
+      <SettingsModal {...defaultProps} source="image" target="pdf" options={confirmedOptions} />
+    )
+
+    expect(screen.getByLabelText('Rotation')).toHaveValue('90')
+    expect(screen.getByRole('spinbutton', { name: 'Scale (%)' })).toHaveValue(150)
+  })
+
+  it('shows and hides EXIF category list with removeExif checkbox', () => {
+    render(<SettingsModal {...defaultProps} source="image" target="jpg" />)
+
+    expect(screen.queryByText('EXIF categories')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Remove EXIF metadata' }))
+    expect(screen.getByText('EXIF categories')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'All metadata' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Remove EXIF metadata' }))
+    expect(screen.queryByText('EXIF categories')).not.toBeInTheDocument()
+  })
+
+  it('keeps EXIF all category mutually exclusive with subcategories', () => {
+    render(<SettingsModal {...defaultProps} source="image" target="jpg" />)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Remove EXIF metadata' }))
+    const allMetadata = screen.getByRole('checkbox', { name: 'All metadata' })
+    const geolocation = screen.getByRole('checkbox', { name: 'Geolocation' })
+
+    fireEvent.click(allMetadata)
+    expect(allMetadata).toBeChecked()
+    expect(geolocation).not.toBeChecked()
+
+    fireEvent.click(geolocation)
+    expect(allMetadata).not.toBeChecked()
+    expect(geolocation).toBeChecked()
+
+    fireEvent.click(allMetadata)
+    expect(allMetadata).toBeChecked()
+    expect(geolocation).not.toBeChecked()
   })
 
   it('when readOnly=true, all inputs are disabled and only Done button visible', () => {
@@ -138,12 +251,15 @@ describe('SettingsModal', () => {
       expect(slider).toBeDisabled()
     })
 
+    // PDF page cards should be disabled in read-only mode
+    const pageCards = screen.queryAllByRole('button', { name: /Page \d+/ })
+    pageCards.forEach(card => {
+      expect(card).toBeDisabled()
+    })
+
     // Only Done button should be present, no Cancel
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
-
-    // Select pages button should be hidden in read-only mode
-    expect(screen.queryByRole('button', { name: 'Select pages' })).not.toBeInTheDocument()
   })
 
   it('renders multiple sections in two-column layout', () => {
@@ -169,6 +285,48 @@ describe('SettingsModal', () => {
     expect(onCancel).not.toHaveBeenCalled()
   })
 
+  it('returns image max dimensions as positive integer options', () => {
+    render(<SettingsModal {...defaultProps} source="image" target="png" />)
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max width' }), {
+      target: { value: '200.8' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Max height' }), {
+      target: { value: '120' }
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image: expect.objectContaining({
+          maxWidth: 200,
+          maxHeight: 120,
+          keepAspectRatio: true
+        })
+      })
+    )
+  })
+
+  it('returns selected EXIF categories only when removeExif is enabled', () => {
+    render(<SettingsModal {...defaultProps} source="image" target="jpg" />)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Remove EXIF metadata' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Camera and lens' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Date and time' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image: expect.objectContaining({
+          removeExif: {
+            enabled: true,
+            categories: ['camera', 'datetime']
+          }
+        })
+      })
+    )
+  })
+
   it('pressing ESC key calls onCancel', () => {
     render(<SettingsModal {...defaultProps} />)
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -176,7 +334,7 @@ describe('SettingsModal', () => {
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  it('shows selected pages count when pages are selected', () => {
+  it('shows selected pages count in inline selector header', () => {
     const options = {
       pdf: {
         ocr: false,

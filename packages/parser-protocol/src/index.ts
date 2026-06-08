@@ -93,6 +93,14 @@ export type ParserBridgeReadyMessage = {
   type: 'ready'
 }
 
+export type ExifCategory =
+  | 'all'
+  | 'geolocation'
+  | 'camera'
+  | 'datetime'
+  | 'software'
+  | 'authorCopyright'
+
 /**
  * 转换选项 - 透传给具体解析器
  */
@@ -117,6 +125,23 @@ export type ParserBridgeConversionOptions = {
     includeBackground?: boolean
     backgroundQuality?: number
     excludeTextFromBackground?: boolean
+  }
+  image?: {
+    quality: number
+    maxWidth?: number
+    maxHeight?: number
+    keepAspectRatio: boolean
+    removeExif?: {
+      enabled: boolean
+      categories: ExifCategory[]
+    }
+  }
+  imageToPdf?: {
+    marginPt: number
+    fit: 'cover'
+    pageMode: 'auto'
+    rotationDeg: 0 | 90 | 180 | 270
+    scalePercent: number
   }
   /** 渲染选项 */
   render?: {

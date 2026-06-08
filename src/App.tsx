@@ -11,12 +11,12 @@ import SettingsModal, {
   type SettingsOptions
 } from './components/SettingsModal'
 import { ParserIframeBridge, type ParserIframeBridgeRef } from './components/ParserIframeBridge'
-import PdfPageSelectorModal from './components/PdfPageSelectorModal'
 import {
   type ConversionResult,
   type ConversionWarning,
   getSupportedTargets,
   type HtmlDecodeOptions,
+  type ExifCategory,
   type SourceFormat,
   type TargetFormat
 } from './lib/converter'
@@ -47,11 +47,17 @@ type ConversionOptions = {
     maxWidth?: number
     maxHeight?: number
     keepAspectRatio: boolean
+    removeExif?: {
+      enabled: boolean
+      categories: ExifCategory[]
+    }
   }
   imageToPdf?: {
     marginPt: number
     fit: 'cover'
     pageMode: 'auto'
+    rotationDeg: 0 | 90 | 180 | 270
+    scalePercent: number
   }
 }
 
@@ -63,13 +69,24 @@ const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
 
 const DEFAULT_IMAGE_OPTIONS: NonNullable<ConversionOptions['image']> = {
   quality: 0.92,
-  keepAspectRatio: true
+  keepAspectRatio: true,
+  removeExif: { enabled: false, categories: [] }
 }
 
 const DEFAULT_IMAGE_TO_PDF_OPTIONS: NonNullable<ConversionOptions['imageToPdf']> = {
   marginPt: 24,
   fit: 'cover',
-  pageMode: 'auto'
+  pageMode: 'auto',
+  rotationDeg: 0,
+  scalePercent: 100
+}
+
+const normalizeImageDimension = (value: number | undefined): number | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) {
+    return undefined
+  }
+
+  return Math.floor(value)
 }
 
 const createDefaultHtmlOptions = (): NonNullable<ConversionOptions['html']> => ({
@@ -195,9 +212,6 @@ function App() {
   const bridgeRef = useRef<ParserIframeBridgeRef>(null)
   const [isConvertingAll, setIsConvertingAll] = useState(false)
   const [isPreparingDownload, setIsPreparingDownload] = useState(false)
-  const [activePdfPageSelectorItemId, setActivePdfPageSelectorItemId] = useState<string | null>(
-    null
-  )
   const [activeSettingsItemId, setActiveSettingsItemId] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
     message: string
@@ -206,9 +220,6 @@ function App() {
   } | null>(null)
   const [activePreviewItemId, setActivePreviewItemId] = useState<string | null>(null)
 
-  const activePdfItem = activePdfPageSelectorItemId
-    ? items.find(it => it.id === activePdfPageSelectorItemId)
-    : undefined
   const activeSettingsItem = activeSettingsItemId
     ? items.find(it => it.id === activeSettingsItemId)
     : undefined
@@ -294,22 +305,6 @@ function App() {
     )
   }
 
-  const changeSelectedPages = (id: string, selectedPages: number[] | undefined) => {
-    setItems(prev =>
-      prev.map(it =>
-        it.id === id
-          ? {
-              ...it,
-              conversionOptions: {
-                ...it.conversionOptions,
-                pdf: { ...it.conversionOptions.pdf, selectedPages }
-              }
-            }
-          : it
-      )
-    )
-  }
-
   const applySettingsOptions = (id: string, next: SettingsOptions) => {
     setItems(prev =>
       prev.map(it => {
@@ -322,18 +317,23 @@ function App() {
           conversionOptions.html = { ...next.html }
         }
         if (next.image) {
+          const maxWidth = normalizeImageDimension(next.image.maxWidth)
+          const maxHeight = normalizeImageDimension(next.image.maxHeight)
           conversionOptions.image = {
             quality: next.image.quality ?? DEFAULT_IMAGE_OPTIONS.quality,
-            maxWidth: next.image.maxWidth,
-            maxHeight: next.image.maxHeight,
-            keepAspectRatio: next.image.keepAspectRatio ?? DEFAULT_IMAGE_OPTIONS.keepAspectRatio
+            maxWidth,
+            maxHeight,
+            keepAspectRatio: next.image.keepAspectRatio ?? DEFAULT_IMAGE_OPTIONS.keepAspectRatio,
+            removeExif: next.image.removeExif ?? DEFAULT_IMAGE_OPTIONS.removeExif
           }
         }
         if (next.imageToPdf) {
           conversionOptions.imageToPdf = {
             marginPt: next.imageToPdf.margin ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.marginPt,
             fit: next.imageToPdf.fit ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.fit,
-            pageMode: next.imageToPdf.pageMode ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.pageMode
+            pageMode: next.imageToPdf.pageMode ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.pageMode,
+            rotationDeg: next.imageToPdf.rotationDeg ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.rotationDeg,
+            scalePercent: next.imageToPdf.scalePercent ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.scalePercent
           }
         }
         return { ...it, conversionOptions }
@@ -631,7 +631,7 @@ function App() {
                               <>
                                 <button
                                   type="button"
-                                  className="btn btn--ghost"
+                                  className="btn btn--ghost row-action-btn"
                                   onClick={() => setActivePreviewItemId(it.id)}
                                   aria-label={
                                     canPreview
@@ -641,11 +641,11 @@ function App() {
                                   title={canPreview ? undefined : t('actions.previewUnsupported')}
                                   disabled={!canPreview || isPreparingDownload}
                                 >
-                                  {canPreview ? '👁' : '⊘'}
+                                  {canPreview ? '🔍' : '⊘'}
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn btn--ghost"
+                                  className="btn btn--ghost row-action-btn"
                                   onClick={() => handleRowDownload(it)}
                                   aria-label={t('actions.download')}
                                   disabled={isPreparingDownload}
@@ -656,7 +656,7 @@ function App() {
                             )}
                             <button
                               type="button"
-                              className="btn btn--ghost"
+                              className="btn btn--ghost row-action-btn"
                               onClick={() => setActiveSettingsItemId(it.id)}
                               aria-label={t('actions.settings')}
                               title={t('actions.settings')}
@@ -666,7 +666,7 @@ function App() {
                             </button>
                             <button
                               type="button"
-                              className="btn btn--ghost"
+                              className="btn btn--ghost row-action-btn"
                               onClick={() => removeItem(it.id)}
                               aria-label={t('actions.remove')}
                               disabled={
@@ -735,19 +735,6 @@ function App() {
       </main>
 
       <Footer />
-      {activePdfItem && (
-        <PdfPageSelectorModal
-          open
-          file={activePdfItem.file}
-          selectedPages={activePdfItem.conversionOptions.pdf.selectedPages}
-          onCancel={() => setActivePdfPageSelectorItemId(null)}
-          onConfirm={pages => {
-            changeSelectedPages(activePdfItem.id, pages)
-            setActivePdfPageSelectorItemId(null)
-          }}
-        />
-      )}
-
       {confirmModal && (
         <ConfirmModal
           open
@@ -778,19 +765,18 @@ function App() {
               ? {
                   margin: activeSettingsItem.conversionOptions.imageToPdf.marginPt,
                   fit: activeSettingsItem.conversionOptions.imageToPdf.fit,
-                  pageMode: activeSettingsItem.conversionOptions.imageToPdf.pageMode
+                  pageMode: activeSettingsItem.conversionOptions.imageToPdf.pageMode,
+                  rotationDeg: activeSettingsItem.conversionOptions.imageToPdf.rotationDeg,
+                  scalePercent: activeSettingsItem.conversionOptions.imageToPdf.scalePercent
                 }
               : undefined
           }}
+          file={activeSettingsItem.file}
           readOnly={activeSettingsItem.status === 'done'}
           onCancel={() => setActiveSettingsItemId(null)}
           onConfirm={next => {
             applySettingsOptions(activeSettingsItem.id, next)
             setActiveSettingsItemId(null)
-          }}
-          onOpenPdfPageSelector={() => {
-            setActiveSettingsItemId(null)
-            setActivePdfPageSelectorItemId(activeSettingsItem.id)
           }}
         />
       )}

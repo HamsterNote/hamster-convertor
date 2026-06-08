@@ -18,17 +18,31 @@ export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
 
 export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
+export type ExifCategory =
+  | 'all'
+  | 'geolocation'
+  | 'camera'
+  | 'datetime'
+  | 'software'
+  | 'authorCopyright'
+
 export type ImageOptions = {
   quality: number
   maxWidth?: number
   maxHeight?: number
   keepAspectRatio: boolean
+  removeExif?: {
+    enabled: boolean
+    categories: ExifCategory[]
+  }
 }
 
 export type ImageToPdfOptions = {
   marginPt: number
-  fit: 'cover'
-  pageMode: 'auto'
+  fit: 'cover' | 'contain'
+  pageMode: 'auto' | 'single' | 'multi'
+  rotationDeg: 0 | 90 | 180 | 270
+  scalePercent: number
 }
 
 export type ConversionOptions = {
@@ -74,7 +88,7 @@ export class UnsupportedConversionError extends Error {
 
 const supportedTargets = {
   pdf: ['txt', 'png', 'jpg', 'webp', 'pdf', 'html'],
-  txt: ['png', 'html'],
+  txt: ['png', 'jpg', 'webp', 'html'],
   image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
   html: ['txt']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
@@ -95,6 +109,8 @@ const adapters: ConversionAdapterMap = {
   },
   txt: {
     png: convertTxtToImage,
+    jpg: convertTxtToImage,
+    webp: convertTxtToImage,
     html: convertTxtToHtml
   },
   image: {

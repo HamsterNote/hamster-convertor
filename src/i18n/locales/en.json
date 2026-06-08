@@ -160,7 +160,22 @@
     "pageModeMulti": "Multi",
     "estimate": "Estimate",
     "reset": "Reset",
-    "heuristicEstimate": "Heuristic estimate: actual output size may vary based on content"
+    "heuristicEstimate": "Heuristic estimate: actual output size may vary based on content",
+    "removeExif": "Remove EXIF metadata",
+    "removeExifHelp": "Choose which metadata groups to remove from image outputs.",
+    "exifCategories": "EXIF categories",
+    "exifCategory": {
+      "all": "All metadata",
+      "geolocation": "Geolocation",
+      "camera": "Camera and lens",
+      "datetime": "Date and time",
+      "software": "Software",
+      "authorCopyright": "Author and copyright"
+    },
+    "rotation": "Rotation",
+    "rotationDegrees": "{{degrees}}°",
+    "scale": "Scale (%)",
+    "imageToPdfTransformHelp": "Rotation is limited to right angles; scale accepts 10% to 300%."
   },
   "confirmations": {
     "title": "Please confirm",

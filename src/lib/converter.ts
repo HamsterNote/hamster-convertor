@@ -45,6 +45,14 @@ export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
 
 export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
+export type ExifCategory =
+  | 'all'
+  | 'geolocation'
+  | 'camera'
+  | 'datetime'
+  | 'software'
+  | 'authorCopyright'
+
 export type ConversionResult = {
   blob: Blob
   filename: string
@@ -71,11 +79,17 @@ export type ConversionRequest = {
       maxWidth?: number
       maxHeight?: number
       keepAspectRatio: boolean
+      removeExif?: {
+        enabled: boolean
+        categories: ExifCategory[]
+      }
     }
     imageToPdf?: {
       marginPt: number
-      fit: 'cover'
-      pageMode: 'auto'
+      fit: 'cover' | 'contain'
+      pageMode: 'auto' | 'single' | 'multi'
+      rotationDeg: 0 | 90 | 180 | 270
+      scalePercent: number
     }
   }
 }

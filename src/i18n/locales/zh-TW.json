@@ -160,7 +160,22 @@
     "pageModeMulti": "多頁",
     "estimate": "估算",
     "reset": "重設",
-    "heuristicEstimate": "啟發式估算：實際輸出大小可能因內容而異"
+    "heuristicEstimate": "啟發式估算：實際輸出大小可能因內容而異",
+    "removeExif": "移除 EXIF 元資料",
+    "removeExifHelp": "選擇要從圖片輸出中移除的元資料分組。",
+    "exifCategories": "EXIF 分類",
+    "exifCategory": {
+      "all": "全部元資料",
+      "geolocation": "地理位置",
+      "camera": "相機與鏡頭",
+      "datetime": "日期與時間",
+      "software": "軟體資訊",
+      "authorCopyright": "作者與版權"
+    },
+    "rotation": "旋轉",
+    "rotationDegrees": "{{degrees}}°",
+    "scale": "縮放 (%)",
+    "imageToPdfTransformHelp": "旋轉僅支援直角；縮放範圍為 10% 到 300%。"
   },
   "confirmations": {
     "title": "請確認",

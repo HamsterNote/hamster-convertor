@@ -126,6 +126,11 @@ const installCanvasAndImageMocks = (): { restore: () => void; state: MockCanvasS
 }
 
 describe('Runtime conversion', () => {
+  beforeEach(() => {
+    mockImageWidth = 32
+    mockImageHeight = 16
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
     parserMocks.pdfEncode.mockReset()
@@ -250,6 +255,85 @@ describe('Runtime conversion', () => {
     }
   })
 
+  it('converts image to JPG when removeExif is enabled', async () => {
+    const { restore } = installCanvasAndImageMocks()
+    try {
+      const [result] = await convertRuntime({
+        filename: 'photo.jpg',
+        sourceFormat: 'image',
+        targetFormat: 'jpg',
+        buffer: createBuffer('jpg-bytes'),
+        mimeType: 'image/jpeg',
+        options: {
+          image: {
+            quality: 0.8,
+            keepAspectRatio: true,
+            removeExif: { enabled: true, categories: ['all'] }
+          }
+        }
+      })
+
+      expect(result?.filename).toBe('photo.jpg')
+      expect(result?.mimeType).toBe('image/jpeg')
+      expect(result?.targetFormat).toBe('jpg')
+      expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toBe('mock png')
+    } finally {
+      restore()
+    }
+  })
+
+  it('skips EXIF parsing for PNG and WEBP when removeExif is enabled', async () => {
+    const { restore } = installCanvasAndImageMocks()
+    try {
+      for (const targetFormat of ['png', 'webp'] as const) {
+        const [result] = await convertRuntime({
+          filename: 'photo.jpg',
+          sourceFormat: 'image',
+          targetFormat,
+          buffer: createBuffer('jpg-bytes'),
+          mimeType: 'image/jpeg',
+          options: {
+            image: {
+              quality: 0.8,
+              keepAspectRatio: true,
+              removeExif: { enabled: true, categories: ['all'] }
+            }
+          }
+        })
+
+        expect(result?.targetFormat).toBe(targetFormat)
+      }
+    } finally {
+      restore()
+    }
+  })
+
+  it('converts text to JPG with removeExif enabled', async () => {
+    const { restore } = installCanvasAndImageMocks()
+    try {
+      const [result] = await convertRuntime({
+        filename: 'note.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'jpg',
+        buffer: createBuffer('hello'),
+        mimeType: 'text/plain',
+        options: {
+          image: {
+            quality: 0.75,
+            keepAspectRatio: true,
+            removeExif: { enabled: true, categories: ['all'] }
+          }
+        }
+      })
+
+      expect(result?.filename).toBe('note.jpg')
+      expect(result?.mimeType).toBe('image/jpeg')
+      expect(result?.targetFormat).toBe('jpg')
+    } finally {
+      restore()
+    }
+  })
+
   it('ignores quality for PNG target', async () => {
     const { restore, state } = installCanvasAndImageMocks()
     try {
@@ -304,17 +388,18 @@ describe('Runtime conversion', () => {
   it('resizes canvas with maxWidth preserving aspect ratio', async () => {
     const { restore, state } = installCanvasAndImageMocks()
     try {
+      mockImageWidth = 400
+      mockImageHeight = 200
       await convertRuntime({
         filename: 'photo.jpg',
         sourceFormat: 'image',
         targetFormat: 'png',
         buffer: createBuffer('jpg-bytes'),
         mimeType: 'image/jpeg',
-        options: { image: { quality: 0.92, maxWidth: 16, keepAspectRatio: true } }
+        options: { image: { quality: 0.92, maxWidth: 200, keepAspectRatio: true } }
       })
-      // MockImage: 32x16, maxWidth=16 → scale=0.5 → 16x8
-      expect(state.lastCanvas?.width).toBe(16)
-      expect(state.lastCanvas?.height).toBe(8)
+      expect(state.lastCanvas?.width).toBe(200)
+      expect(state.lastCanvas?.height).toBe(100)
     } finally {
       restore()
     }
@@ -342,23 +427,75 @@ describe('Runtime conversion', () => {
   it('does not upscale when maxWidth exceeds natural width', async () => {
     const { restore, state } = installCanvasAndImageMocks()
     try {
+      mockImageWidth = 100
+      mockImageHeight = 50
       await convertRuntime({
         filename: 'photo.jpg',
         sourceFormat: 'image',
         targetFormat: 'png',
         buffer: createBuffer('jpg-bytes'),
         mimeType: 'image/jpeg',
-        options: { image: { quality: 0.92, maxWidth: 64, keepAspectRatio: true } }
+        options: { image: { quality: 0.92, maxWidth: 200, keepAspectRatio: true } }
       })
-      // MockImage: 32x16, maxWidth=64 → scale clamped to 1 → 32x16
-      expect(state.lastCanvas?.width).toBe(32)
-      expect(state.lastCanvas?.height).toBe(16)
+      expect(state.lastCanvas?.width).toBe(100)
+      expect(state.lastCanvas?.height).toBe(50)
     } finally {
       restore()
     }
   })
 
-  it('accepts imageToPdf options with marginPt, fit, and pageMode', () => {
+  it('downscales to maxWidth and keeps original size when maxWidth is larger', async () => {
+    const { restore, state } = installCanvasAndImageMocks()
+    try {
+      mockImageWidth = 800
+      mockImageHeight = 400
+      await convertRuntime({
+        filename: 'wide.jpg',
+        sourceFormat: 'image',
+        targetFormat: 'webp',
+        buffer: createBuffer('jpg-bytes'),
+        mimeType: 'image/jpeg',
+        options: { image: { quality: 0.92, maxWidth: 320, keepAspectRatio: true } }
+      })
+      expect(state.lastCanvas?.width).toBe(320)
+      expect(state.lastCanvas?.height).toBe(160)
+
+      await convertRuntime({
+        filename: 'small.jpg',
+        sourceFormat: 'image',
+        targetFormat: 'webp',
+        buffer: createBuffer('jpg-bytes'),
+        mimeType: 'image/jpeg',
+        options: { image: { quality: 0.92, maxWidth: 1200, keepAspectRatio: true } }
+      })
+      expect(state.lastCanvas?.width).toBe(800)
+      expect(state.lastCanvas?.height).toBe(400)
+    } finally {
+      restore()
+    }
+  })
+
+  it('uses the smaller scale factor when maxWidth and maxHeight are both set', async () => {
+    const { restore, state } = installCanvasAndImageMocks()
+    try {
+      mockImageWidth = 400
+      mockImageHeight = 300
+      await convertRuntime({
+        filename: 'photo.jpg',
+        sourceFormat: 'image',
+        targetFormat: 'png',
+        buffer: createBuffer('jpg-bytes'),
+        mimeType: 'image/jpeg',
+        options: { image: { quality: 0.92, maxWidth: 300, maxHeight: 120, keepAspectRatio: true } }
+      })
+      expect(state.lastCanvas?.width).toBe(160)
+      expect(state.lastCanvas?.height).toBe(120)
+    } finally {
+      restore()
+    }
+  })
+
+  it('accepts imageToPdf options with marginPt, fit, pageMode, rotation, and scale', () => {
     const request: Parameters<typeof convertRuntime>[0] = {
       filename: 'photo.jpg',
       sourceFormat: 'image',
@@ -366,12 +503,20 @@ describe('Runtime conversion', () => {
       buffer: createBuffer('jpg-bytes'),
       mimeType: 'image/jpeg',
       options: {
-        imageToPdf: { marginPt: 24, fit: 'cover', pageMode: 'auto' }
+        imageToPdf: {
+          marginPt: 24,
+          fit: 'contain',
+          pageMode: 'multi',
+          rotationDeg: 270,
+          scalePercent: 150
+        }
       }
     }
     expect(request.options?.imageToPdf?.marginPt).toBe(24)
-    expect(request.options?.imageToPdf?.fit).toBe('cover')
-    expect(request.options?.imageToPdf?.pageMode).toBe('auto')
+    expect(request.options?.imageToPdf?.fit).toBe('contain')
+    expect(request.options?.imageToPdf?.pageMode).toBe('multi')
+    expect(request.options?.imageToPdf?.rotationDeg).toBe(270)
+    expect(request.options?.imageToPdf?.scalePercent).toBe(150)
   })
 
   it('preserves OCR_REQUIRED error', async () => {
@@ -392,8 +537,29 @@ describe('Runtime conversion', () => {
   })
 })
 
-describe('Image-to-PDF cover-fit', () => {
+describe('Image-to-PDF A4 sizing', () => {
   let restoreDomMocks: (() => void) | undefined
+  const a4Portrait = { width: 595.28, height: 841.89 }
+  const a4Landscape = { width: 841.89, height: 595.28 }
+  const marginPt = 24
+
+  const getLastAddImageCall = () => {
+    const call = jsPdfMocks.addImage.mock.calls.at(-1)
+    if (!call) {
+      throw new Error('Expected addImage to be called')
+    }
+    return call as [string, number, number, number, number, string | undefined, unknown, number]
+  }
+
+  const expectWithinUsableBounds = (usableWidth: number, usableHeight: number) => {
+    const [, x, y, drawWidth, drawHeight] = getLastAddImageCall()
+    expect(drawWidth).toBeLessThanOrEqual(usableWidth)
+    expect(drawHeight).toBeLessThanOrEqual(usableHeight)
+    expect(x).toBeGreaterThanOrEqual(marginPt)
+    expect(y).toBeGreaterThanOrEqual(marginPt)
+    expect(x + drawWidth).toBeLessThanOrEqual(marginPt + usableWidth)
+    expect(y + drawHeight).toBeLessThanOrEqual(marginPt + usableHeight)
+  }
 
   beforeEach(() => {
     jsPdfMocks.addImage.mockClear()
@@ -412,7 +578,7 @@ describe('Image-to-PDF cover-fit', () => {
     restoreDomMocks?.()
   })
 
-  it('legacy: no imageToPdf uses image dimensions and draws at origin', async () => {
+  it('uses deterministic A4 landscape pages without imageToPdf options', async () => {
     const [result] = await convertRuntime({
       filename: 'photo.jpg',
       sourceFormat: 'image',
@@ -421,46 +587,172 @@ describe('Image-to-PDF cover-fit', () => {
       mimeType: 'image/jpeg'
     })
 
-    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({ unit: 'px', format: [32, 16] })
-    expect(jsPdfMocks.addImage).toHaveBeenCalledWith('blob:mock-image', 0, 0, 32, 16)
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Landscape.width, a4Landscape.height]
+    })
+    expect(jsPdfMocks.addImage).toHaveBeenCalledWith(
+      'blob:mock-image',
+      0,
+      0,
+      a4Landscape.width,
+      a4Landscape.height,
+      undefined,
+      undefined,
+      0
+    )
     expect(result?.filename).toBe('photo.pdf')
     expect(result?.mimeType).toBe('application/pdf')
     expect(result?.targetFormat).toBe('pdf')
   })
 
-  it('cover-fit with margin 0 draws full-size at origin', async () => {
+  it.each(['contain', 'cover'] as const)(
+    'keeps a large landscape image inside usable page width for %s fit',
+    async fit => {
+      mockImageWidth = 4000
+      mockImageHeight = 3000
+
+      await convertRuntime({
+        filename: 'large.jpg',
+        sourceFormat: 'image',
+        targetFormat: 'pdf',
+        buffer: createBuffer('jpg-bytes'),
+        mimeType: 'image/jpeg',
+        options: {
+          imageToPdf: {
+            marginPt,
+            fit,
+            pageMode: 'auto',
+            rotationDeg: 0,
+            scalePercent: 100
+          }
+        }
+      })
+
+      expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+        unit: 'pt',
+        format: [a4Landscape.width, a4Landscape.height]
+      })
+      expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
+    }
+  )
+
+  it.each([90, 270] as const)(
+    'rotation %i swaps effective dimensions for auto page mode',
+    async rotationDeg => {
+      mockImageWidth = 4000
+      mockImageHeight = 3000
+
+      await convertRuntime({
+        filename: 'photo.jpg',
+        sourceFormat: 'image',
+        targetFormat: 'pdf',
+        buffer: createBuffer('jpg-bytes'),
+        mimeType: 'image/jpeg',
+        options: {
+          imageToPdf: {
+            marginPt,
+            fit: 'contain',
+            pageMode: 'auto',
+            rotationDeg,
+            scalePercent: 100
+          }
+        }
+      })
+
+      expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+        unit: 'pt',
+        format: [a4Portrait.width, a4Portrait.height]
+      })
+      expect(getLastAddImageCall()[7]).toBe(rotationDeg)
+      expectWithinUsableBounds(a4Portrait.width - marginPt * 2, a4Portrait.height - marginPt * 2)
+    }
+  )
+
+  it('single page mode forces portrait A4 for landscape images', async () => {
+    mockImageWidth = 4000
+    mockImageHeight = 3000
+
     await convertRuntime({
-      filename: 'photo.jpg',
+      filename: 'landscape.jpg',
       sourceFormat: 'image',
       targetFormat: 'pdf',
       buffer: createBuffer('jpg-bytes'),
       mimeType: 'image/jpeg',
-      options: { imageToPdf: { marginPt: 0, fit: 'cover', pageMode: 'auto' } }
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'cover',
+          pageMode: 'single',
+          rotationDeg: 0,
+          scalePercent: 100
+        }
+      }
     })
 
-    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({ unit: 'px', format: [32, 16] })
-    expect(jsPdfMocks.addImage).toHaveBeenCalledWith('blob:mock-image', 0, 0, 32, 16)
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Portrait.width, a4Portrait.height]
+    })
+    expectWithinUsableBounds(a4Portrait.width - marginPt * 2, a4Portrait.height - marginPt * 2)
   })
 
-  it('cover-fit with margin on landscape image centers and crops', async () => {
+  it('multi page mode behaves like auto without adding tiling', async () => {
+    mockImageWidth = 4000
+    mockImageHeight = 3000
+
     await convertRuntime({
-      filename: 'photo.jpg',
+      filename: 'large.jpg',
       sourceFormat: 'image',
       targetFormat: 'pdf',
       buffer: createBuffer('jpg-bytes'),
       mimeType: 'image/jpeg',
-      options: { imageToPdf: { marginPt: 4, fit: 'cover', pageMode: 'auto' } }
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'contain',
+          pageMode: 'multi',
+          rotationDeg: 0,
+          scalePercent: 100
+        }
+      }
     })
 
-    // content box: 24x8, scale: max(24/32, 8/16)=0.75, draw: 24x12
-    // x=4+(24-24)/2=4, y=4+(8-12)/2=2
-    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({ unit: 'px', format: [32, 16] })
-    expect(jsPdfMocks.addImage).toHaveBeenCalledWith('blob:mock-image', 4, 2, 24, 12)
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Landscape.width, a4Landscape.height]
+    })
+    expect(jsPdfMocks.addImage).toHaveBeenCalledTimes(1)
   })
 
-  it('cover-fit on portrait image', async () => {
-    mockImageWidth = 16
-    mockImageHeight = 32
+  it('clamps scale 300 on wide images to usable page bounds', async () => {
+    mockImageWidth = 4000
+    mockImageHeight = 1000
+
+    await convertRuntime({
+      filename: 'wide.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'contain',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 300
+        }
+      }
+    })
+
+    expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
+    expect(jsPdfMocks.addImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps rotated and scaled images inside A4 bounds', async () => {
+    mockImageWidth = 1200
+    mockImageHeight = 2400
 
     await convertRuntime({
       filename: 'portrait.jpg',
@@ -468,39 +760,41 @@ describe('Image-to-PDF cover-fit', () => {
       targetFormat: 'pdf',
       buffer: createBuffer('jpg-bytes'),
       mimeType: 'image/jpeg',
-      options: { imageToPdf: { marginPt: 4, fit: 'cover', pageMode: 'auto' } }
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'contain',
+          pageMode: 'auto',
+          rotationDeg: 90,
+          scalePercent: 150
+        }
+      }
     })
 
-    // content box: 8x24, scale: max(8/16, 24/32)=0.75, draw: 12x24
-    // x=4+(8-12)/2=2, y=4+(24-24)/2=4
-    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({ unit: 'px', format: [16, 32] })
-    expect(jsPdfMocks.addImage).toHaveBeenCalledWith('blob:mock-image', 2, 4, 12, 24)
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Landscape.width, a4Landscape.height]
+    })
+    expect(getLastAddImageCall()[7]).toBe(90)
+    expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
   })
 
-  it('clamps excessive margin rather than throwing', async () => {
+  it('revokes object URL after A4 sizing', async () => {
     await convertRuntime({
       filename: 'photo.jpg',
       sourceFormat: 'image',
       targetFormat: 'pdf',
       buffer: createBuffer('jpg-bytes'),
       mimeType: 'image/jpeg',
-      options: { imageToPdf: { marginPt: 100, fit: 'cover', pageMode: 'auto' } }
-    })
-
-    // maxMargin=min(32,16)/2=8, clamped to 8
-    // content box: 16x0, scale: max(16/32, 0/16)=0.5, draw: 16x8
-    // x=8+(16-16)/2=8, y=8+(0-8)/2=4
-    expect(jsPdfMocks.addImage).toHaveBeenCalledWith('blob:mock-image', 8, 4, 16, 8)
-  })
-
-  it('revokes object URL in cover-fit path', async () => {
-    await convertRuntime({
-      filename: 'photo.jpg',
-      sourceFormat: 'image',
-      targetFormat: 'pdf',
-      buffer: createBuffer('jpg-bytes'),
-      mimeType: 'image/jpeg',
-      options: { imageToPdf: { marginPt: 4, fit: 'cover', pageMode: 'auto' } }
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'cover',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 100
+        }
+      }
     })
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-image')

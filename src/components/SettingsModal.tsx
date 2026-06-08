@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import PdfPageSelectorInline from './PdfPageSelectorInline'
 import type {
   HtmlDecodeOptions,
   HtmlLayoutOptions,
+  ExifCategory,
   SourceFormat,
   TargetFormat
 } from '../lib/converter'
@@ -16,12 +18,18 @@ type ImageTargetOptions = {
   maxHeight?: number
   keepAspectRatio?: boolean
   quality?: number
+  removeExif?: {
+    enabled: boolean
+    categories: ExifCategory[]
+  }
 }
 
 type ImageToPdfOptions = {
   margin?: number
   fit?: 'cover' | 'contain'
   pageMode?: 'auto' | 'single' | 'multi'
+  rotationDeg?: 0 | 90 | 180 | 270
+  scalePercent?: number
 }
 
 type SettingsOptions = {
@@ -43,12 +51,12 @@ type SettingsModalProps = {
   source: SourceFormat
   target: TargetFormat
   fileName: string
+  file: File
   status: 'ready' | 'queued' | 'converting' | 'done' | 'failed'
   options?: SettingsOptions
   readOnly?: boolean
   onCancel: () => void
   onConfirm: (next: SettingsOptions) => void
-  onOpenPdfPageSelector: () => void
 }
 
 type TextControlDraft = {
@@ -86,13 +94,28 @@ type Draft = {
     maxHeight: string
     keepAspectRatio: boolean
     quality: number // Display value 10-100
+    removeExifEnabled: boolean
+    removeExifCategories: ExifCategory[]
   }
   imageToPdf: {
     margin: string
     fit: 'cover' | 'contain'
     pageMode: 'auto' | 'single' | 'multi'
+    rotationDeg: 0 | 90 | 180 | 270
+    scalePercent: string
   }
 }
+
+const EXIF_CATEGORY_OPTIONS = [
+  'all',
+  'geolocation',
+  'camera',
+  'datetime',
+  'software',
+  'authorCopyright'
+] as const satisfies readonly ExifCategory[]
+
+const ROTATION_DEGREE_OPTIONS = [0, 90, 180, 270] as const
 
 const HTML_BACKGROUND_QUALITY_OPTIONS = [
   { value: 0.3, labelKey: 'options.backgroundQualityLow' },
@@ -116,13 +139,36 @@ const DEFAULT_IMAGE_OPTIONS = {
   maxWidth: '',
   maxHeight: '',
   keepAspectRatio: true,
-  quality: 92 // Display value
+  quality: 92, // Display value
+  removeExifEnabled: false,
+  removeExifCategories: [] as ExifCategory[]
 }
 
 const DEFAULT_IMAGE_TO_PDF_OPTIONS = {
   margin: '',
   fit: 'cover' as const,
-  pageMode: 'auto' as const
+  pageMode: 'auto' as const,
+  rotationDeg: 0 as const,
+  scalePercent: '100'
+}
+
+const normalizeExifCategories = (categories: ExifCategory[]): ExifCategory[] =>
+  categories.includes('all') ? ['all'] : [...new Set(categories)]
+
+const getNextExifCategories = (
+  current: ExifCategory[],
+  category: ExifCategory,
+  checked: boolean
+): ExifCategory[] => {
+  if (!checked) {
+    return current.filter(item => item !== category)
+  }
+
+  if (category === 'all') {
+    return ['all']
+  }
+
+  return [...current.filter(item => item !== 'all'), category]
 }
 
 const createTextControlDraft = (
@@ -164,12 +210,20 @@ const createDraft = (options?: SettingsModalProps['options']): Draft => ({
     quality:
       options?.image?.quality !== undefined
         ? Math.round(options.image.quality * 100)
-        : DEFAULT_IMAGE_OPTIONS.quality
+        : DEFAULT_IMAGE_OPTIONS.quality,
+    removeExifEnabled:
+      options?.image?.removeExif?.enabled ?? DEFAULT_IMAGE_OPTIONS.removeExifEnabled,
+    removeExifCategories: normalizeExifCategories(
+      options?.image?.removeExif?.categories ?? DEFAULT_IMAGE_OPTIONS.removeExifCategories
+    )
   },
   imageToPdf: {
     margin: options?.imageToPdf?.margin?.toString() ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.margin,
     fit: options?.imageToPdf?.fit ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.fit,
-    pageMode: options?.imageToPdf?.pageMode ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.pageMode
+    pageMode: options?.imageToPdf?.pageMode ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.pageMode,
+    rotationDeg: options?.imageToPdf?.rotationDeg ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.rotationDeg,
+    scalePercent:
+      options?.imageToPdf?.scalePercent?.toString() ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.scalePercent
   }
 })
 
@@ -177,6 +231,11 @@ const optionalNumber = (value: string): number | undefined => {
   if (value.trim() === '') return undefined
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : undefined
+}
+
+const optionalImageDimension = (value: string): number | undefined => {
+  const parsed = optionalNumber(value)
+  return parsed !== undefined && parsed >= 1 ? Math.floor(parsed) : undefined
 }
 
 const cleanTextControl = (
@@ -220,11 +279,17 @@ const cleanOutput = (draft: Draft): SettingsOptions => {
   output.html = htmlOutput
 
   // Image options
-  const maxWidth = optionalNumber(draft.image.maxWidth)
-  const maxHeight = optionalNumber(draft.image.maxHeight)
+  const maxWidth = optionalImageDimension(draft.image.maxWidth)
+  const maxHeight = optionalImageDimension(draft.image.maxHeight)
   const imageOutput: NonNullable<SettingsOptions['image']> = {
     keepAspectRatio: draft.image.keepAspectRatio,
-    quality: draft.image.quality / 100
+    quality: draft.image.quality / 100,
+    removeExif: {
+      enabled: draft.image.removeExifEnabled,
+      categories: draft.image.removeExifEnabled
+        ? normalizeExifCategories(draft.image.removeExifCategories)
+        : []
+    }
   }
   if (maxWidth !== undefined) imageOutput.maxWidth = maxWidth
   if (maxHeight !== undefined) imageOutput.maxHeight = maxHeight
@@ -232,9 +297,12 @@ const cleanOutput = (draft: Draft): SettingsOptions => {
 
   // Image to PDF options
   const margin = optionalNumber(draft.imageToPdf.margin)
+  const scalePercent = optionalNumber(draft.imageToPdf.scalePercent)
   const imageToPdfOutput: NonNullable<SettingsOptions['imageToPdf']> = {
     fit: draft.imageToPdf.fit,
-    pageMode: draft.imageToPdf.pageMode
+    pageMode: draft.imageToPdf.pageMode,
+    rotationDeg: draft.imageToPdf.rotationDeg,
+    scalePercent: scalePercent ?? 100
   }
   if (margin !== undefined) imageToPdfOutput.margin = margin
   output.imageToPdf = imageToPdfOutput
@@ -280,12 +348,12 @@ export default function SettingsModal({
   source,
   target,
   fileName,
+  file,
   status,
   options,
   readOnly = false,
   onCancel,
-  onConfirm,
-  onOpenPdfPageSelector
+  onConfirm
 }: SettingsModalProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState<Draft>(() => createDraft(options))
@@ -345,6 +413,21 @@ export default function SettingsModal({
     setDraft(prev => ({ ...prev, image: { ...prev.image, [key]: value } }))
   }
 
+  const toggleExifCategory = (category: ExifCategory, checked: boolean) => {
+    setDraft(prev => {
+      const current = prev.image.removeExifCategories
+      const categories = getNextExifCategories(current, category, checked)
+
+      return {
+        ...prev,
+        image: {
+          ...prev.image,
+          removeExifCategories: normalizeExifCategories(categories)
+        }
+      }
+    })
+  }
+
   const updateImageToPdf = <Key extends keyof Draft['imageToPdf']>(
     key: Key,
     value: Draft['imageToPdf'][Key]
@@ -352,11 +435,7 @@ export default function SettingsModal({
     setDraft(prev => ({ ...prev, imageToPdf: { ...prev.imageToPdf, [key]: value } }))
   }
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onCancel()
-    }
-  }
+  const handleOverlayClick = () => onCancel()
 
   const handleConfirm = () => {
     onConfirm(cleanOutput(draft))
@@ -368,19 +447,19 @@ export default function SettingsModal({
   const hasMultipleSections = sections.length > 1
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div
-      className="pdf-modal-overlay"
-      onClick={handleOverlayClick}
-      onKeyDown={e => e.key === 'Escape' && onCancel()}
-    >
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+    <div className="pdf-modal-overlay">
+      <button
+        type="button"
+        className="pdf-modal-overlay__backdrop"
+        aria-hidden="true"
+        tabIndex={-1}
+        onClick={handleOverlayClick}
+      />
       <div
         className="pdf-modal settings-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        onClick={e => e.stopPropagation()}
       >
         <div className="pdf-modal__header">
           <h2 id={titleId}>{readOnly ? t('settingsModal.viewTitle') : t('settingsModal.title')}</h2>
@@ -392,24 +471,12 @@ export default function SettingsModal({
           {/* PDF Pages Section */}
           {sections.includes('pdfPages') && (
             <div className="settings-modal__section">
-              <h3 className="settings-modal__section-title">{t('settingsModal.pdfPagesTitle')}</h3>
-              {draft.pdf.selectedPages !== undefined && (
-                <div className="settings-modal__summary">
-                  {t('options.pdfPages.selectedCount', {
-                    count: draft.pdf.selectedPages.length
-                  })}
-                </div>
-              )}
-              {!readOnly && (
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={onOpenPdfPageSelector}
-                  disabled={readOnly}
-                >
-                  {t('actions.selectPages')}
-                </button>
-              )}
+              <PdfPageSelectorInline
+                file={file}
+                selectedPages={draft.pdf.selectedPages ?? []}
+                readOnly={readOnly}
+                onSelectedPagesChange={pages => updatePdf('selectedPages', pages)}
+              />
             </div>
           )}
 
@@ -706,6 +773,37 @@ export default function SettingsModal({
                 </label>
               )}
 
+              <label className="settings-modal__checkbox settings-modal__field--wide">
+                <input
+                  type="checkbox"
+                  checked={draft.image.removeExifEnabled}
+                  onChange={event => updateImage('removeExifEnabled', event.target.checked)}
+                  disabled={readOnly}
+                />
+                <span>{t('settingsModal.removeExif')}</span>
+              </label>
+
+              <div className="settings-modal__estimate settings-modal__field--wide">
+                {t('settingsModal.removeExifHelp')}
+              </div>
+
+              {draft.image.removeExifEnabled && (
+                <div className="settings-modal__field settings-modal__field--wide">
+                  <span>{t('settingsModal.exifCategories')}</span>
+                  {EXIF_CATEGORY_OPTIONS.map(category => (
+                    <label key={category} className="settings-modal__checkbox">
+                      <input
+                        type="checkbox"
+                        checked={draft.image.removeExifCategories.includes(category)}
+                        onChange={event => toggleExifCategory(category, event.target.checked)}
+                        disabled={readOnly}
+                      />
+                      <span>{t(`settingsModal.exifCategory.${category}`)}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
               <div className="settings-modal__estimate">{t('settingsModal.heuristicEstimate')}</div>
             </div>
           )}
@@ -759,6 +857,45 @@ export default function SettingsModal({
                   <option value="multi">{t('settingsModal.pageModeMulti')}</option>
                 </select>
               </label>
+
+              <label className="settings-modal__field">
+                <span>{t('settingsModal.rotation')}</span>
+                <select
+                  value={String(draft.imageToPdf.rotationDeg)}
+                  onChange={event =>
+                    updateImageToPdf(
+                      'rotationDeg',
+                      Number(event.target.value) as 0 | 90 | 180 | 270
+                    )
+                  }
+                  disabled={readOnly}
+                >
+                  {ROTATION_DEGREE_OPTIONS.map(rotationDeg => (
+                    <option key={rotationDeg} value={String(rotationDeg)}>
+                      {t('settingsModal.rotationDegrees', { degrees: rotationDeg })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="settings-modal__field">
+                <span>{t('settingsModal.scale')}</span>
+                <input
+                  type="number"
+                  min="10"
+                  max="300"
+                  inputMode="numeric"
+                  value={draft.imageToPdf.scalePercent}
+                  onChange={event => updateImageToPdf('scalePercent', event.target.value)}
+                  placeholder="100"
+                  disabled={readOnly}
+                  aria-label={t('settingsModal.scale')}
+                />
+              </label>
+
+              <div className="settings-modal__estimate settings-modal__field--wide">
+                {t('settingsModal.imageToPdfTransformHelp')}
+              </div>
             </div>
           )}
         </div>

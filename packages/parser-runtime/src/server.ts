@@ -113,6 +113,19 @@ const isArrayBuffer = (value: unknown): value is ArrayBuffer => value instanceof
 const isNumberArray = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every(item => typeof item === 'number')
 
+const EXIF_CATEGORIES = [
+  'all',
+  'geolocation',
+  'camera',
+  'datetime',
+  'software',
+  'authorCopyright'
+] as const satisfies readonly ExifCategory[]
+
+const ROTATION_DEGREES = [
+  0, 90, 180, 270
+] as const satisfies readonly ImageToPdfOptions['rotationDeg'][]
+
 const isSourceFormat = (value: string): value is SourceFormat =>
   ['pdf', 'txt', 'image', 'html'].includes(value)
 
@@ -174,6 +187,86 @@ const readNestedRecord = (
   return isRecord(value) ? value : undefined
 }
 
+const clampNumber = (value: unknown, fallback: number, min: number, max: number): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.min(Math.max(value, min), max)
+}
+
+const normalizeImageDimension = (value: unknown): number | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) {
+    return undefined
+  }
+
+  return Math.floor(value)
+}
+
+const normalizeRotationDeg = (value: unknown): ImageToPdfOptions['rotationDeg'] =>
+  ROTATION_DEGREES.includes(value as ImageToPdfOptions['rotationDeg'])
+    ? (value as ImageToPdfOptions['rotationDeg'])
+    : 0
+
+const normalizeExifCategories = (value: unknown): ExifCategory[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const categories = value.filter((item): item is ExifCategory =>
+    EXIF_CATEGORIES.includes(item as ExifCategory)
+  )
+  const uniqueCategories = [...new Set(categories)]
+  return uniqueCategories.includes('all') ? ['all'] : uniqueCategories
+}
+
+const normalizeImageOptions = (value?: Record<string, unknown>): ImageOptions | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  const removeExif = readNestedRecord(value, 'removeExif')
+
+  return {
+    quality: clampNumber(value.quality, 0.92, 0.1, 1),
+    maxWidth: normalizeImageDimension(value.maxWidth),
+    maxHeight: normalizeImageDimension(value.maxHeight),
+    keepAspectRatio: typeof value.keepAspectRatio === 'boolean' ? value.keepAspectRatio : true,
+    removeExif: {
+      enabled: typeof removeExif?.enabled === 'boolean' ? removeExif.enabled : false,
+      categories: normalizeExifCategories(removeExif?.categories)
+    }
+  }
+}
+
+const normalizeImageToPdfOptions = (
+  value?: Record<string, unknown>
+): ImageToPdfOptions | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  // 验证 fit：只允许 'cover' 或 'contain'，默认 'cover'
+  const validFits: ImageToPdfOptions['fit'][] = ['cover', 'contain']
+  const fit = validFits.includes(value.fit as ImageToPdfOptions['fit'])
+    ? (value.fit as ImageToPdfOptions['fit'])
+    : 'cover'
+
+  // 验证 pageMode：只允许 'auto'、'single'、'multi'，默认 'auto'
+  const validPageModes: ImageToPdfOptions['pageMode'][] = ['auto', 'single', 'multi']
+  const pageMode = validPageModes.includes(value.pageMode as ImageToPdfOptions['pageMode'])
+    ? (value.pageMode as ImageToPdfOptions['pageMode'])
+    : 'auto'
+
+  return {
+    marginPt: typeof value.marginPt === 'number' ? value.marginPt : 24,
+    fit,
+    pageMode,
+    rotationDeg: normalizeRotationDeg(value.rotationDeg),
+    scalePercent: clampNumber(value.scalePercent, 100, 10, 300)
+  }
+}
+
 const normalizeConversionOptions = (
   options?: Record<string, unknown>
 ): ConversionOptions | undefined => {
@@ -184,6 +277,8 @@ const normalizeConversionOptions = (
   const pdf = readNestedRecord(options, 'pdf')
   const decode = readNestedRecord(options, 'decode')
   const layout = readNestedRecord(options, 'layout')
+  const image = readNestedRecord(options, 'image')
+  const imageToPdf = readNestedRecord(options, 'imageToPdf')
   const normalized: ConversionOptions = {}
 
   if (pdf) {
@@ -200,6 +295,16 @@ const normalizeConversionOptions = (
 
   if (layout) {
     normalized.layout = layout as ConversionOptions['layout']
+  }
+
+  const normalizedImage = normalizeImageOptions(image)
+  if (normalizedImage) {
+    normalized.image = normalizedImage
+  }
+
+  const normalizedImageToPdf = normalizeImageToPdfOptions(imageToPdf)
+  if (normalizedImageToPdf) {
+    normalized.imageToPdf = normalizedImageToPdf
   }
 
   return normalized
@@ -509,6 +614,9 @@ import {
   convertRuntime,
   type ConversionOptions,
   type ConversionResult,
+  type ExifCategory,
+  type ImageOptions,
+  type ImageToPdfOptions,
   type SourceFormat,
   type TargetFormat
 } from './conversion'

@@ -559,7 +559,7 @@ test.describe('converter app', () => {
     ])
   })
 
-  test('opens image to PDF settings, edits margin, converts, and previews result', async ({
+  test('opens image to PDF settings, edits transform settings, converts, and previews result', async ({
     page
   }) => {
     await page.locator(dropzoneFileInput).setInputFiles(validPngPayload())
@@ -574,11 +574,15 @@ test.describe('converter app', () => {
     await expect(settingsDialog).toContainText('Image to PDF Options')
 
     await settingsDialog.getByLabel('Margin (pt)').fill('12')
+    await settingsDialog.getByLabel('Rotation').selectOption('90')
+    await settingsDialog.getByLabel('Scale (%)').fill('150')
     await settingsDialog.getByRole('button', { name: 'Done' }).click()
     await expect(settingsDialog).toBeHidden()
 
     await settingsButton.click()
     await expect(settingsDialog.getByLabel('Margin (pt)')).toHaveValue('12')
+    await expect(settingsDialog.getByLabel('Rotation')).toHaveValue('90')
+    await expect(settingsDialog.getByLabel('Scale (%)')).toHaveValue('150')
     await settingsDialog.getByRole('button', { name: 'Done' }).click()
 
     await page.getByRole('button', { name: 'Convert all' }).click()
@@ -765,35 +769,45 @@ test.describe('converter app', () => {
     await expect.poll(async () => downloadNames(page)).toEqual(['photo.webp'])
   })
 
-  test('selects PDF pages and converts to exact output count in zh-CN', async ({ page }) => {
-    await page.locator('.nav__select').selectOption('zh-CN')
+  test('selects PDF pages inline from Settings and converts to exact output count', async ({
+    page
+  }) => {
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
 
     await targetSelectForRow(page, 'sample.pdf').selectOption('png')
 
-    await page.getByRole('button', { name: '选择页数' }).click()
-    await expect(page.locator('.pdf-modal')).toBeVisible()
-
-    await page.getByRole('button', { name: '取消全选' }).click()
-
-    const pageCards = page.locator('.pdf-modal__card')
-    await expect(pageCards).toHaveCount(2)
-    await pageCards.nth(0).click()
-
-    await page.getByRole('button', { name: '完成' }).click()
-    await expect(page.locator('.pdf-modal')).toBeHidden()
-
     const pdfRow = rowForFile(page, 'sample.pdf')
-    await expect(pdfRow).toContainText('已选择 1 页')
+    await pdfRow.getByRole('button', { name: 'Settings' }).click()
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+    await expect(settingsDialog).toBeVisible()
+    await expect(settingsDialog.locator('.pdf-page-selector-inline__sticky-header')).toContainText(
+      'PDF Pages'
+    )
 
-    await page.getByRole('button', { name: '全部转换' }).click()
+    await settingsDialog.getByRole('button', { name: 'Select all' }).click()
+    await expect(settingsDialog).toContainText('2 pages selected')
 
-    await expect(pdfRow.locator('.status')).toContainText('完成', {
+    const pageCards = settingsDialog.locator('.pdf-modal__card')
+    await expect(pageCards).toHaveCount(2)
+    await settingsDialog.getByRole('button', { name: 'Page 2' }).click()
+    await expect(settingsDialog).toContainText('1 page selected')
+
+    await settingsDialog.getByRole('button', { name: 'Collapse' }).click()
+    await expect(settingsDialog.getByRole('button', { name: 'Page 1' })).toBeHidden()
+    await settingsDialog.getByRole('button', { name: 'Expand' }).click()
+    await expect(settingsDialog.getByRole('button', { name: 'Page 1' })).toBeVisible()
+
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    await expect(pdfRow.locator('.status')).toContainText('Done', {
       timeout: 15000
     })
-    await expect(pdfRow.locator('.status')).toContainText('1 个输出')
+    await expect(pdfRow.locator('.status')).toContainText('1 output')
 
-    await pdfRow.getByRole('button', { name: '下载' }).click()
+    await pdfRow.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['sample-page-001.png'])
   })
 

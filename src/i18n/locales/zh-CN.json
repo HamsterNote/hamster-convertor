@@ -160,7 +160,22 @@
     "pageModeMulti": "多页",
     "estimate": "估算",
     "reset": "重置",
-    "heuristicEstimate": "启发式估算：实际输出大小可能因内容而异"
+    "heuristicEstimate": "启发式估算：实际输出大小可能因内容而异",
+    "removeExif": "移除 EXIF 元数据",
+    "removeExifHelp": "选择要从图片输出中移除的元数据分组。",
+    "exifCategories": "EXIF 分类",
+    "exifCategory": {
+      "all": "全部元数据",
+      "geolocation": "地理位置",
+      "camera": "相机与镜头",
+      "datetime": "日期与时间",
+      "software": "软件信息",
+      "authorCopyright": "作者与版权"
+    },
+    "rotation": "旋转",
+    "rotationDegrees": "{{degrees}}°",
+    "scale": "缩放 (%)",
+    "imageToPdfTransformHelp": "旋转仅支持直角；缩放范围为 10% 到 300%。"
   },
   "confirmations": {
     "title": "请确认",

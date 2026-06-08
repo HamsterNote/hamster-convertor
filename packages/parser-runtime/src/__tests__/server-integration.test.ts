@@ -129,6 +129,42 @@ const createConvertRequest = (requestId: string) => ({
   buffer: new ArrayBuffer(8)
 })
 
+const createImageConvertRequest = (requestId: string) => ({
+  requestId,
+  type: 'convert' as const,
+  filename: `${requestId}.jpg`,
+  sourceFormat: 'image',
+  targetFormat: 'png',
+  buffer: new ArrayBuffer(8),
+  options: {
+    image: {
+      quality: 0.9,
+      maxWidth: 200.8,
+      maxHeight: 120,
+      keepAspectRatio: true
+    }
+  }
+})
+
+const createImageToPdfRequest = (requestId: string, overrides?: Record<string, unknown>) => ({
+  requestId,
+  type: 'convert' as const,
+  filename: `${requestId}.jpg`,
+  sourceFormat: 'image',
+  targetFormat: 'pdf',
+  buffer: new ArrayBuffer(8),
+  options: {
+    imageToPdf: {
+      marginPt: 24,
+      fit: 'contain',
+      pageMode: 'single',
+      rotationDeg: 0,
+      scalePercent: 100,
+      ...overrides
+    }
+  }
+})
+
 const createCancelRequest = (requestId: string) => ({
   requestId,
   type: 'cancel' as const
@@ -252,6 +288,82 @@ describe('ProtocolServer integration', () => {
     )
     const percents = progressMsgs.map(r => r.progress?.percent)
     expect(percents).toEqual([0, 15, 35, 55, 75, 90, 100])
+  })
+
+  it('normalizes image max dimensions before runtime conversion', async () => {
+    port.dispatch(createImageConvertRequest('image-options'))
+
+    await waitFor(() => getResultIds(port).includes('image-options'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceFormat: 'image',
+        targetFormat: 'png',
+        options: expect.objectContaining({
+          image: expect.objectContaining({
+            quality: 0.9,
+            maxWidth: 200,
+            maxHeight: 120,
+            keepAspectRatio: true
+          })
+        })
+      })
+    )
+  })
+
+  it('propagates user-provided fit and pageMode for image-to-PDF', async () => {
+    port.dispatch(createImageToPdfRequest('img2pdf-options'))
+
+    await waitFor(() => getResultIds(port).includes('img2pdf-options'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceFormat: 'image',
+        targetFormat: 'pdf',
+        options: expect.objectContaining({
+          imageToPdf: expect.objectContaining({
+            fit: 'contain',
+            pageMode: 'single'
+          })
+        })
+      })
+    )
+  })
+
+  it('defaults fit to cover and pageMode to auto for invalid values', async () => {
+    port.dispatch(createImageToPdfRequest('img2pdf-invalid', { fit: 'stretch', pageMode: 'tiled' }))
+
+    await waitFor(() => getResultIds(port).includes('img2pdf-invalid'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          imageToPdf: expect.objectContaining({
+            fit: 'cover',
+            pageMode: 'auto'
+          })
+        })
+      })
+    )
+  })
+
+  it('defaults fit to cover and pageMode to auto when missing', async () => {
+    port.dispatch(
+      createImageToPdfRequest('img2pdf-missing', { fit: undefined, pageMode: undefined })
+    )
+
+    await waitFor(() => getResultIds(port).includes('img2pdf-missing'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          imageToPdf: expect.objectContaining({
+            fit: 'cover',
+            pageMode: 'auto'
+          })
+        })
+      })
+    )
   })
 
   // =========================================================================
