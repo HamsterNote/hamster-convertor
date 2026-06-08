@@ -580,14 +580,14 @@ function App() {
                       isRunningStatus(it.status) ||
                       isPreparingDownload
                     return (
-                      <tr key={it.id}>
-                        <td>
+                      <tr key={it.id} className="file-table__row">
+                        <td className="file-table__cell file-table__cell--name">
                           <span className="file-table__filename" title={it.file.name}>
                             {truncateMiddle(it.file.name)}
                           </span>
                         </td>
-                        <td>{it.source}</td>
-                        <td>
+                        <td className="file-table__cell file-table__cell--source">{it.source}</td>
+                        <td className="file-table__cell file-table__cell--target">
                           <div className="file-table__target-controls">
                             <select
                               className="file-table select"
@@ -603,7 +603,9 @@ function App() {
                             </select>
                           </div>
                         </td>
-                        <td className={`status status--${it.status}`}>
+                        <td
+                          className={`file-table__cell file-table__cell--status status status--${it.status}`}
+                        >
                           {t(`status.${it.status}` as const)}
                           {it.status === 'failed' && it.errorMessage && (
                             <div className="status__detail status__detail--error">
@@ -625,7 +627,7 @@ function App() {
                             </div>
                           )}
                         </td>
-                        <td>
+                        <td className="file-table__cell file-table__cell--actions">
                           <div className="row-actions">
                             {it.status === 'done' && (
                               <>

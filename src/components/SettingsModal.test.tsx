@@ -67,8 +67,9 @@ describe('SettingsModal', () => {
     // Select all / deselect all controls
     expect(screen.getByRole('button', { name: 'Select all' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Deselect all' })).toBeInTheDocument()
-    // Collapse button
-    expect(screen.getByRole('button', { name: /collapse|expand/i })).toBeInTheDocument()
+    // Collapse button (PDF page selector has its own collapse button)
+    const collapseButtons = screen.getAllByRole('button', { name: /collapse|expand/i })
+    expect(collapseButtons.length).toBeGreaterThan(0)
   })
 
   it('renders PDF OCR section when source is pdf and target is pdf', () => {
@@ -144,13 +145,19 @@ describe('SettingsModal', () => {
 
   it('collapses and expands inline PDF selector', () => {
     render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
-    const collapseBtn = screen.getByRole('button', { name: 'Collapse' })
-    fireEvent.click(collapseBtn)
-    // When collapsed, page cards should not be visible
+    const collapseButtons = screen.getAllByRole('button', { name: 'Collapse' })
+    const pdfCollapseBtn = collapseButtons.find(btn =>
+      btn.classList.contains('pdf-page-selector-inline__collapse-btn')
+    )
+    expect(pdfCollapseBtn).toBeDefined()
+    fireEvent.click(pdfCollapseBtn!)
     expect(screen.queryByRole('button', { name: 'Page 1' })).not.toBeInTheDocument()
-    const expandBtn = screen.getByRole('button', { name: 'Expand' })
-    fireEvent.click(expandBtn)
-    // When expanded, page cards should be visible again
+    const expandButtons = screen.getAllByRole('button', { name: 'Expand' })
+    const pdfExpandBtn = expandButtons.find(btn =>
+      btn.classList.contains('pdf-page-selector-inline__collapse-btn')
+    )
+    expect(pdfExpandBtn).toBeDefined()
+    fireEvent.click(pdfExpandBtn!)
     expect(screen.getByRole('button', { name: 'Page 1' })).toBeInTheDocument()
   })
 
@@ -332,6 +339,24 @@ describe('SettingsModal', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('collapses and expands HTML Options section by clicking the section header row', () => {
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    expect(screen.getByText('Background options')).toBeInTheDocument()
+
+    // Click the header div itself, NOT the inner collapse button
+    const sectionHeaders = document.querySelectorAll('.settings-modal__section-header')
+    const htmlOptionsHeader = Array.from(sectionHeaders).find(header =>
+      header.textContent?.includes('HTML Options')
+    )
+    expect(htmlOptionsHeader).toBeDefined()
+
+    fireEvent.click(htmlOptionsHeader!)
+    expect(screen.queryByText('Background options')).not.toBeInTheDocument()
+
+    fireEvent.click(htmlOptionsHeader!)
+    expect(screen.getByText('Background options')).toBeInTheDocument()
   })
 
   it('shows selected pages count in inline selector header', () => {

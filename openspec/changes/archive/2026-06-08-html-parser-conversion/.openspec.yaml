@@ -3,22 +3,22 @@ schema: spec-driven
 # 元数据
 metadata:
   id: html-parser-conversion
-  created: "2026-06-08"
+  created: '2026-06-08'
   author: system
-  version: "1.0"
+  version: '1.0'
   status: archived
 
 # 来源信息
 source:
   type: sisyphus_migration
   path: .sisyphus/plans/add-html-parser.md
-  description: "将 .sisyphus 计划文件迁移到 OpenSpec 格式"
+  description: '将 .sisyphus 计划文件迁移到 OpenSpec 格式'
 
 # 变更描述
 change:
-  summary: "集成 @hamster-note/html-parser，支持 PDF/HTML/TXT 多格式转换"
-  motivation: "扩展文档转换器功能，支持更多格式间的相互转换"
-  impact: "medium"
+  summary: '集成 @hamster-note/html-parser，支持 PDF/HTML/TXT 多格式转换'
+  motivation: '扩展文档转换器功能，支持更多格式间的相互转换'
+  impact: 'medium'
 
 # 迁移时间戳
-migrated_at: "2026-06-08T00:00:00Z"
+migrated_at: '2026-06-08T00:00:00Z'

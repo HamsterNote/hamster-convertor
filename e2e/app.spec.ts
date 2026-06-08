@@ -880,4 +880,24 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: 'Remove' }).click()
     await expect(page.locator('.file-table')).toBeHidden()
   })
+
+  test('shows cell layout instead of table on mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+
+    const cardList = page.locator('.file-card-list')
+    await expect(cardList).toBeVisible()
+
+    const card = cardList.locator('.file-card').filter({ hasText: 'sample.pdf' })
+    await expect(card).toBeVisible()
+
+    await expect(card.locator('.file-card__filename')).toContainText('sample.pdf')
+    await expect(card.locator('.file-card__meta')).toContainText('pdf')
+
+    const actions = card.locator('.file-card__actions')
+    await expect(actions.getByRole('button', { name: 'Settings' })).toBeVisible()
+    await expect(actions.getByRole('button', { name: 'Remove' })).toBeVisible()
+
+    await expect(page.locator('table.file-table')).toBeHidden()
+  })
 })

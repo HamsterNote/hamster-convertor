@@ -5,6 +5,7 @@
 ### 原始需求
 
 接入 `@hamster-note/html-parser`，支持以下转换路径：
+
 - **PDF → HTML**：将 PDF 文档转换为 HTML 格式
 - **TXT → HTML**：将纯文本转换为 HTML 格式
 - **HTML → TXT**：将 HTML 文档提取为纯文本

@@ -18,6 +18,7 @@
 - [x] 1.8 保持 `convertFile()` 作为通用适配器查找
 
 **验收标准**:
+
 - [x] `getSupportedTargets('pdf')` 通过适配器映射表包含 `html`
 - [x] `getSupportedTargets('txt')` 包含 `html`
 - [x] `getSupportedTargets('html')` 返回 `['txt']`
@@ -38,6 +39,7 @@
 - [x] 2.5 在 `src/i18n/locales/zh-TW.json` 中添加 `formats.targets.html`
 
 **验收标准**:
+
 - [x] `.html` 上传被接受为源格式 `html`
 - [x] `.htm` 上传被接受为源格式 `html`
 - [x] HTML 在所有三种语言中作为目标标签显示
@@ -55,6 +57,7 @@
 - [x] 3.5 扩展 `src/test/fixtures.ts` 添加 `loadHtmlFixture()`
 
 **验收标准**:
+
 - [x] 测试可以构建确定性的模拟 HTML 解析器输出
 - [x] `loadHtmlFixture()` 返回浏览器兼容的 `File`
 - [x] 夹具包含嵌套可见文本和 HTML 敏感字符
@@ -74,6 +77,7 @@
 - [x] 4.5 使用 `normalizeHtml()` 进行 HTML 输出比较
 
 **验收标准**:
+
 - [x] `yarn vitest run src/__tests__/converter.contract.test.ts src/__tests__/converter.txt-adapter.test.ts src/__tests__/convert.integration.test.ts` 通过
 - [x] 测试断言 `pdf -> html`、`txt -> html`、`html -> txt` 的目标支持
 - [x] 测试断言 HTML 敏感 TXT 输入不会变成可执行的原始标记
@@ -92,6 +96,7 @@
 - [x] 5.5 验证下载扩展名和 MIME 类型
 
 **验收标准**:
+
 - [x] `yarn playwright test e2e/app.spec.ts --project=chromium` 通过
 - [x] 端到端验证 PDF → HTML 转换达到成功状态
 - [x] 端到端验证 TXT → HTML 转换产生 `.html` 输出
@@ -114,6 +119,7 @@
 - [x] 6.7 捕获命令输出作为证据
 
 **验收标准**:
+
 - [x] `yarn vitest run src/__tests__/converter.contract.test.ts src/__tests__/converter.txt-adapter.test.ts src/__tests__/convert.integration.test.ts` 通过
 - [x] `yarn test:run` 通过或记录无关的预先存在失败
 - [x] `yarn playwright test e2e/app.spec.ts --project=chromium` 通过
