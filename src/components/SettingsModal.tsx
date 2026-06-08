@@ -340,6 +340,22 @@ function getSettingsSections(
   return sections
 }
 
+const SECTION_ID_MAP: Record<SettingsSection, string> = {
+  pdfPages: 'settings-section-pdf-pages',
+  pdfOcr: 'settings-section-pdf-ocr',
+  htmlOptions: 'settings-section-html-options',
+  imageTarget: 'settings-section-image-target',
+  imageToPdf: 'settings-section-image-to-pdf'
+}
+
+const SECTION_TITLE_KEY_MAP: Record<SettingsSection, string> = {
+  pdfPages: 'settingsModal.pdfPagesTitle',
+  pdfOcr: 'settingsModal.pdfOcrTitle',
+  htmlOptions: 'settingsModal.htmlOptionsTitle',
+  imageTarget: 'settingsModal.imageOptionsTitle',
+  imageToPdf: 'settingsModal.imageToPdfTitle'
+}
+
 export type { SettingsModalProps, SettingsOptions, SettingsSection }
 export { getSettingsSections }
 
@@ -458,7 +474,6 @@ export default function SettingsModal({
   if (!open || sections.length === 0) return null
 
   const titleId = 'settings-modal-title'
-  const hasMultipleSections = sections.length > 1
 
   return (
     <div className="pdf-modal-overlay">
@@ -479,505 +494,522 @@ export default function SettingsModal({
           <h2 id={titleId}>{readOnly ? t('settingsModal.viewTitle') : t('settingsModal.title')}</h2>
         </div>
 
-        <div
-          className={`settings-modal__body ${hasMultipleSections ? 'settings-modal__body--columns' : ''}`}
-        >
-          {/* PDF Pages Section */}
-          {sections.includes('pdfPages') && (
-            <div className="settings-modal__section">
-              <PdfPageSelectorInline
-                file={file}
-                selectedPages={draft.pdf.selectedPages ?? []}
-                readOnly={readOnly}
-                onSelectedPagesChange={pages => updatePdf('selectedPages', pages)}
-              />
-            </div>
-          )}
-
-          {/* PDF OCR Section */}
-          {sections.includes('pdfOcr') && (
-            <div className="settings-modal__section">
+        <div className="settings-modal__layout">
+          <nav className="settings-modal__nav">
+            {sections.map(section => (
               <button
+                key={section}
                 type="button"
-                className="settings-modal__section-header"
-                onClick={() => toggleSection('pdfOcr')}
-                aria-expanded={!collapsedSections.pdfOcr}
-                aria-label={collapsedSections.pdfOcr ? 'Expand' : 'Collapse'}
+                className="settings-modal__nav-button"
+                aria-controls={SECTION_ID_MAP[section]}
+                onClick={() => {
+                  const el = document.getElementById(SECTION_ID_MAP[section])
+                  el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                }}
               >
-                <span className="settings-modal__collapse-btn" aria-hidden="true">
-                  {collapsedSections.pdfOcr ? '▶' : '▼'}
-                </span>
-                <span className="settings-modal__section-title">
-                  {t('settingsModal.pdfOcrTitle')}
-                </span>
+                {t(SECTION_TITLE_KEY_MAP[section])}
               </button>
-              {!collapsedSections.pdfOcr && (
-                <div className="settings-modal__section-content">
-                  <label className="settings-modal__checkbox">
-                    <input
-                      type="checkbox"
-                      checked={draft.pdf.ocr}
-                      onChange={event => updatePdf('ocr', event.target.checked)}
-                      disabled={readOnly}
-                    />
-                    <span>{t('options.ocr')}</span>
-                  </label>
-                </div>
-              )}
-            </div>
-          )}
+            ))}
+          </nav>
 
-          {/* HTML Options Section */}
-          {sections.includes('htmlOptions') && (
-            <div className="settings-modal__section">
-              <button
-                type="button"
-                className="settings-modal__section-header"
-                onClick={() => toggleSection('htmlOptions')}
-                aria-expanded={!collapsedSections.htmlOptions}
-                aria-label={collapsedSections.htmlOptions ? 'Expand' : 'Collapse'}
-              >
-                <span className="settings-modal__collapse-btn" aria-hidden="true">
-                  {collapsedSections.htmlOptions ? '▶' : '▼'}
-                </span>
-                <span className="settings-modal__section-title">
-                  {t('settingsModal.htmlOptionsTitle')}
-                </span>
-              </button>
-              {!collapsedSections.htmlOptions && (
-                <div className="settings-modal__section-content">
-                  {/* Background */}
-                  <h4 className="settings-modal__subsection-title">
-                    {t('htmlOptionsModal.backgroundSection')}
-                  </h4>
-                  <label className="settings-modal__checkbox settings-modal__field--wide">
-                    <input
-                      type="checkbox"
-                      checked={draft.background.includeBackground}
-                      onChange={event =>
-                        updateBackground('includeBackground', event.target.checked)
-                      }
-                      disabled={readOnly}
-                    />
-                    <span>{t('options.includeBackground')}</span>
-                  </label>
+          <div className="settings-modal__body">
+            {/* PDF Pages Section */}
+            {sections.includes('pdfPages') && (
+              <div id={SECTION_ID_MAP['pdfPages']} className="settings-modal__section">
+                <PdfPageSelectorInline
+                  file={file}
+                  selectedPages={draft.pdf.selectedPages ?? []}
+                  readOnly={readOnly}
+                  onSelectedPagesChange={pages => updatePdf('selectedPages', pages)}
+                />
+              </div>
+            )}
 
-                  <label className="settings-modal__field settings-modal__field--wide">
-                    <span>{t('options.backgroundQuality')}</span>
-                    <select
-                      value={String(draft.background.backgroundQuality)}
-                      onChange={event =>
-                        updateBackground('backgroundQuality', Number(event.target.value))
-                      }
-                      disabled={readOnly}
-                      aria-label={t('options.backgroundQuality')}
-                    >
-                      {HTML_BACKGROUND_QUALITY_OPTIONS.map(option => (
-                        <option key={option.value} value={String(option.value)}>
-                          {t(option.labelKey)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="settings-modal__checkbox settings-modal__field--wide">
-                    <input
-                      type="checkbox"
-                      checked={draft.background.excludeTextFromBackground}
-                      onChange={event =>
-                        updateBackground('excludeTextFromBackground', event.target.checked)
-                      }
-                      disabled={readOnly}
-                    />
-                    <span>{t('options.excludeTextFromBackground')}</span>
-                  </label>
-
-                  {/* Text Controls */}
-                  <h4 className="settings-modal__subsection-title">
-                    {t('htmlOptionsModal.textControlSection')}
-                  </h4>
-                  <label className="settings-modal__field">
-                    <span>{t('options.fontSize')}</span>
-                    <input
-                      type="number"
-                      min="1"
-                      inputMode="decimal"
-                      value={draft.textControl.fontSize}
-                      onChange={event => updateTextControl('fontSize', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                    />
-                  </label>
-
-                  <label className="settings-modal__field">
-                    <span>{t('options.lineHeight')}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      inputMode="decimal"
-                      value={draft.textControl.lineHeight}
-                      onChange={event => updateTextControl('lineHeight', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                    />
-                  </label>
-
-                  <label className="settings-modal__field">
-                    <span>{t('options.fontWeight')}</span>
-                    <input
-                      type="number"
-                      min="100"
-                      max="900"
-                      step="100"
-                      inputMode="numeric"
-                      value={draft.textControl.fontWeight}
-                      onChange={event => updateTextControl('fontWeight', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                    />
-                  </label>
-
-                  <label className="settings-modal__field">
-                    <span>{t('options.color')}</span>
-                    <input
-                      type="text"
-                      value={draft.textControl.color}
-                      onChange={event => updateTextControl('color', event.target.value)}
-                      placeholder="#2d1f00"
-                      disabled={readOnly}
-                    />
-                  </label>
-
-                  <label className="settings-modal__field settings-modal__field--wide">
-                    <span>{t('options.fontFamily')}</span>
-                    <input
-                      type="text"
-                      value={draft.textControl.fontFamily}
-                      onChange={event => updateTextControl('fontFamily', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                    />
-                  </label>
-
-                  <label className="settings-modal__field">
-                    <span>{t('options.vertical')}</span>
-                    <select
-                      value={draft.textControl.vertical}
-                      onChange={event => updateTextControl('vertical', event.target.value)}
-                      disabled={readOnly}
-                    >
-                      <option value="">{t('options.defaultValue')}</option>
-                      <option value="horizontal-tb">horizontal-tb</option>
-                      <option value="vertical-rl">vertical-rl</option>
-                      <option value="vertical-lr">vertical-lr</option>
-                    </select>
-                  </label>
-
-                  <label className="settings-modal__field">
-                    <span>{t('options.dir')}</span>
-                    <select
-                      value={draft.textControl.dir}
-                      onChange={event => updateTextControl('dir', event.target.value)}
-                      disabled={readOnly}
-                    >
-                      <option value="">{t('options.defaultValue')}</option>
-                      <option value="ltr">ltr</option>
-                      <option value="rtl">rtl</option>
-                      <option value="auto">auto</option>
-                    </select>
-                  </label>
-
-                  <label className="settings-modal__checkbox settings-modal__field--wide">
-                    <input
-                      type="checkbox"
-                      checked={draft.textControl.italic}
-                      onChange={event => updateTextControl('italic', event.target.checked)}
-                      disabled={readOnly}
-                    />
-                    <span>{t('options.italic')}</span>
-                  </label>
-
-                  {/* Layout */}
-                  <h4 className="settings-modal__subsection-title">
-                    {t('htmlOptionsModal.layoutSection')}
-                  </h4>
-                  <div className="settings-modal__field settings-modal__field--wide">
+            {/* PDF OCR Section */}
+            {sections.includes('pdfOcr') && (
+              <div id={SECTION_ID_MAP['pdfOcr']} className="settings-modal__section">
+                <button
+                  type="button"
+                  className="settings-modal__section-header"
+                  onClick={() => toggleSection('pdfOcr')}
+                  aria-expanded={!collapsedSections.pdfOcr}
+                  aria-label={collapsedSections.pdfOcr ? 'Expand' : 'Collapse'}
+                >
+                  <span className="settings-modal__collapse-btn" aria-hidden="true">
+                    {collapsedSections.pdfOcr ? '▶' : '▼'}
+                  </span>
+                  <span className="settings-modal__section-title">
+                    {t('settingsModal.pdfOcrTitle')}
+                  </span>
+                </button>
+                {!collapsedSections.pdfOcr && (
+                  <div className="settings-modal__section-content">
                     <label className="settings-modal__checkbox">
                       <input
-                        type="radio"
-                        name="html-layout-mode"
-                        checked={draft.layout.mode === 'paginated'}
-                        onChange={() => updateLayout('mode', 'paginated')}
+                        type="checkbox"
+                        checked={draft.pdf.ocr}
+                        onChange={event => updatePdf('ocr', event.target.checked)}
                         disabled={readOnly}
                       />
-                      <span>{t('options.paginated')}</span>
-                    </label>
-                    <label className="settings-modal__checkbox">
-                      <input
-                        type="radio"
-                        name="html-layout-mode"
-                        checked={draft.layout.mode === 'continuous'}
-                        onChange={() => updateLayout('mode', 'continuous')}
-                        disabled={readOnly}
-                      />
-                      <span>{t('options.continuous')}</span>
+                      <span>{t('options.ocr')}</span>
                     </label>
                   </div>
+                )}
+              </div>
+            )}
 
-                  {draft.layout.mode === 'continuous' && (
-                    <>
-                      <h4 className="settings-modal__subsection-title">
-                        {t('htmlOptionsModal.widthSection')}
-                      </h4>
-                      <div className="settings-modal__field settings-modal__field--wide">
-                        <label className="settings-modal__checkbox">
-                          <input
-                            type="radio"
-                            name="html-width-mode"
-                            checked={draft.layout.widthMode === 'actual'}
-                            onChange={() => updateLayout('widthMode', 'actual')}
-                            disabled={readOnly}
-                          />
-                          <span>{t('options.actualWidth')}</span>
-                        </label>
-                        <label className="settings-modal__checkbox">
-                          <input
-                            type="radio"
-                            name="html-width-mode"
-                            checked={draft.layout.widthMode === 'fit'}
-                            onChange={() => updateLayout('widthMode', 'fit')}
-                            disabled={readOnly}
-                          />
-                          <span>{t('options.fitWidth')}</span>
-                        </label>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            {/* HTML Options Section */}
+            {sections.includes('htmlOptions') && (
+              <div id={SECTION_ID_MAP['htmlOptions']} className="settings-modal__section">
+                <button
+                  type="button"
+                  className="settings-modal__section-header"
+                  onClick={() => toggleSection('htmlOptions')}
+                  aria-expanded={!collapsedSections.htmlOptions}
+                  aria-label={collapsedSections.htmlOptions ? 'Expand' : 'Collapse'}
+                >
+                  <span className="settings-modal__collapse-btn" aria-hidden="true">
+                    {collapsedSections.htmlOptions ? '▶' : '▼'}
+                  </span>
+                  <span className="settings-modal__section-title">
+                    {t('settingsModal.htmlOptionsTitle')}
+                  </span>
+                </button>
+                {!collapsedSections.htmlOptions && (
+                  <div className="settings-modal__section-content">
+                    {/* Background */}
+                    <h4 className="settings-modal__subsection-title">
+                      {t('htmlOptionsModal.backgroundSection')}
+                    </h4>
+                    <label className="settings-modal__checkbox settings-modal__field--wide">
+                      <input
+                        type="checkbox"
+                        checked={draft.background.includeBackground}
+                        onChange={event =>
+                          updateBackground('includeBackground', event.target.checked)
+                        }
+                        disabled={readOnly}
+                      />
+                      <span>{t('options.includeBackground')}</span>
+                    </label>
 
-          {/* Image Target Options Section */}
-          {sections.includes('imageTarget') && (
-            <div className="settings-modal__section">
-              <button
-                type="button"
-                className="settings-modal__section-header"
-                onClick={() => toggleSection('imageTarget')}
-                aria-expanded={!collapsedSections.imageTarget}
-                aria-label={collapsedSections.imageTarget ? 'Expand' : 'Collapse'}
-              >
-                <span className="settings-modal__collapse-btn" aria-hidden="true">
-                  {collapsedSections.imageTarget ? '▶' : '▼'}
-                </span>
-                <span className="settings-modal__section-title">
-                  {t('settingsModal.imageOptionsTitle')}
-                </span>
-              </button>
-              {!collapsedSections.imageTarget && (
-                <div className="settings-modal__section-content">
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.maxWidth')}</span>
-                    <input
-                      type="number"
-                      min="1"
-                      inputMode="numeric"
-                      value={draft.image.maxWidth}
-                      onChange={event => updateImage('maxWidth', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                      aria-label={t('settingsModal.maxWidth')}
-                    />
-                  </label>
-
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.maxHeight')}</span>
-                    <input
-                      type="number"
-                      min="1"
-                      inputMode="numeric"
-                      value={draft.image.maxHeight}
-                      onChange={event => updateImage('maxHeight', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                      aria-label={t('settingsModal.maxHeight')}
-                    />
-                  </label>
-
-                  <label className="settings-modal__checkbox settings-modal__field--wide">
-                    <input
-                      type="checkbox"
-                      checked={draft.image.keepAspectRatio}
-                      onChange={event => updateImage('keepAspectRatio', event.target.checked)}
-                      disabled={readOnly}
-                    />
-                    <span>{t('settingsModal.keepAspectRatio')}</span>
-                  </label>
-
-                  {target !== 'png' && (
                     <label className="settings-modal__field settings-modal__field--wide">
-                      <span>{t('settingsModal.quality')}</span>
-                      <input
-                        type="range"
-                        min="10"
-                        max="100"
-                        value={draft.image.quality}
-                        onChange={event => updateImage('quality', Number(event.target.value))}
+                      <span>{t('options.backgroundQuality')}</span>
+                      <select
+                        value={String(draft.background.backgroundQuality)}
+                        onChange={event =>
+                          updateBackground('backgroundQuality', Number(event.target.value))
+                        }
                         disabled={readOnly}
-                        aria-label={t('settingsModal.quality')}
-                      />
-                      <span className="settings-modal__quality-value">{draft.image.quality}</span>
+                        aria-label={t('options.backgroundQuality')}
+                      >
+                        {HTML_BACKGROUND_QUALITY_OPTIONS.map(option => (
+                          <option key={option.value} value={String(option.value)}>
+                            {t(option.labelKey)}
+                          </option>
+                        ))}
+                      </select>
                     </label>
-                  )}
 
-                  <label className="settings-modal__checkbox settings-modal__field--wide">
-                    <input
-                      type="checkbox"
-                      checked={draft.image.removeExifEnabled}
-                      onChange={event => updateImage('removeExifEnabled', event.target.checked)}
-                      disabled={readOnly}
-                    />
-                    <span>{t('settingsModal.removeExif')}</span>
-                  </label>
+                    <label className="settings-modal__checkbox settings-modal__field--wide">
+                      <input
+                        type="checkbox"
+                        checked={draft.background.excludeTextFromBackground}
+                        onChange={event =>
+                          updateBackground('excludeTextFromBackground', event.target.checked)
+                        }
+                        disabled={readOnly}
+                      />
+                      <span>{t('options.excludeTextFromBackground')}</span>
+                    </label>
 
-                  <div className="settings-modal__estimate settings-modal__field--wide">
-                    {t('settingsModal.removeExifHelp')}
-                  </div>
+                    {/* Text Controls */}
+                    <h4 className="settings-modal__subsection-title">
+                      {t('htmlOptionsModal.textControlSection')}
+                    </h4>
+                    <label className="settings-modal__field">
+                      <span>{t('options.fontSize')}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        inputMode="decimal"
+                        value={draft.textControl.fontSize}
+                        onChange={event => updateTextControl('fontSize', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                      />
+                    </label>
 
-                  {draft.image.removeExifEnabled && (
+                    <label className="settings-modal__field">
+                      <span>{t('options.lineHeight')}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        inputMode="decimal"
+                        value={draft.textControl.lineHeight}
+                        onChange={event => updateTextControl('lineHeight', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('options.fontWeight')}</span>
+                      <input
+                        type="number"
+                        min="100"
+                        max="900"
+                        step="100"
+                        inputMode="numeric"
+                        value={draft.textControl.fontWeight}
+                        onChange={event => updateTextControl('fontWeight', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('options.color')}</span>
+                      <input
+                        type="text"
+                        value={draft.textControl.color}
+                        onChange={event => updateTextControl('color', event.target.value)}
+                        placeholder="#2d1f00"
+                        disabled={readOnly}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field settings-modal__field--wide">
+                      <span>{t('options.fontFamily')}</span>
+                      <input
+                        type="text"
+                        value={draft.textControl.fontFamily}
+                        onChange={event => updateTextControl('fontFamily', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('options.vertical')}</span>
+                      <select
+                        value={draft.textControl.vertical}
+                        onChange={event => updateTextControl('vertical', event.target.value)}
+                        disabled={readOnly}
+                      >
+                        <option value="">{t('options.defaultValue')}</option>
+                        <option value="horizontal-tb">horizontal-tb</option>
+                        <option value="vertical-rl">vertical-rl</option>
+                        <option value="vertical-lr">vertical-lr</option>
+                      </select>
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('options.dir')}</span>
+                      <select
+                        value={draft.textControl.dir}
+                        onChange={event => updateTextControl('dir', event.target.value)}
+                        disabled={readOnly}
+                      >
+                        <option value="">{t('options.defaultValue')}</option>
+                        <option value="ltr">ltr</option>
+                        <option value="rtl">rtl</option>
+                        <option value="auto">auto</option>
+                      </select>
+                    </label>
+
+                    <label className="settings-modal__checkbox settings-modal__field--wide">
+                      <input
+                        type="checkbox"
+                        checked={draft.textControl.italic}
+                        onChange={event => updateTextControl('italic', event.target.checked)}
+                        disabled={readOnly}
+                      />
+                      <span>{t('options.italic')}</span>
+                    </label>
+
+                    {/* Layout */}
+                    <h4 className="settings-modal__subsection-title">
+                      {t('htmlOptionsModal.layoutSection')}
+                    </h4>
                     <div className="settings-modal__field settings-modal__field--wide">
-                      <span>{t('settingsModal.exifCategories')}</span>
-                      {EXIF_CATEGORY_OPTIONS.map(category => (
-                        <label key={category} className="settings-modal__checkbox">
-                          <input
-                            type="checkbox"
-                            checked={draft.image.removeExifCategories.includes(category)}
-                            onChange={event => toggleExifCategory(category, event.target.checked)}
-                            disabled={readOnly}
-                          />
-                          <span>{t(`settingsModal.exifCategory.${category}`)}</span>
-                        </label>
-                      ))}
+                      <label className="settings-modal__checkbox">
+                        <input
+                          type="radio"
+                          name="html-layout-mode"
+                          checked={draft.layout.mode === 'paginated'}
+                          onChange={() => updateLayout('mode', 'paginated')}
+                          disabled={readOnly}
+                        />
+                        <span>{t('options.paginated')}</span>
+                      </label>
+                      <label className="settings-modal__checkbox">
+                        <input
+                          type="radio"
+                          name="html-layout-mode"
+                          checked={draft.layout.mode === 'continuous'}
+                          onChange={() => updateLayout('mode', 'continuous')}
+                          disabled={readOnly}
+                        />
+                        <span>{t('options.continuous')}</span>
+                      </label>
                     </div>
-                  )}
 
-                  <div className="settings-modal__estimate">
-                    {t('settingsModal.heuristicEstimate')}
+                    {draft.layout.mode === 'continuous' && (
+                      <>
+                        <h4 className="settings-modal__subsection-title">
+                          {t('htmlOptionsModal.widthSection')}
+                        </h4>
+                        <div className="settings-modal__field settings-modal__field--wide">
+                          <label className="settings-modal__checkbox">
+                            <input
+                              type="radio"
+                              name="html-width-mode"
+                              checked={draft.layout.widthMode === 'actual'}
+                              onChange={() => updateLayout('widthMode', 'actual')}
+                              disabled={readOnly}
+                            />
+                            <span>{t('options.actualWidth')}</span>
+                          </label>
+                          <label className="settings-modal__checkbox">
+                            <input
+                              type="radio"
+                              name="html-width-mode"
+                              checked={draft.layout.widthMode === 'fit'}
+                              onChange={() => updateLayout('widthMode', 'fit')}
+                              disabled={readOnly}
+                            />
+                            <span>{t('options.fitWidth')}</span>
+                          </label>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
-          {/* Image to PDF Options Section */}
-          {sections.includes('imageToPdf') && (
-            <div className="settings-modal__section">
-              <button
-                type="button"
-                className="settings-modal__section-header"
-                onClick={() => toggleSection('imageToPdf')}
-                aria-expanded={!collapsedSections.imageToPdf}
-                aria-label={collapsedSections.imageToPdf ? 'Expand' : 'Collapse'}
-              >
-                <span className="settings-modal__collapse-btn" aria-hidden="true">
-                  {collapsedSections.imageToPdf ? '▶' : '▼'}
-                </span>
-                <span className="settings-modal__section-title">
-                  {t('settingsModal.imageToPdfTitle')}
-                </span>
-              </button>
-              {!collapsedSections.imageToPdf && (
-                <div className="settings-modal__section-content">
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.margin')}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      inputMode="numeric"
-                      value={draft.imageToPdf.margin}
-                      onChange={event => updateImageToPdf('margin', event.target.value)}
-                      placeholder={t('options.defaultValue')}
-                      disabled={readOnly}
-                      aria-label={t('settingsModal.margin')}
-                    />
-                  </label>
+            {/* Image Target Options Section */}
+            {sections.includes('imageTarget') && (
+              <div id={SECTION_ID_MAP['imageTarget']} className="settings-modal__section">
+                <button
+                  type="button"
+                  className="settings-modal__section-header"
+                  onClick={() => toggleSection('imageTarget')}
+                  aria-expanded={!collapsedSections.imageTarget}
+                  aria-label={collapsedSections.imageTarget ? 'Expand' : 'Collapse'}
+                >
+                  <span className="settings-modal__collapse-btn" aria-hidden="true">
+                    {collapsedSections.imageTarget ? '▶' : '▼'}
+                  </span>
+                  <span className="settings-modal__section-title">
+                    {t('settingsModal.imageOptionsTitle')}
+                  </span>
+                </button>
+                {!collapsedSections.imageTarget && (
+                  <div className="settings-modal__section-content">
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.maxWidth')}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        inputMode="numeric"
+                        value={draft.image.maxWidth}
+                        onChange={event => updateImage('maxWidth', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.maxWidth')}
+                      />
+                    </label>
 
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.fit')}</span>
-                    <select
-                      value={draft.imageToPdf.fit}
-                      onChange={event =>
-                        updateImageToPdf('fit', event.target.value as 'cover' | 'contain')
-                      }
-                      disabled={readOnly}
-                    >
-                      <option value="cover">{t('settingsModal.fitCover')}</option>
-                      <option value="contain">{t('settingsModal.fitContain')}</option>
-                    </select>
-                  </label>
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.maxHeight')}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        inputMode="numeric"
+                        value={draft.image.maxHeight}
+                        onChange={event => updateImage('maxHeight', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.maxHeight')}
+                      />
+                    </label>
 
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.pageMode')}</span>
-                    <select
-                      value={draft.imageToPdf.pageMode}
-                      onChange={event =>
-                        updateImageToPdf(
-                          'pageMode',
-                          event.target.value as 'auto' | 'single' | 'multi'
-                        )
-                      }
-                      disabled={readOnly}
-                    >
-                      <option value="auto">{t('settingsModal.pageModeAuto')}</option>
-                      <option value="single">{t('settingsModal.pageModeSingle')}</option>
-                      <option value="multi">{t('settingsModal.pageModeMulti')}</option>
-                    </select>
-                  </label>
+                    <label className="settings-modal__checkbox settings-modal__field--wide">
+                      <input
+                        type="checkbox"
+                        checked={draft.image.keepAspectRatio}
+                        onChange={event => updateImage('keepAspectRatio', event.target.checked)}
+                        disabled={readOnly}
+                      />
+                      <span>{t('settingsModal.keepAspectRatio')}</span>
+                    </label>
 
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.rotation')}</span>
-                    <select
-                      value={String(draft.imageToPdf.rotationDeg)}
-                      onChange={event =>
-                        updateImageToPdf(
-                          'rotationDeg',
-                          Number(event.target.value) as 0 | 90 | 180 | 270
-                        )
-                      }
-                      disabled={readOnly}
-                    >
-                      {ROTATION_DEGREE_OPTIONS.map(rotationDeg => (
-                        <option key={rotationDeg} value={String(rotationDeg)}>
-                          {t('settingsModal.rotationDegrees', { degrees: rotationDeg })}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    {target !== 'png' && (
+                      <label className="settings-modal__field settings-modal__field--wide">
+                        <span>{t('settingsModal.quality')}</span>
+                        <input
+                          type="range"
+                          min="10"
+                          max="100"
+                          value={draft.image.quality}
+                          onChange={event => updateImage('quality', Number(event.target.value))}
+                          disabled={readOnly}
+                          aria-label={t('settingsModal.quality')}
+                        />
+                        <span className="settings-modal__quality-value">{draft.image.quality}</span>
+                      </label>
+                    )}
 
-                  <label className="settings-modal__field">
-                    <span>{t('settingsModal.scale')}</span>
-                    <input
-                      type="number"
-                      min="10"
-                      max="300"
-                      inputMode="numeric"
-                      value={draft.imageToPdf.scalePercent}
-                      onChange={event => updateImageToPdf('scalePercent', event.target.value)}
-                      placeholder="100"
-                      disabled={readOnly}
-                      aria-label={t('settingsModal.scale')}
-                    />
-                  </label>
+                    <label className="settings-modal__checkbox settings-modal__field--wide">
+                      <input
+                        type="checkbox"
+                        checked={draft.image.removeExifEnabled}
+                        onChange={event => updateImage('removeExifEnabled', event.target.checked)}
+                        disabled={readOnly}
+                      />
+                      <span>{t('settingsModal.removeExif')}</span>
+                    </label>
 
-                  <div className="settings-modal__estimate settings-modal__field--wide">
-                    {t('settingsModal.imageToPdfTransformHelp')}
+                    <div className="settings-modal__estimate settings-modal__field--wide">
+                      {t('settingsModal.removeExifHelp')}
+                    </div>
+
+                    {draft.image.removeExifEnabled && (
+                      <div className="settings-modal__field settings-modal__field--wide">
+                        <span>{t('settingsModal.exifCategories')}</span>
+                        {EXIF_CATEGORY_OPTIONS.map(category => (
+                          <label key={category} className="settings-modal__checkbox">
+                            <input
+                              type="checkbox"
+                              checked={draft.image.removeExifCategories.includes(category)}
+                              onChange={event => toggleExifCategory(category, event.target.checked)}
+                              disabled={readOnly}
+                            />
+                            <span>{t(`settingsModal.exifCategory.${category}`)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="settings-modal__estimate">
+                      {t('settingsModal.heuristicEstimate')}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+
+            {/* Image to PDF Options Section */}
+            {sections.includes('imageToPdf') && (
+              <div id={SECTION_ID_MAP['imageToPdf']} className="settings-modal__section">
+                <button
+                  type="button"
+                  className="settings-modal__section-header"
+                  onClick={() => toggleSection('imageToPdf')}
+                  aria-expanded={!collapsedSections.imageToPdf}
+                  aria-label={collapsedSections.imageToPdf ? 'Expand' : 'Collapse'}
+                >
+                  <span className="settings-modal__collapse-btn" aria-hidden="true">
+                    {collapsedSections.imageToPdf ? '▶' : '▼'}
+                  </span>
+                  <span className="settings-modal__section-title">
+                    {t('settingsModal.imageToPdfTitle')}
+                  </span>
+                </button>
+                {!collapsedSections.imageToPdf && (
+                  <div className="settings-modal__section-content">
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.margin')}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        value={draft.imageToPdf.margin}
+                        onChange={event => updateImageToPdf('margin', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.margin')}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.fit')}</span>
+                      <select
+                        value={draft.imageToPdf.fit}
+                        onChange={event =>
+                          updateImageToPdf('fit', event.target.value as 'cover' | 'contain')
+                        }
+                        disabled={readOnly}
+                      >
+                        <option value="cover">{t('settingsModal.fitCover')}</option>
+                        <option value="contain">{t('settingsModal.fitContain')}</option>
+                      </select>
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.pageMode')}</span>
+                      <select
+                        value={draft.imageToPdf.pageMode}
+                        onChange={event =>
+                          updateImageToPdf(
+                            'pageMode',
+                            event.target.value as 'auto' | 'single' | 'multi'
+                          )
+                        }
+                        disabled={readOnly}
+                      >
+                        <option value="auto">{t('settingsModal.pageModeAuto')}</option>
+                        <option value="single">{t('settingsModal.pageModeSingle')}</option>
+                        <option value="multi">{t('settingsModal.pageModeMulti')}</option>
+                      </select>
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.rotation')}</span>
+                      <select
+                        value={String(draft.imageToPdf.rotationDeg)}
+                        onChange={event =>
+                          updateImageToPdf(
+                            'rotationDeg',
+                            Number(event.target.value) as 0 | 90 | 180 | 270
+                          )
+                        }
+                        disabled={readOnly}
+                      >
+                        {ROTATION_DEGREE_OPTIONS.map(rotationDeg => (
+                          <option key={rotationDeg} value={String(rotationDeg)}>
+                            {t('settingsModal.rotationDegrees', { degrees: rotationDeg })}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.scale')}</span>
+                      <input
+                        type="number"
+                        min="10"
+                        max="300"
+                        inputMode="numeric"
+                        value={draft.imageToPdf.scalePercent}
+                        onChange={event => updateImageToPdf('scalePercent', event.target.value)}
+                        placeholder="100"
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.scale')}
+                      />
+                    </label>
+
+                    <div className="settings-modal__estimate settings-modal__field--wide">
+                      {t('settingsModal.imageToPdfTransformHelp')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="pdf-modal__actions">

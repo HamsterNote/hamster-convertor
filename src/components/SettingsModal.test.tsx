@@ -55,10 +55,15 @@ describe('SettingsModal', () => {
 
   it('renders PDF pages section with inline selector when source is pdf', () => {
     render(<SettingsModal {...defaultProps} />)
-    expect(screen.getByText('PDF Pages')).toBeInTheDocument()
-    const stickyHeader = screen
-      .getByText('PDF Pages')
-      .closest('.pdf-page-selector-inline__sticky-header')
+    // Use getAllByText since navigation and section title both contain 'PDF Pages'
+    const pdfPagesElements = screen.getAllByText('PDF Pages')
+    expect(pdfPagesElements.length).toBeGreaterThanOrEqual(1)
+    // Find the section title (not the nav button) for sticky header check
+    const sectionTitle = pdfPagesElements.find(el =>
+      el.classList.contains('pdf-page-selector-inline__title')
+    )
+    expect(sectionTitle).toBeInTheDocument()
+    const stickyHeader = sectionTitle?.closest('.pdf-page-selector-inline__sticky-header')
     expect(stickyHeader).toBeInTheDocument()
     expect(within(stickyHeader as HTMLElement).getByText('0 pages selected')).toBeInTheDocument()
     // Inline selector renders page cards
@@ -74,7 +79,9 @@ describe('SettingsModal', () => {
 
   it('renders PDF OCR section when source is pdf and target is pdf', () => {
     render(<SettingsModal {...defaultProps} target="pdf" />)
-    expect(screen.getByText('PDF OCR')).toBeInTheDocument()
+    // Use getAllByText since navigation and section title both contain 'PDF OCR'
+    const pdfOcrElements = screen.getAllByText('PDF OCR')
+    expect(pdfOcrElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('checkbox', { name: 'OCR' })).toBeInTheDocument()
   })
 
@@ -85,13 +92,17 @@ describe('SettingsModal', () => {
 
   it('renders HTML options section when target is html', () => {
     render(<SettingsModal {...defaultProps} target="html" />)
-    expect(screen.getByText('HTML Options')).toBeInTheDocument()
+    // Use getAllByText since navigation and section title both contain 'HTML Options'
+    const htmlOptionsElements = screen.getAllByText('HTML Options')
+    expect(htmlOptionsElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Background options')).toBeInTheDocument()
   })
 
   it('renders image target options when target is png', () => {
     render(<SettingsModal {...defaultProps} source="image" target="png" />)
-    expect(screen.getByText('Image Options')).toBeInTheDocument()
+    // Use getAllByText since navigation and section title both contain 'Image Options'
+    const imageOptionsElements = screen.getAllByText('Image Options')
+    expect(imageOptionsElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('spinbutton', { name: 'Max width' })).toBeInTheDocument()
     expect(screen.getByRole('spinbutton', { name: 'Max height' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Keep aspect ratio' })).toBeInTheDocument()
@@ -117,7 +128,9 @@ describe('SettingsModal', () => {
 
   it('renders image-to-PDF options when source is image and target is pdf', () => {
     render(<SettingsModal {...defaultProps} source="image" target="pdf" />)
-    expect(screen.getByText('Image to PDF Options')).toBeInTheDocument()
+    // Use getAllByText since navigation and section title both contain 'Image to PDF Options'
+    const imageToPdfElements = screen.getAllByText('Image to PDF Options')
+    expect(imageToPdfElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('spinbutton', { name: 'Margin (pt)' })).toBeInTheDocument()
   })
 
@@ -147,14 +160,14 @@ describe('SettingsModal', () => {
     render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
     const collapseButtons = screen.getAllByRole('button', { name: 'Collapse' })
     const pdfCollapseBtn = collapseButtons.find(btn =>
-      btn.classList.contains('pdf-page-selector-inline__collapse-btn')
+      btn.classList.contains('pdf-page-selector-inline__header')
     )
     expect(pdfCollapseBtn).toBeDefined()
     fireEvent.click(pdfCollapseBtn!)
     expect(screen.queryByRole('button', { name: 'Page 1' })).not.toBeInTheDocument()
     const expandButtons = screen.getAllByRole('button', { name: 'Expand' })
     const pdfExpandBtn = expandButtons.find(btn =>
-      btn.classList.contains('pdf-page-selector-inline__collapse-btn')
+      btn.classList.contains('pdf-page-selector-inline__header')
     )
     expect(pdfExpandBtn).toBeDefined()
     fireEvent.click(pdfExpandBtn!)
@@ -269,13 +282,40 @@ describe('SettingsModal', () => {
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 
-  it('renders multiple sections in two-column layout', () => {
+  it('renders a side navigation landmark with visible section titles', () => {
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    const nav = screen.getByRole('navigation')
+    expect(nav).toBeInTheDocument()
+    expect(within(nav).getByText('PDF Pages')).toBeInTheDocument()
+    expect(within(nav).getByText('HTML Options')).toBeInTheDocument()
+  })
+
+  it('does not use two-column layout class on modal body', () => {
     render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
     const dialog = screen.getByRole('dialog')
-    expect(dialog).toBeInTheDocument()
-    // When multiple sections, body should have columns class
-    const body = dialog.querySelector('.settings-modal__body--columns')
+    const body = dialog.querySelector('.settings-modal__body')
     expect(body).toBeInTheDocument()
+    expect(dialog.querySelector('.settings-modal__body--columns')).not.toBeInTheDocument()
+  })
+
+  it('body contains section wrappers for each active section', () => {
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    const dialog = screen.getByRole('dialog')
+    const body = dialog.querySelector('.settings-modal__body')
+    const sections = body!.querySelectorAll('.settings-modal__section')
+    expect(sections.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('clicking nav item for HTML Options scrolls that section into view', () => {
+    const scrollIntoViewMock = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoViewMock
+
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
+    const nav = screen.getByRole('navigation')
+    const htmlOptionsNavBtn = within(nav).getByText('HTML Options')
+    fireEvent.click(htmlOptionsNavBtn)
+
+    expect(scrollIntoViewMock).toHaveBeenCalledOnce()
   })
 
   it('clicking Cancel button calls onCancel', () => {

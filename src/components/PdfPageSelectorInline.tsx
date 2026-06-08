@@ -50,21 +50,21 @@ export default function PdfPageSelectorInline({
   return (
     <div className="pdf-page-selector-inline">
       <div className="pdf-page-selector-inline__sticky-header">
-        <div className="pdf-page-selector-inline__header">
-          <button
-            type="button"
-            className="pdf-page-selector-inline__collapse-btn"
-            onClick={() => setCollapsed(prev => !prev)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? 'Expand' : 'Collapse'}
-          >
+        <button
+          type="button"
+          className="pdf-page-selector-inline__header"
+          onClick={() => setCollapsed(prev => !prev)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand' : 'Collapse'}
+        >
+          <span className="pdf-page-selector-inline__collapse-btn" aria-hidden="true">
             {collapsed ? '▶' : '▼'}
-          </button>
+          </span>
           <h3 className="pdf-page-selector-inline__title">{t('settingsModal.pdfPagesTitle')}</h3>
           <span className="pdf-page-selector-inline__count">
             {t('options.pdfPages.selectedCount', { count: selectedCount })}
           </span>
-        </div>
+        </button>
 
         {!collapsed && !readOnly && pageShells.length > 0 && (
           <div className="pdf-page-selector-inline__controls">
