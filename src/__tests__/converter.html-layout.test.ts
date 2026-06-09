@@ -7,6 +7,14 @@ const chineseFragment = `<div class="hamster-note-document"><style> .hamster-not
 // 模拟完整 HTML 文档（含 charset）— 来自 html-parser decode() 或外部工具
 const fullDocument = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>测试文档</title></head><body><div class="hamster-note-document"><style> .hamster-note-text { position: absolute; white-space: pre; } </style><div class="hamster-note-page" style="width:612px;height:792px;"><span class="hamster-note-text" style="font-size:14px;">架构设计：Chrome浏览器</span></div></div></body></html>`
 
+const expectPaginatedCssContract = (result: string) => {
+  expect(result).toMatch(/\.hamster-note-document\s*\{[^}]*padding-top:\s*24px/i)
+  expect(result).toMatch(/\.hamster-note-page\s*\{[^}]*margin:\s*0 auto 24px auto/i)
+  expect(result).toMatch(/\.hamster-note-page:last-child\s*\{[^}]*margin-bottom:\s*24px/i)
+  expect(result).toMatch(/\.hamster-note-page\s*\{[^}]*box-shadow:\s*0 2px 8px/i)
+  expect(result).not.toMatch(/:last-child\s*\{[^}]*box-shadow:\s*none/i)
+}
+
 describe('applyHtmlLayout charset and document structure', () => {
   describe('fragment input (no charset, no <html>/<head>)', () => {
     it('wraps fragment in full HTML document with <meta charset="utf-8">', () => {
@@ -93,12 +101,12 @@ describe('applyHtmlLayout charset and document structure', () => {
   })
 
   describe('paginated mode layout CSS', () => {
-    it('adds page shadow and gap styles', () => {
+    it('adds centered page shadow and edge spacing styles', () => {
       const result = applyHtmlLayout(chineseFragment, { mode: 'paginated' })
 
       expect(result).toContain('box-shadow')
-      expect(result).toContain('margin-bottom')
       expect(result).toContain('border-radius')
+      expectPaginatedCssContract(result)
     })
   })
 })

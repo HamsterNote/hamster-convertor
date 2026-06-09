@@ -1,22 +1,23 @@
 import log from 'loglevel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ConfirmModal } from './components/ConfirmModal'
 import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
 import FullscreenLoading from './components/FullscreenLoading'
 import Header from './components/Header'
-import { ConfirmModal } from './components/ConfirmModal'
+import { ParserIframeBridge, type ParserIframeBridgeRef } from './components/ParserIframeBridge'
+import PreviewModal from './components/PreviewModal'
 import SettingsModal, {
   getSettingsSections,
   type SettingsOptions
 } from './components/SettingsModal'
-import { ParserIframeBridge, type ParserIframeBridgeRef } from './components/ParserIframeBridge'
 import {
   type ConversionResult,
   type ConversionWarning,
+  type ExifCategory,
   getSupportedTargets,
   type HtmlDecodeOptions,
-  type ExifCategory,
   type SourceFormat,
   type TargetFormat
 } from './lib/converter'
@@ -25,7 +26,6 @@ import { truncateMiddle } from './lib/filename'
 import { convertViaBridge } from './lib/parser-bridge/proxy'
 import { getPdfPageCount } from './lib/pdf-utils'
 import { getPreviewableOutputs } from './lib/preview'
-import PreviewModal from './components/PreviewModal'
 
 type BackgroundDecodeOptions = NonNullable<HtmlDecodeOptions['background']>
 
@@ -161,6 +161,12 @@ const createFileItemId = (file: File): string => {
 
 type ConversionErrorKey = 'conversionFailed' | 'emptyOcr' | 'ocrRequired'
 
+type BatchProgress = {
+  total: number
+  processed: number
+  active: boolean
+}
+
 const isPendingStatus = (status: FileItem['status']) =>
   ['ready', 'queued', 'converting'].includes(status)
 
@@ -211,6 +217,11 @@ function App() {
   const addFilesInputRef = useRef<HTMLInputElement>(null)
   const bridgeRef = useRef<ParserIframeBridgeRef>(null)
   const [isConvertingAll, setIsConvertingAll] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<BatchProgress>({
+    total: 0,
+    processed: 0,
+    active: false
+  })
   const [isPreparingDownload, setIsPreparingDownload] = useState(false)
   const [activeSettingsItemId, setActiveSettingsItemId] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
@@ -236,6 +247,18 @@ function App() {
     it => it.status === 'done' && it.outputs && it.outputs.length > 0
   )
   const canDownloadArchive = items.length > 0 && !hasPending && downloadableItems.length > 0
+  let fullscreenLoadingLabel = t('loading.converting')
+
+  if (batchProgress.active) {
+    fullscreenLoadingLabel = t('loading.convertingWithProgress', {
+      processed: batchProgress.processed,
+      total: batchProgress.total
+    })
+  }
+
+  if (isPreparingDownload) {
+    fullscreenLoadingLabel = t('loading.preparingDownload')
+  }
 
   useEffect(() => {
     document.title = `${t('appName')} | Hamster Document Converter`
@@ -270,6 +293,22 @@ function App() {
 
   const removeItem = (id: string) => {
     setItems(prev => prev.filter(x => x.id !== id))
+  }
+
+  const copyItem = (id: string) => {
+    const source = items.find(it => it.id === id)
+    if (!source) return
+
+    const newItem: FileItem = {
+      ...source,
+      id: createFileItemId(source.file),
+      status: 'ready',
+      outputs: undefined,
+      warnings: undefined,
+      errorMessage: undefined
+    }
+
+    setItems(prev => [...prev, newItem])
   }
 
   const clearAll = () => setItems([])
@@ -449,23 +488,28 @@ function App() {
     const isRunning = itemsRef.current.some(it => isRunningStatus(it.status))
     if (isRunning) return
 
-    const idsToConvert = itemsRef.current
-      .filter(it => isConvertibleStatus(it.status))
-      .map(i => i.id)
-    if (idsToConvert.length === 0) return
+    const batchIds = itemsRef.current.filter(it => isConvertibleStatus(it.status)).map(i => i.id)
+    if (batchIds.length === 0) return
 
-    const userConfirmed = await confirmLargePdfsBeforeConvert(idsToConvert)
+    const userConfirmed = await confirmLargePdfsBeforeConvert(batchIds)
     if (!userConfirmed) return
 
+    const batchIdSet = new Set(batchIds)
     setIsConvertingAll(true)
-    setItems(prev => prev.map(queueItem))
+    setBatchProgress({ active: true, total: batchIds.length, processed: 0 })
+    setItems(prev => prev.map(item => (batchIdSet.has(item.id) ? queueItem(item) : item)))
 
     try {
-      for (const id of idsToConvert) {
-        await convertSingleItem(id)
+      for (const id of batchIds) {
+        try {
+          await convertSingleItem(id)
+        } finally {
+          setBatchProgress(prev => ({ ...prev, processed: prev.processed + 1 }))
+        }
       }
     } finally {
       setIsConvertingAll(false)
+      setBatchProgress(prev => ({ ...prev, active: false }))
     }
   }
 
@@ -507,7 +551,7 @@ function App() {
     <div className="app">
       <FullscreenLoading
         visible={isConvertingAll || isPreparingDownload}
-        label={isPreparingDownload ? t('loading.preparingDownload') : t('loading.converting')}
+        label={fullscreenLoadingLabel}
       />
       <ParserIframeBridge ref={bridgeRef} />
       <Header />
@@ -669,6 +713,18 @@ function App() {
                             <button
                               type="button"
                               className="btn btn--ghost row-action-btn"
+                              onClick={() => copyItem(it.id)}
+                              aria-label={t('actions.copy')}
+                              title={t('actions.copy')}
+                              disabled={
+                                isRunningStatus(it.status) || isConvertingAll || isPreparingDownload
+                              }
+                            >
+                              ⧉
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost row-action-btn"
                               onClick={() => removeItem(it.id)}
                               aria-label={t('actions.remove')}
                               disabled={
@@ -716,6 +772,11 @@ function App() {
             >
               {t('actions.convertAll')}
             </button>
+            {batchProgress.active && (
+              <span aria-live="polite" className="batch-progress">
+                {batchProgress.processed} / {batchProgress.total}
+              </span>
+            )}
             <button
               type="button"
               className="btn btn--ghost"

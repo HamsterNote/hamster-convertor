@@ -1,5 +1,5 @@
 import type { ParserBridgeConversionResultPayload } from '@hamster-note/parser-protocol'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import type { ParserIframeBridgeRef } from '../components/ParserIframeBridge'
@@ -101,6 +101,11 @@ const getFileTargetSelects = () => {
   return table.querySelectorAll('select.file-table.select')
 }
 
+const getFileRows = () => {
+  const table = screen.getByRole('table')
+  return Array.from(table.querySelectorAll('tbody tr'))
+}
+
 const changeNativeSelectValue = (select: HTMLSelectElement, value: string) => {
   const valueDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')
   const setValue = valueDescriptor?.set
@@ -117,18 +122,32 @@ const createBridgeResult = ({
   contents = 'fake',
   filename = 'result.txt',
   mimeType = 'text/plain',
-  targetFormat = 'txt'
+  targetFormat = 'txt',
+  warnings
 }: {
   contents?: string
   filename?: string
   mimeType?: string
   targetFormat?: string
+  warnings?: string[]
 } = {}): ParserBridgeConversionResultPayload => ({
   filename,
   mimeType,
   targetFormat,
-  buffer: textToArrayBuffer(contents)
+  buffer: textToArrayBuffer(contents),
+  warnings
 })
+
+const createDeferred = <T,>() => {
+  let resolve: ((value: T) => void) | undefined
+  let reject: ((error: Error) => void) | undefined
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+
+  return { promise, resolve, reject }
+}
 
 describe('app upload feedback', () => {
   beforeEach(async () => {
@@ -426,6 +445,151 @@ describe('app upload feedback', () => {
     expect(tableSelects[1]).toBeEnabled()
   })
 
+  it('copy action appears in row actions and appends the duplicate to the list end', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    const alphaFile = new File(['alpha'], 'alpha.txt', { type: 'text/plain' })
+    const betaFile = new File(['beta'], 'beta.txt', { type: 'text/plain' })
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [alphaFile, betaFile] }
+    })
+
+    await screen.findByRole('row', { name: /alpha\.txt/ })
+    await screen.findByRole('row', { name: /beta\.txt/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    const initialRows = getFileRows()
+    expect(initialRows).toHaveLength(2)
+
+    const copyButton = within(initialRows[0]).getByRole('button', { name: 'Copy' })
+    expect(copyButton).toHaveClass('row-action-btn')
+    expect(copyButton.closest('.row-actions')).toBeInTheDocument()
+    expect(copyButton).toHaveTextContent('⧉')
+
+    fireEvent.click(copyButton)
+
+    const rows = getFileRows()
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toHaveTextContent('alpha.txt')
+    expect(rows[1]).toHaveTextContent('beta.txt')
+    expect(rows[2]).toHaveTextContent('alpha.txt')
+    expect(within(rows[2]).getByText('Ready')).toBeInTheDocument()
+    expect(getFileTargetSelects()[2]).toHaveValue('html')
+  })
+
+  it('copying a done row resets artifacts, keeps source/options, and can convert the copy', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: '<html></html>',
+        filename: 'sample.html',
+        mimeType: 'text/html',
+        targetFormat: 'html',
+        warnings: ['minor issue']
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    const pdfFile = new File(['pdf'], 'sample.pdf', { type: 'application/pdf' })
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [pdfFile] }
+    })
+
+    await screen.findByRole('row', { name: /sample\.pdf/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'html' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Page 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Page 3' }))
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    const firstConvertCall = vi.mocked(convertViaBridge).mock.calls[0]
+    expect(firstConvertCall?.[1]).toBe(pdfFile)
+    expect(firstConvertCall?.[3]).toBe('html')
+    expect(firstConvertCall?.[4]?.pdf).toEqual({ ocr: false, selectedPages: [1, 3] })
+
+    const doneRow = getFileRows()[0]
+    expect(within(doneRow).getByText('Done')).toBeInTheDocument()
+    expect(within(doneRow).getByText('1 output')).toBeInTheDocument()
+    expect(within(doneRow).getByText('minor issue')).toBeInTheDocument()
+
+    fireEvent.click(within(doneRow).getByRole('button', { name: 'Copy' }))
+
+    const rowsAfterCopy = getFileRows()
+    expect(rowsAfterCopy).toHaveLength(2)
+    expect(within(rowsAfterCopy[0]).getByText('Done')).toBeInTheDocument()
+    expect(within(rowsAfterCopy[0]).getByText('1 output')).toBeInTheDocument()
+    expect(within(rowsAfterCopy[1]).getByText('Ready')).toBeInTheDocument()
+    expect(within(rowsAfterCopy[1]).queryByText('Done')).not.toBeInTheDocument()
+    expect(within(rowsAfterCopy[1]).queryByText(/output/)).not.toBeInTheDocument()
+    expect(within(rowsAfterCopy[1]).queryByText('minor issue')).not.toBeInTheDocument()
+    expect(getFileTargetSelects()[1]).toHaveValue('html')
+    expect(getFileTargetSelects()[1]).toBeEnabled()
+
+    fireEvent.click(within(rowsAfterCopy[1]).getByRole('button', { name: 'Remove' }))
+
+    const rowsAfterRemovingCopy = getFileRows()
+    expect(rowsAfterRemovingCopy).toHaveLength(1)
+    expect(within(rowsAfterRemovingCopy[0]).getByText('Done')).toBeInTheDocument()
+    expect(within(rowsAfterRemovingCopy[0]).getByText('1 output')).toBeInTheDocument()
+    expect(within(rowsAfterRemovingCopy[0]).getByText('minor issue')).toBeInTheDocument()
+
+    fireEvent.click(within(rowsAfterRemovingCopy[0]).getByRole('button', { name: 'Copy' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(convertViaBridge)).toHaveBeenCalledTimes(2)
+    })
+
+    const secondConvertCall = vi.mocked(convertViaBridge).mock.calls[1]
+    expect(secondConvertCall?.[1]).toBe(pdfFile)
+    expect(secondConvertCall?.[1]).toBe(firstConvertCall?.[1])
+    expect(secondConvertCall?.[3]).toBe('html')
+    expect(secondConvertCall?.[4]?.pdf).toBe(firstConvertCall?.[4]?.pdf)
+    expect(secondConvertCall?.[4]?.pdf).toEqual({ ocr: false, selectedPages: [1, 3] })
+  })
+
+  it('disables copy while the source row is queued or converting', async () => {
+    let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
+    const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
+      resolveConversion = resolve
+    })
+    bridgeMocks.convert.mockReturnValue(conversionPromise)
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'running.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /running\.txt/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy' })).toBeDisabled()
+    })
+
+    resolveConversion?.(createBridgeResult())
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy' })).toBeEnabled()
+    })
+  })
+
   it('shows full-screen loading during convert-all and hides on completion', async () => {
     let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
     const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
@@ -481,6 +645,79 @@ describe('app upload feedback', () => {
     await waitFor(() => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
     })
+  })
+
+  it('tracks convert-all batch progress for click-time eligible rows only', async () => {
+    const firstBatchFailure = createDeferred<ParserBridgeConversionResultPayload>()
+    const secondBatchSuccess = createDeferred<ParserBridgeConversionResultPayload>()
+    firstBatchFailure.promise.catch(() => {}).catch(() => {})
+
+    bridgeMocks.convert
+      .mockResolvedValueOnce(createBridgeResult({ filename: 'pre-done.txt' }))
+      .mockReturnValueOnce(firstBatchFailure.promise)
+      .mockReturnValueOnce(secondBatchSuccess.promise)
+      .mockResolvedValue(createBridgeResult({ filename: 'late.txt' }))
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['done'], 'pre-done.pdf', { type: 'application/pdf' })] }
+    })
+    await screen.findByRole('row', { name: /pre-done\.pdf/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+    expect(screen.queryByText('0 / 0')).not.toBeInTheDocument()
+    expect(bridgeMocks.convert).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: {
+        files: [
+          new File(['fail'], 'current-fail.pdf', { type: 'application/pdf' }),
+          new File(['ok'], 'current-ok.pdf', { type: 'application/pdf' })
+        ]
+      }
+    })
+    await screen.findByRole('row', { name: /current-fail\.pdf/ })
+    await screen.findByRole('row', { name: /current-ok\.pdf/ })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('0 / 2')).toBeInTheDocument()
+    })
+
+    firstBatchFailure.reject?.(new Error('conversion failed'))
+
+    await waitFor(() => {
+      expect(screen.getByText('1 / 2')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledTimes(3)
+    })
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['late'], 'late-added.pdf', { type: 'application/pdf' })] }
+    })
+    await screen.findByRole('row', { name: /late-added\.pdf/ })
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+    expect(screen.queryByText(/\/ 3$/)).not.toBeInTheDocument()
+
+    secondBatchSuccess.resolve?.(createBridgeResult({ filename: 'current-ok.txt' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('1 / 2')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByText('2 / 2')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Done')).toHaveLength(2)
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Ready')).toBeInTheDocument()
+    expect(bridgeMocks.convert).toHaveBeenCalledTimes(3)
   })
 
   it('hides PNG/JPG/WEBP targets for GIF and SVG image files', async () => {

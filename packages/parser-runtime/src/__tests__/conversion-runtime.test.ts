@@ -65,6 +65,14 @@ const textFromBuffer = (buffer: ArrayBuffer): string => new TextDecoder().decode
 
 const createBuffer = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer
 
+const expectPaginatedCssContract = (result: string) => {
+  expect(result).toMatch(/\.hamster-note-document\s*\{[^}]*padding-top:\s*24px/i)
+  expect(result).toMatch(/\.hamster-note-page\s*\{[^}]*margin:\s*0 auto 24px auto/i)
+  expect(result).toMatch(/\.hamster-note-page:last-child\s*\{[^}]*margin-bottom:\s*24px/i)
+  expect(result).toMatch(/\.hamster-note-page\s*\{[^}]*box-shadow:\s*0 2px 8px/i)
+  expect(result).not.toMatch(/:last-child\s*\{[^}]*box-shadow:\s*none/i)
+}
+
 type MockCanvasState = {
   lastCanvas: { width: number; height: number } | null
   lastToBlobArgs: { type: string | undefined; quality: number | undefined }
@@ -152,7 +160,9 @@ describe('Runtime conversion', () => {
     expect(result?.filename).toBe('sample.html')
     expect(result?.mimeType).toBe('text/html;charset=utf-8')
     expect(result?.targetFormat).toBe('html')
-    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toContain('PDF text')
+    const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
+    expect(html).toContain('PDF text')
+    expectPaginatedCssContract(html)
   })
 
   it('converts image to PNG', async () => {
@@ -561,6 +571,27 @@ describe('Image-to-PDF A4 sizing', () => {
     expect(y + drawHeight).toBeLessThanOrEqual(marginPt + usableHeight)
   }
 
+  const expectContainAtTopLeftWithinBounds = (usableWidth: number, usableHeight: number) => {
+    const [, x, y] = getLastAddImageCall()
+    expect(x).toBe(marginPt)
+    expect(y).toBe(marginPt)
+    expectWithinUsableBounds(usableWidth, usableHeight)
+  }
+
+  const convertImageToPdf = (
+    imageToPdf: NonNullable<
+      NonNullable<Parameters<typeof convertRuntime>[0]['options']>['imageToPdf']
+    >
+  ) =>
+    convertRuntime({
+      filename: 'photo.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: { imageToPdf }
+    })
+
   beforeEach(() => {
     jsPdfMocks.addImage.mockClear()
     jsPdfMocks.output.mockClear()
@@ -636,6 +667,93 @@ describe('Image-to-PDF A4 sizing', () => {
       expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
     }
   )
+
+  it('draws width-dominant contain images from the top-left margin', async () => {
+    mockImageWidth = 4000
+    mockImageHeight = 1000
+
+    await convertImageToPdf({
+      marginPt,
+      fit: 'contain',
+      pageMode: 'auto',
+      rotationDeg: 0,
+      scalePercent: 100
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Landscape.width, a4Landscape.height]
+    })
+    expectContainAtTopLeftWithinBounds(
+      a4Landscape.width - marginPt * 2,
+      a4Landscape.height - marginPt * 2
+    )
+  })
+
+  it('draws height-dominant contain images from the top-left margin', async () => {
+    mockImageWidth = 1000
+    mockImageHeight = 4000
+
+    await convertImageToPdf({
+      marginPt,
+      fit: 'contain',
+      pageMode: 'auto',
+      rotationDeg: 0,
+      scalePercent: 100
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Portrait.width, a4Portrait.height]
+    })
+    expectContainAtTopLeftWithinBounds(
+      a4Portrait.width - marginPt * 2,
+      a4Portrait.height - marginPt * 2
+    )
+  })
+
+  it('draws square contain images from the top-left margin', async () => {
+    mockImageWidth = 2000
+    mockImageHeight = 2000
+
+    await convertImageToPdf({
+      marginPt,
+      fit: 'contain',
+      pageMode: 'auto',
+      rotationDeg: 0,
+      scalePercent: 100
+    })
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      unit: 'pt',
+      format: [a4Portrait.width, a4Portrait.height]
+    })
+    expectContainAtTopLeftWithinBounds(
+      a4Portrait.width - marginPt * 2,
+      a4Portrait.height - marginPt * 2
+    )
+  })
+
+  it('keeps cover images centered when scale leaves drawable whitespace', async () => {
+    mockImageWidth = 4000
+    mockImageHeight = 1000
+
+    await convertImageToPdf({
+      marginPt,
+      fit: 'cover',
+      pageMode: 'single',
+      rotationDeg: 0,
+      scalePercent: 50
+    })
+
+    const [, x, y, drawWidth, drawHeight] = getLastAddImageCall()
+    const usableWidth = a4Portrait.width - marginPt * 2
+    const usableHeight = a4Portrait.height - marginPt * 2
+    expect(x).toBeCloseTo(marginPt + (usableWidth - drawWidth) / 2)
+    expect(y).toBeCloseTo(marginPt + (usableHeight - drawHeight) / 2)
+    expect(x).toBeGreaterThan(marginPt)
+    expect(y).toBeGreaterThan(marginPt)
+    expectWithinUsableBounds(usableWidth, usableHeight)
+  })
 
   it.each([90, 270] as const)(
     'rotation %i swaps effective dimensions for auto page mode',

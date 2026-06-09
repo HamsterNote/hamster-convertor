@@ -107,6 +107,26 @@ const routeMultiOutputProxy = async (page: Page): Promise<void> => {
   })
 }
 
+const routeDelayedProxy = async (page: Page): Promise<void> => {
+  await page.route('**/src/lib/parser-bridge/proxy.ts*', async route => {
+    await route.fulfill({
+      contentType: 'application/javascript',
+      body: [
+        'export async function convertViaBridge(_bridge, file, _sourceFormat, targetFormat) {',
+        '  await new Promise(resolve => setTimeout(resolve, 500))',
+        "  const baseName = file.name.replace(/\\.[^/.]+$/, '') || file.name",
+        '  return {',
+        "    filename: baseName + '.' + targetFormat,",
+        "    mimeType: targetFormat === 'html' ? 'text/html' : 'text/plain',",
+        '    targetFormat,',
+        "    blob: new Blob(['delayed conversion'], { type: targetFormat === 'html' ? 'text/html' : 'text/plain' })",
+        '  }',
+        '}'
+      ].join('\n')
+    })
+  })
+}
+
 const activeProgressPhases = ['reading', 'encoding', 'decoding', 'rendering', 'packaging']
 
 const expectSerialProgress = (progressEvents: ManualRuntimeProgressEvent[]) => {
@@ -697,6 +717,104 @@ test.describe('converter app', () => {
 
     await page.locator('.preview-modal__close').click()
     await expect(page.locator('.preview-modal')).toBeHidden()
+  })
+
+  test('copy button appends a ready duplicate row', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
+
+    const rows = rowForFile(page, 'notes.txt')
+    await expect(rows).toHaveCount(1)
+
+    await rows.nth(0).getByRole('button', { name: 'Copy' }).click()
+
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(0).locator('.status')).toContainText('Ready')
+    await expect(rows.nth(1).locator('.status')).toContainText('Ready')
+  })
+
+  test('convert all progress excludes a pre-completed copied row', async ({ page }) => {
+    await routeDelayedProxy(page)
+    await page.reload()
+    await waitForBridgeReady(page)
+
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
+    await targetSelectForRow(page, 'notes.txt').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const rows = rowForFile(page, 'notes.txt')
+    await expect(rows.nth(0).locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+
+    await rows.nth(0).getByRole('button', { name: 'Copy' }).click()
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(1).locator('.status')).toContainText('Ready')
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    await expect(page.locator('.batch-progress')).toHaveText('0 / 1')
+    await expect(rows.nth(0).locator('.status')).toContainText('Done')
+    await expect(rows.nth(1).locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+  })
+
+  test('preview modal keeps rendered HTML preview surfaces white', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
+
+    await targetSelectForRow(page, 'notes.txt').selectOption('html')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const txtRow = rowForFile(page, 'notes.txt')
+    await expect(txtRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+
+    await txtRow.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.locator('.preview-modal__iframe')).toBeVisible()
+
+    const previewBackgrounds = await page.evaluate(() => {
+      const content = document.querySelector('.preview-modal__content')
+      const iframe = document.querySelector('.preview-modal__iframe')
+      if (!(content instanceof HTMLElement) || !(iframe instanceof HTMLElement)) {
+        throw new Error('Expected HTML preview elements to be rendered')
+      }
+      return {
+        content: window.getComputedStyle(content).backgroundColor,
+        iframe: window.getComputedStyle(iframe).backgroundColor
+      }
+    })
+
+    expect(previewBackgrounds).toEqual({
+      content: 'rgb(255, 255, 255)',
+      iframe: 'rgb(255, 255, 255)'
+    })
+  })
+
+  test('PDF preview renders with the canvas viewer instead of an iframe', async ({ page }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+
+    await targetSelectForRow(page, 'sample.pdf').selectOption('pdf')
+    await page.getByRole('button', { name: 'Convert all' }).click()
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+
+    await pdfRow.getByRole('button', { name: 'Preview' }).click()
+
+    await expect(page.locator('.preview-modal__pdf-viewer')).toBeVisible()
+    await expect(page.locator('.preview-modal__pdf-viewer canvas').first()).toBeVisible({
+      timeout: 15000
+    })
+    await expect(page.locator('.preview-modal__content iframe')).toHaveCount(0)
   })
 
   test('converts HTML to TXT and downloads', async ({ page }) => {

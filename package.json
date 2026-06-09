@@ -23,6 +23,11 @@
     "test:e2e:install": "npx playwright install --with-deps"
   },
   "dependencies": {
+    "@hamster-note/document-parser": "^0.3.1",
+    "@hamster-note/html-parser": "^0.8.0",
+    "@hamster-note/image-parser": "^0.3.0",
+    "@hamster-note/pdf-parser": "^0.7.0",
+    "@hamster-note/txt-parser": "^0.2.0",
     "@hamster-note/types": "^0.8.0",
     "i18next": "^23.10.1",
     "i18next-browser-languagedetector": "^8.0.0",

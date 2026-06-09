@@ -39,6 +39,7 @@
     "htmlConvertOptions": "HTML 转换选项",
     "continue": "继续",
     "settings": "设置",
+    "copy": "复制",
     "preview": "预览",
     "previewUnsupported": "该格式不支持预览"
   },
@@ -58,6 +59,7 @@
   },
   "loading": {
     "converting": "转换中...",
+    "convertingWithProgress": "转换中（{{processed}} / {{total}}）",
     "preparingDownload": "准备下载中..."
   },
   "errors": {

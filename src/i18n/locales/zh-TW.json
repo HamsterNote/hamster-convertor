@@ -39,6 +39,7 @@
     "htmlConvertOptions": "HTML 轉換選項",
     "continue": "繼續",
     "settings": "設定",
+    "copy": "複製",
     "preview": "預覽",
     "previewUnsupported": "該格式不支援預覽"
   },
@@ -58,6 +59,7 @@
   },
   "loading": {
     "converting": "轉換中...",
+    "convertingWithProgress": "轉換中（{{processed}} / {{total}}）",
     "preparingDownload": "準備下載中..."
   },
   "errors": {

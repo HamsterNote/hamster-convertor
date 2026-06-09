@@ -275,6 +275,7 @@ a {
   padding: 0;
   text-align: center;
   line-height: 30px;
+  font-size: 15px;
 }
 
 .status__detail {
@@ -796,17 +797,21 @@ a {
 }
 
 .preview-modal-overlay {
+  appearance: none;
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border: 0;
   background: rgba(0, 0, 0, 0.45);
-  padding: 16px;
+  cursor: default;
 }
 
 .preview-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 51;
+  transform: translate(-50%, -50%);
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -921,12 +926,20 @@ a {
   animation: pdf-modal-spin 0.8s linear infinite;
 }
 
+.preview-modal__content,
+.preview-modal__pdf-viewer {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: #fff;
+}
+
 .preview-modal__iframe {
   flex: 1;
   width: 100%;
   height: 100%;
   border: none;
-  background: var(--color-bg);
+  background: #fff;
 }
 
 /* Settings Modal */
@@ -939,9 +952,10 @@ a {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   gap: 20px;
-  padding: 0 20px;
+  padding: 16px 20px 0;
   max-height: calc(100% - 128px);
   overflow: hidden;
+  flex: 1;
 }
 
 .settings-modal__body {
@@ -1116,7 +1130,7 @@ a {
 
   .settings-modal__layout {
     grid-template-columns: 1fr;
-    padding: 0 14px 0 16px;
+    padding: 16px 14px 0 16px;
     max-height: calc(100% - 128px);
     overflow-y: auto;
   }
@@ -1220,7 +1234,6 @@ a {
   appearance: none;
   width: 100%;
   border: 0;
-  background: transparent;
   cursor: pointer;
   text-align: left;
   position: sticky;
@@ -1250,8 +1263,6 @@ a {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: calc(100vh - 204px);
-  overflow-y: auto;
   padding-right: 4px;
 }
 

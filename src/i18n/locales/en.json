@@ -39,6 +39,7 @@
     "htmlConvertOptions": "HTML conversion options",
     "continue": "Continue",
     "settings": "Settings",
+    "copy": "Copy",
     "preview": "Preview",
     "previewUnsupported": "Preview not available for this format"
   },
@@ -58,6 +59,7 @@
   },
   "loading": {
     "converting": "Converting...",
+    "convertingWithProgress": "Converting ({{processed}} / {{total}})",
     "preparingDownload": "Preparing download..."
   },
   "errors": {

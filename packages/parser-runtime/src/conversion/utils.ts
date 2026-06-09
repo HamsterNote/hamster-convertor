@@ -234,22 +234,22 @@ export const applyHtmlLayout = (html: string, layoutOptions?: HtmlLayoutOptions)
   if (!layoutOptions || layoutOptions.mode === 'paginated') {
     const paginatedCss = `
       html, body { overflow: auto !important; height: auto !important; margin: 0; padding: 0; }
-      .hamster-note-document { overflow: visible !important; height: auto !important; contain: none !important; }
-      .hamster-note-page { page-break-after: always; break-after: page; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1); border-radius: 2px; }
-      .hamster-note-page:last-child { page-break-after: auto; break-after: auto; margin-bottom: 0; box-shadow: none; }
+      .hamster-note-document { overflow: visible !important; height: auto !important; contain: none !important; padding-top: 24px !important; }
+      .hamster-note-page { page-break-after: always; break-after: page; margin: 0 auto 24px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1); border-radius: 2px; }
+      .hamster-note-page:last-child { page-break-after: auto; break-after: auto; margin-bottom: 24px; }
     `.trim()
     return injectStyleIntoHead(withCharset, paginatedCss)
   }
 
   const actualWidthCss = `
     html, body { overflow: auto !important; height: auto !important; margin: 0; padding: 0; }
-    .hamster-note-document { overflow: visible !important; height: auto !important; }
+    .hamster-note-document { overflow: visible !important; height: auto !important; padding-top: 24px !important; }
     .hamster-note-page { overflow: visible !important; }
   `.trim()
 
   const fitWidthCss = `
     html, body { overflow-x: hidden !important; overflow-y: auto !important; height: auto !important; margin: 0; padding: 0; }
-    .hamster-note-document { width: 100% !important; max-width: 100% !important; overflow: visible !important; height: auto !important; }
+    .hamster-note-document { width: 100% !important; max-width: 100% !important; overflow: visible !important; height: auto !important; padding-top: 24px !important; }
     .hamster-note-page { width: 100% !important; height: 0 !important; overflow: hidden !important; position: relative !important; }
   `.trim()
 

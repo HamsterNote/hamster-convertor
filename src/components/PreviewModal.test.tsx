@@ -1,8 +1,14 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '../i18n'
-import PreviewModal from './PreviewModal'
 import type { ConversionResult } from '../lib/converter'
+import { loadPdfDocument } from '../lib/pdf-utils'
+import PreviewModal from './PreviewModal'
+
+vi.mock('../lib/pdf-utils', () => ({
+  loadPdfDocument: vi.fn()
+}))
 
 let mockUrlCounter = 0
 const mockCreateObjectURL = vi.fn(() => {
@@ -10,6 +16,7 @@ const mockCreateObjectURL = vi.fn(() => {
   return `blob:mock-url-${mockUrlCounter}`
 })
 const mockRevokeObjectURL = vi.fn()
+const mockGetContext = vi.fn(() => ({}) as CanvasRenderingContext2D)
 
 beforeAll(() => {
   Object.defineProperty(globalThis.URL, 'createObjectURL', {
@@ -22,17 +29,48 @@ beforeAll(() => {
     writable: true,
     configurable: true
   })
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    value: mockGetContext,
+    writable: true,
+    configurable: true
+  })
 })
 
 const revokeObjectURLSpy = mockRevokeObjectURL
 const createObjectURLSpy = mockCreateObjectURL
+const loadPdfDocumentMock = vi.mocked(loadPdfDocument)
 
-function makeResult(filename: string, mimeType = 'text/html'): ConversionResult {
+function makeResult(
+  filename: string,
+  mimeType = 'text/html',
+  targetFormat: ConversionResult['targetFormat'] = 'html'
+): ConversionResult {
+  const blob = new Blob(['<p>hello</p>'], { type: mimeType })
+  Object.defineProperty(blob, 'arrayBuffer', {
+    value: vi.fn(async () => new ArrayBuffer(8)),
+    configurable: true
+  })
+
   return {
-    blob: new Blob(['<p>hello</p>'], { type: mimeType }),
+    blob,
     filename,
     mimeType,
-    targetFormat: 'html'
+    targetFormat
+  }
+}
+
+function makeFakePdfDocument() {
+  return {
+    numPages: 2,
+    getPage: vi.fn(async () => ({
+      getViewport: vi.fn((_options: { scale: number }) => ({ width: 200, height: 300 })),
+      render: vi.fn((_options: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => ({
+        promise: Promise.resolve(),
+        cancel: vi.fn()
+      }))
+    })),
+    cleanup: vi.fn(),
+    destroy: vi.fn()
   }
 }
 
@@ -43,6 +81,8 @@ describe('PreviewModal', () => {
     vi.clearAllMocks()
     revokeObjectURLSpy.mockClear()
     createObjectURLSpy.mockClear()
+    mockGetContext.mockClear()
+    loadPdfDocumentMock.mockResolvedValue(makeFakePdfDocument())
     window.localStorage.setItem('i18nextLng', 'en')
     await i18n.changeLanguage('en')
   })
@@ -67,14 +107,31 @@ describe('PreviewModal', () => {
     // No tab bar
     expect(document.querySelector('.preview-modal__tabs')).toBeNull()
 
-    // Iframe present with empty sandbox
+    const content = document.querySelector('.preview-modal__content')
     const iframe = document.querySelector('iframe')
-    expect(iframe).not.toBeNull()
-    expect(iframe!.hasAttribute('sandbox')).toBe(true)
-    expect(iframe!.getAttribute('sandbox')).toBe('')
+    if (!(content instanceof HTMLElement)) {
+      throw new Error('Expected preview content')
+    }
+    if (!(iframe instanceof HTMLIFrameElement)) {
+      throw new Error('Expected iframe preview')
+    }
+    expect(document.querySelector('.preview-modal__pdf-viewer')).toBeNull()
+    expect(content).toContainElement(iframe)
+    expect(iframe).toHaveClass('preview-modal__iframe')
+    expect(iframe.hasAttribute('sandbox')).toBe(true)
+    expect(iframe.getAttribute('sandbox')).toBe('')
 
     // Loading spinner initially visible (iframe hidden)
-    expect(iframe!.style.display).toBe('none')
+    expect(iframe.style.display).toBe('none')
+  })
+
+  it('keeps preview document surfaces white in CSS', () => {
+    const css = readFileSync('src/styles/global.css', 'utf8')
+
+    expect(css).toMatch(
+      /\.preview-modal__content,\s*\.preview-modal__pdf-viewer\s*\{[\s\S]*background:\s*#fff;/
+    )
+    expect(css).toMatch(/\.preview-modal__iframe\s*\{[\s\S]*background:\s*#fff;/)
   })
 
   it('multi-result: shows tab bar with result filenames', () => {
@@ -163,43 +220,88 @@ describe('PreviewModal', () => {
     render(<PreviewModal open results={[makeResult('a.html')]} onClose={onClose} />)
 
     const iframe = document.querySelector('iframe')
-    expect(iframe).not.toBeNull()
+    if (!(iframe instanceof HTMLIFrameElement)) {
+      throw new Error('Expected iframe preview')
+    }
 
     // Simulate iframe load
-    fireEvent.load(iframe!)
+    fireEvent.load(iframe)
 
     // After load, iframe should be visible
-    expect(iframe!.style.display).toBe('block')
+    expect(iframe.style.display).toBe('block')
 
     // Spinner should be hidden
     const spinner = document.querySelector('.preview-modal__spinner')
     expect(spinner).toBeNull()
   })
 
-  it('PDF fallback: hides spinner after timeout even if onLoad never fires', () => {
-    vi.useFakeTimers()
+  it('PDF result: renders all pages into canvases and skips iframe', async () => {
     render(
-      <PreviewModal open results={[makeResult('a.pdf', 'application/pdf')]} onClose={onClose} />
+      <PreviewModal
+        open
+        results={[makeResult('a.pdf', 'application/pdf', 'pdf')]}
+        onClose={onClose}
+      />
     )
 
-    const iframe = document.querySelector('iframe')
-    expect(iframe).not.toBeNull()
-    expect(iframe!.style.display).toBe('none')
-
-    // Spinner visible before timeout
+    const viewer = document.querySelector('.preview-modal__pdf-viewer')
+    if (!(viewer instanceof HTMLElement)) {
+      throw new Error('Expected PDF viewer')
+    }
+    expect(document.querySelector('iframe')).toBeNull()
     expect(document.querySelector('.preview-modal__spinner')).not.toBeNull()
 
-    // Advance past the 800ms fallback timeout
-    act(() => {
-      vi.advanceTimersByTime(1000)
+    await waitFor(() => {
+      expect(viewer.querySelectorAll('canvas')).toHaveLength(2)
     })
 
-    // Iframe should now be visible
-    expect(iframe!.style.display).toBe('block')
-
-    // Spinner should be hidden
+    expect(loadPdfDocumentMock).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('iframe')).toBeNull()
     expect(document.querySelector('.preview-modal__spinner')).toBeNull()
+  })
 
-    vi.useRealTimers()
+  it('PDF load failure: shows a clear error and no iframe', async () => {
+    loadPdfDocumentMock.mockRejectedValueOnce(new Error('mock load failed'))
+
+    render(
+      <PreviewModal
+        open
+        results={[makeResult('broken.pdf', 'application/pdf', 'pdf')]}
+        onClose={onClose}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Unable to render PDF preview: mock load failed')).toBeVisible()
+    })
+
+    expect(document.querySelector('.pdf-modal__error')).not.toBeNull()
+    expect(document.querySelector('.preview-modal__pdf-viewer')).toBeNull()
+    expect(document.querySelector('iframe')).toBeNull()
+  })
+
+  it('switching from PDF to HTML removes PDF viewer and shows iframe', async () => {
+    const results = [
+      makeResult('first.pdf', 'application/pdf', 'pdf'),
+      makeResult('second.html', 'text/html', 'html')
+    ]
+    render(<PreviewModal open results={results} onClose={onClose} />)
+
+    const viewer = document.querySelector('.preview-modal__pdf-viewer')
+    if (!(viewer instanceof HTMLElement)) {
+      throw new Error('Expected PDF viewer')
+    }
+
+    await waitFor(() => {
+      expect(viewer.querySelectorAll('canvas')).toHaveLength(2)
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'second.html' }))
+
+    await waitFor(() => {
+      expect(document.querySelector('iframe')).not.toBeNull()
+    })
+
+    expect(document.querySelector('.preview-modal__pdf-viewer')).toBeNull()
   })
 })

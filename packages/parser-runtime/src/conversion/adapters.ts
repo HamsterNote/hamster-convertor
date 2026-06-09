@@ -232,6 +232,15 @@ const getImageToPdfDrawBox = (
   const drawWidth = Math.min(coverClampedWidth * scaleMultiplier, usableWidth)
   const drawHeight = Math.min(coverClampedHeight * scaleMultiplier, usableHeight)
 
+  if (options.fit === 'contain') {
+    return {
+      drawHeight,
+      drawWidth,
+      x: marginPt,
+      y: marginPt
+    }
+  }
+
   return {
     drawHeight,
     drawWidth,
