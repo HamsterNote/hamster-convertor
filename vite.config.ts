@@ -14,6 +14,7 @@ const pdfParserStandardFontsPath = path.resolve(
 const localDevAlias: Record<string, string> = {}
 const typesPath = path.resolve(__dirname, '../types/src/index.ts')
 const parserRuntimeIndexPath = path.resolve(__dirname, 'packages/parser-runtime/index.html')
+const pdfParserStandardFontsExpression = 'new URL("./standard_fonts/", import.meta.url).href'
 
 if (existsSync(typesPath)) {
   localDevAlias['@hamster-note/types'] = typesPath
@@ -65,6 +66,25 @@ const interceptPdfjsImportPlugin = (): Plugin => ({
 
     return {
       code: modifiedCode,
+      map: null
+    }
+  }
+})
+
+const ensurePdfParserStandardFontUrlPlugin = (): Plugin => ({
+  name: 'ensure-pdf-parser-standard-font-url',
+  enforce: 'pre',
+  transform(code, id) {
+    const isPdfParserModule = id.includes('@hamster-note/pdf-parser') || id.includes('/PdfParser/')
+    if (!isPdfParserModule || !code.includes(pdfParserStandardFontsExpression)) {
+      return null
+    }
+
+    return {
+      code: code.replaceAll(
+        pdfParserStandardFontsExpression,
+        `${pdfParserStandardFontsExpression}.replace(/\\/?$/, '/')`
+      ),
       map: null
     }
   }
@@ -135,7 +155,12 @@ const parserRuntimeDevServerPlugin = (): Plugin => ({
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [interceptPdfjsImportPlugin(), parserRuntimeDevServerPlugin(), react()],
+  plugins: [
+    interceptPdfjsImportPlugin(),
+    ensurePdfParserStandardFontUrlPlugin(),
+    parserRuntimeDevServerPlugin(),
+    react()
+  ],
   resolve: {
     alias: {
       ...localDevAlias,

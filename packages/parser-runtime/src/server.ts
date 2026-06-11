@@ -49,7 +49,7 @@ type ParserBridgeError = {
 type ParserBridgeResponse = {
   requestId: string
   type: 'convert:result' | 'convert:error' | 'progress'
-  payload?: ParserBridgeConversionResultPayload
+  payload?: ParserBridgeConversionResultPayload | ParserBridgeConversionResultPayload[]
   error?: ParserBridgeError
   progress?: ParserBridgeProgress
 }
@@ -63,7 +63,7 @@ export type ConversionTask = {
   options?: Record<string, unknown>
   status: 'queued' | 'active' | 'completed' | 'cancelled' | 'error'
   progress?: ParserBridgeProgress
-  result?: ParserBridgeConversionResultPayload
+  result?: ParserBridgeConversionResultPayload[]
   error?: ParserBridgeError
 }
 
@@ -393,7 +393,7 @@ export function createProtocolServer(port: MessagePort): ProtocolServer {
 
   const runConversion = async (
     task: ConversionTask
-  ): Promise<ParserBridgeConversionResultPayload> => {
+  ): Promise<ParserBridgeConversionResultPayload[]> => {
     if (!isSourceFormat(task.sourceFormat) || !isTargetFormat(task.targetFormat)) {
       throw createError(
         'UNSUPPORTED_CONVERSION',
@@ -409,22 +409,20 @@ export function createProtocolServer(port: MessagePort): ProtocolServer {
       buffer: task.buffer,
       options: normalizeConversionOptions(task.options)
     })
-    const [result] = results
-
-    if (!result) {
+    if (results.length === 0) {
       throw createError('CONVERSION_FAILED', 'Conversion produced no output')
     }
 
-    return {
+    return results.map(result => ({
       filename: result.filename,
       mimeType: result.mimeType,
       targetFormat: result.targetFormat,
       buffer: result.buffer,
       warnings: normalizeWarnings(result.warnings)
-    }
+    }))
   }
 
-  const completeTask = (task: ConversionTask, result: ParserBridgeConversionResultPayload) => {
+  const completeTask = (task: ConversionTask, result: ParserBridgeConversionResultPayload[]) => {
     if (disposed || task.status === 'cancelled' || cancelledActiveRequestIds.has(task.requestId)) {
       console.warn(
         '[parser-runtime] Ignored late conversion result after cancellation:',
@@ -436,7 +434,11 @@ export function createProtocolServer(port: MessagePort): ProtocolServer {
     task.status = 'completed'
     task.result = result
     emitProgress(task, 'completed')
-    postResponse({ requestId: task.requestId, type: 'convert:result', payload: result })
+    postResponse({
+      requestId: task.requestId,
+      type: 'convert:result',
+      payload: result.length === 1 ? result[0] : result
+    })
   }
 
   const cancelActiveAtBoundary = (task: ConversionTask) => {

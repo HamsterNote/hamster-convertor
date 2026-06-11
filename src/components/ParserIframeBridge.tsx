@@ -9,7 +9,9 @@ import { BridgeError, BridgeErrorCode, createBridgeClient } from '../lib/parser-
 import { getParserRuntimeUrl } from '../lib/parser-bridge/url'
 
 export type ParserIframeBridgeRef = {
-  convert: (request: ParserBridgeRequest) => Promise<ParserBridgeConversionResultPayload>
+  convert: (
+    request: ParserBridgeRequest
+  ) => Promise<ParserBridgeConversionResultPayload | ParserBridgeConversionResultPayload[]>
   getProgress: () => ParserBridgeProgress | null
   cancel: (requestId: string) => Promise<void>
 }

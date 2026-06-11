@@ -428,10 +428,10 @@
   dependencies:
     "@hamster-note/types" "^0.5.1"
 
-"@hamster-note/html-parser@^0.8.0":
-  version "0.8.0"
-  resolved "https://registry.yarnpkg.com/@hamster-note/html-parser/-/html-parser-0.8.0.tgz#d1fea85b1e6ee6793836635fee90b915bbf689fd"
-  integrity sha512-qO9JIRkvlDbD1XfcjU+Aucx6g/5sIzR3FbmyyVwHQk9cQpgaEz7iPHj+51xcNXXPSWz66KhDFsLdpDXP04EUOw==
+"@hamster-note/html-parser@^0.9.0":
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/@hamster-note/html-parser/-/html-parser-0.9.0.tgz#3a9b5cf554bfb4771ad873d85657769bf5263d6a"
+  integrity sha512-5Hw2nns8jZmcw9bodepaq6mu+rT8FHLIWQSmczIr3jClXP1csIawDCavh73hlg5vokfBcN139GZBhNfkDFAJNw==
   dependencies:
     "@chenglou/pretext" "^0.0.6"
     "@hamster-note/document-parser" "0.3.1"

@@ -33,14 +33,18 @@ export function generateRequestId(): string {
 }
 
 type PendingRequest = {
-  resolve: (value: ParserBridgeConversionResultPayload) => void
+  resolve: (
+    value: ParserBridgeConversionResultPayload | ParserBridgeConversionResultPayload[]
+  ) => void
   reject: (error: Error) => void
   timeoutId: ReturnType<typeof setTimeout>
   cancelled: boolean
 }
 
 export type BridgeClient = {
-  sendConvert: (request: ParserBridgeRequest) => Promise<ParserBridgeConversionResultPayload>
+  sendConvert: (
+    request: ParserBridgeRequest
+  ) => Promise<ParserBridgeConversionResultPayload | ParserBridgeConversionResultPayload[]>
   sendCancel: (requestId: string) => Promise<void>
   getProgress: () => ParserBridgeProgress | null
   dispose: () => void
@@ -81,7 +85,9 @@ export function createBridgeClient(port: MessagePort): BridgeClient {
 
     if (data.type === 'convert:result' && data.payload && typeof data.payload === 'object') {
       pending.delete(requestId)
-      pendingRequest.resolve(data.payload as ParserBridgeConversionResultPayload)
+      pendingRequest.resolve(
+        data.payload as ParserBridgeConversionResultPayload | ParserBridgeConversionResultPayload[]
+      )
     } else if (data.type === 'convert:error' && data.error && typeof data.error === 'object') {
       pending.delete(requestId)
       const error = data.error as { code?: string; message?: string }

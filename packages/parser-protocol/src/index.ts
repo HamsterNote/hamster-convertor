@@ -81,7 +81,7 @@ export type ParserBridgeError = {
 export type ParserBridgeResponse = {
   requestId: string
   type: 'convert:result' | 'convert:error' | 'progress'
-  payload?: ParserBridgeConversionResultPayload
+  payload?: ParserBridgeConversionResultPayload | ParserBridgeConversionResultPayload[]
   error?: ParserBridgeError
   progress?: ParserBridgeProgress
 }
@@ -318,7 +318,9 @@ export function isParserBridgeResponse(value: unknown): value is ParserBridgeRes
   if (!isString(requestId)) return false
 
   if (type === 'convert:result') {
-    return isParserBridgeConversionResultPayload(payload)
+    return Array.isArray(payload)
+      ? payload.every(isParserBridgeConversionResultPayload)
+      : isParserBridgeConversionResultPayload(payload)
   }
 
   if (type === 'convert:error') {

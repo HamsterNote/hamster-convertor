@@ -47,13 +47,21 @@ type ParserBridgeResponse = {
     percent: number
     queueLength: number
   }
-  payload?: {
-    filename: string
-    mimeType: string
-    targetFormat: string
-    buffer: ArrayBuffer
-    warnings?: string[]
-  }
+  payload?:
+    | {
+        filename: string
+        mimeType: string
+        targetFormat: string
+        buffer: ArrayBuffer
+        warnings?: string[]
+      }
+    | {
+        filename: string
+        mimeType: string
+        targetFormat: string
+        buffer: ArrayBuffer
+        warnings?: string[]
+      }[]
 }
 
 type ReadyMessage = { type: 'ready' }
@@ -195,6 +203,14 @@ const getPhases = (port: FakeMessagePort, requestId: string) =>
 const hasReady = (port: FakeMessagePort) =>
   port.messages.some(m => !isResponse(m) && m.type === 'ready')
 
+const getPayloadArray = (payload: ParserBridgeResponse['payload']) => {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  return payload ? [payload] : []
+}
+
 const waitFor = async (predicate: () => boolean) => {
   for (let i = 0; i < 50; i++) {
     if (predicate()) return
@@ -257,8 +273,41 @@ describe('ProtocolServer integration', () => {
       r => r.requestId === 'e2e-1' && r.type === 'convert:result'
     )
     expect(result).toBeDefined()
-    expect(result?.payload?.filename).toBe('e2e-1.html')
-    expect(result?.payload?.mimeType).toBe('text/html;charset=utf-8')
+    const [payload] = getPayloadArray(result?.payload)
+    expect(payload?.filename).toBe('e2e-1.html')
+    expect(payload?.mimeType).toBe('text/html;charset=utf-8')
+  })
+
+  it('returns every runtime conversion output in one result payload', async () => {
+    conversionMock.mockImplementationOnce(async (request: ConversionTask) => [
+      {
+        filename: `${request.filename.replace(/\.pdf$/i, '')}-page-001.png`,
+        mimeType: 'image/png',
+        targetFormat: 'png',
+        buffer: new ArrayBuffer(1)
+      },
+      {
+        filename: `${request.filename.replace(/\.pdf$/i, '')}-page-002.png`,
+        mimeType: 'image/png',
+        targetFormat: 'png',
+        buffer: new ArrayBuffer(2)
+      }
+    ])
+
+    port.dispatch({
+      ...createConvertRequest('multi-output'),
+      targetFormat: 'png'
+    })
+
+    await waitFor(() => getResultIds(port).includes('multi-output'))
+
+    const result = getResponses(port).find(
+      r => r.requestId === 'multi-output' && r.type === 'convert:result'
+    )
+    expect(getPayloadArray(result?.payload).map(payload => payload.filename)).toEqual([
+      'multi-output-page-001.png',
+      'multi-output-page-002.png'
+    ])
   })
 
   it('reports full stage progression for a single request', async () => {
@@ -489,10 +538,11 @@ describe('ProtocolServer integration', () => {
     const result = getResponses(port).find(
       r => r.requestId === 'payload-check' && r.type === 'convert:result'
     )
-    expect(result?.payload).toBeDefined()
-    expect(typeof result?.payload?.filename).toBe('string')
-    expect(typeof result?.payload?.mimeType).toBe('string')
-    expect(typeof result?.payload?.targetFormat).toBe('string')
-    expect(result?.payload?.buffer).toBeInstanceOf(ArrayBuffer)
+    const [payload] = getPayloadArray(result?.payload)
+    expect(payload).toBeDefined()
+    expect(typeof payload?.filename).toBe('string')
+    expect(typeof payload?.mimeType).toBe('string')
+    expect(typeof payload?.targetFormat).toBe('string')
+    expect(payload?.buffer).toBeInstanceOf(ArrayBuffer)
   })
 })

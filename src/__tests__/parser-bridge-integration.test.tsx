@@ -19,6 +19,14 @@ const createTestFile = (name: string, content: string): File => {
   return new File([buffer], name, { type: 'application/pdf' })
 }
 
+type MockBridgePayload = {
+  filename: string
+  mimeType: string
+  targetFormat: string
+  buffer: ArrayBuffer
+  warnings?: string[]
+}
+
 const createSimpleMockBridge = (
   onConvert: (request: {
     requestId: string
@@ -27,15 +35,7 @@ const createSimpleMockBridge = (
     targetFormat: string
     buffer: ArrayBuffer
     options?: Record<string, unknown>
-  }) =>
-    | {
-        filename: string
-        mimeType: string
-        targetFormat: string
-        buffer: ArrayBuffer
-        warnings?: string[]
-      }
-    | Error
+  }) => MockBridgePayload | MockBridgePayload[] | Error
 ): ParserIframeBridgeRef => ({
   convert: vi.fn(async request => {
     const result = onConvert(request)
@@ -62,7 +62,7 @@ describe('convertViaBridge integration', () => {
     }))
 
     const file = createTestFile('test.pdf', '%PDF-1.4 mock content')
-    const result = await convertViaBridge(bridge, file, 'pdf', 'html')
+    const [result] = await convertViaBridge(bridge, file, 'pdf', 'html')
 
     expect(bridge.convert).toHaveBeenCalledTimes(1)
 
@@ -80,6 +80,32 @@ describe('convertViaBridge integration', () => {
     expect(result.targetFormat).toBe('html')
     expect(result.blob).toBeInstanceOf(Blob)
     expect(result.warnings).toBeUndefined()
+  })
+
+  it('preserves multiple bridge outputs in order', async () => {
+    const bridge = createSimpleMockBridge(() => [
+      {
+        filename: 'pages-page-001.png',
+        mimeType: 'image/png',
+        targetFormat: 'png',
+        buffer: new ArrayBuffer(1)
+      },
+      {
+        filename: 'pages-page-002.png',
+        mimeType: 'image/png',
+        targetFormat: 'png',
+        buffer: new ArrayBuffer(2)
+      }
+    ])
+
+    const file = createTestFile('pages.pdf', '%PDF')
+    const results = await convertViaBridge(bridge, file, 'pdf', 'png')
+
+    expect(results.map(result => result.filename)).toEqual([
+      'pages-page-001.png',
+      'pages-page-002.png'
+    ])
+    expect(results.every(result => result.blob instanceof Blob)).toBe(true)
   })
 
   it('propagates bridge error to caller', async () => {
@@ -126,7 +152,7 @@ describe('convertViaBridge integration', () => {
     }))
 
     const file = createTestFile('warn.pdf', '%PDF')
-    const result = await convertViaBridge(bridge, file, 'pdf', 'html')
+    const [result] = await convertViaBridge(bridge, file, 'pdf', 'html')
 
     expect(result.warnings).toEqual(['OCR quality low', 'Missing font fallback'])
   })
@@ -160,7 +186,7 @@ describe('convertViaBridge integration', () => {
     const file1 = createTestFile('a.pdf', 'A')
     const file2 = createTestFile('b.pdf', 'B')
 
-    const [r1, r2] = await Promise.all([
+    const [[r1], [r2]] = await Promise.all([
       convertViaBridge(bridge, file1, 'pdf', 'html'),
       convertViaBridge(bridge, file2, 'pdf', 'html')
     ])

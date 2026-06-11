@@ -42,7 +42,7 @@ export async function convertViaBridge(
   sourceFormat: string,
   targetFormat: TargetFormat,
   options?: Record<string, unknown>
-): Promise<ConversionResult> {
+): Promise<ConversionResult[]> {
   const buffer = await readFileAsArrayBuffer(file)
   const request: ParserBridgeRequest = {
     requestId: generateRequestId(),
@@ -55,15 +55,19 @@ export async function convertViaBridge(
   }
 
   const result = await bridgeRef.convert(request)
-  if (!isTargetFormat(result.targetFormat)) {
-    throw new Error(`Unsupported bridge target format: ${result.targetFormat}`)
-  }
+  const payloads = Array.isArray(result) ? result : [result]
 
-  return {
-    filename: result.filename,
-    mimeType: result.mimeType,
-    targetFormat: result.targetFormat,
-    blob: new Blob([result.buffer], { type: result.mimeType }),
-    warnings: result.warnings
-  }
+  return payloads.map(payload => {
+    if (!isTargetFormat(payload.targetFormat)) {
+      throw new Error(`Unsupported bridge target format: ${payload.targetFormat}`)
+    }
+
+    return {
+      filename: payload.filename,
+      mimeType: payload.mimeType,
+      targetFormat: payload.targetFormat,
+      blob: new Blob([payload.buffer], { type: payload.mimeType }),
+      warnings: payload.warnings
+    }
+  })
 }
