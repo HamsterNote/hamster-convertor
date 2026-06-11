@@ -51,3 +51,6 @@ test-results/
 
 # ts 增量编译
 *.tsbuildinfo
+
+# Codemap 状态文件（工具内部状态）
+.slim/
