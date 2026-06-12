@@ -1,4 +1,6 @@
 import {
+  convertDocxToHtml,
+  convertDocxToTxt,
   convertHtmlToTxt,
   convertImageToHtml,
   convertImageToImage,
@@ -12,9 +14,14 @@ import {
   convertTxtToImage,
   type RuntimeConversionAdapter
 } from './adapters'
-import type { ConversionWarning, HtmlDecodeOptions, HtmlLayoutOptions } from './utils'
+import type {
+  ConversionWarning,
+  HtmlDecodeOptions,
+  HtmlEncodeOptions,
+  HtmlLayoutOptions
+} from './utils'
 
-export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
+export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html' | 'docx'
 
 export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
@@ -51,6 +58,7 @@ export type ConversionOptions = {
     selectedPages?: number[]
     selectedImagePages?: number[]
   }
+  encode?: HtmlEncodeOptions
   decode?: HtmlDecodeOptions
   layout?: HtmlLayoutOptions
   image?: ImageOptions
@@ -90,7 +98,8 @@ const supportedTargets = {
   pdf: ['txt', 'png', 'jpg', 'webp', 'pdf', 'html'],
   txt: ['png', 'jpg', 'webp', 'html'],
   image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
-  html: ['txt']
+  html: ['txt'],
+  docx: ['txt', 'html']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
 
 type ConversionAdapterMap = Record<
@@ -123,6 +132,10 @@ const adapters: ConversionAdapterMap = {
   },
   html: {
     txt: convertHtmlToTxt
+  },
+  docx: {
+    txt: convertDocxToTxt,
+    html: convertDocxToHtml
   }
 }
 

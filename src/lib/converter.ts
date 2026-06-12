@@ -1,9 +1,5 @@
 export type ConversionWarning = string | { message: string }
 
-/**
- * html-parser@0.8.0 的 DecodeOptions 类型定义
- * 用于控制 HTML 解码时的文字样式和背景渲染行为
- */
 export type HtmlDecodeOptions = {
   textControl?: {
     fontSize?: number
@@ -19,7 +15,13 @@ export type HtmlDecodeOptions = {
     includeBackground?: boolean
     backgroundQuality?: number
     excludeTextFromBackground?: boolean
+    excludeImagesFromBackground?: boolean
   }
+}
+
+export type HtmlEncodeOptions = {
+  excludeSelectors?: string[]
+  snapshotWidth?: number
 }
 
 export type PdfToHtmlResult = {
@@ -41,7 +43,7 @@ export type ConvertPdfToHtml = (
   }
 ) => Promise<PdfToHtmlResult>
 
-export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html'
+export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html' | 'docx'
 
 export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
 
@@ -72,6 +74,7 @@ export type ConversionRequest = {
       selectedPages?: number[]
       selectedImagePages?: number[]
     }
+    encode?: HtmlEncodeOptions
     decode?: HtmlDecodeOptions
     layout?: HtmlLayoutOptions
     image?: {
@@ -110,7 +113,8 @@ const supportedTargets = {
   pdf: ['txt', 'png', 'jpg', 'webp', 'pdf', 'html'],
   txt: ['png', 'html'],
   image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
-  html: ['txt']
+  html: ['txt'],
+  docx: ['txt', 'html']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
 
 export const getSupportedTargets = (source: SourceFormat): TargetFormat[] => [

@@ -25,16 +25,17 @@ const wrappedGetDocument = (src?: GetDocumentSrc) => {
     const params = src as CMapParams
 
     if (!params.cMapUrl) {
+      const cMapUrl = `${import.meta.env.BASE_URL || '/'}cmaps/`.replace(/\/+/g, '/')
       console.log('[pdfjs-wrapper] Injecting CMap options:', {
-        cMapUrl: '/cmaps/',
+        cMapUrl,
         cMapPacked: true,
         useWorkerFetch: true
       })
       return originalGetDocument({
         ...params,
-        cMapUrl: '/cmaps/',
+        cMapUrl,
         cMapPacked: true,
-        useWorkerFetch: true // 强制 Worker 直接获取 CMap，绕过自动检测
+        useWorkerFetch: true
       } as unknown as GetDocumentSrc)
     }
   }

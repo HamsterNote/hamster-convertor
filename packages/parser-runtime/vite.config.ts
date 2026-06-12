@@ -90,8 +90,22 @@ const ensurePdfParserStandardFontUrlPlugin = (): Plugin => ({
   }
 })
 
+// 与根 vite.config.ts 保持一致的 BASE_PATH 处理逻辑：
+// - 默认根部署：base = '/parser-runtime/'
+// - 子路径部署 BASE_PATH=/beta/：base = '/beta/parser-runtime/'
+// 注意：这里要避免出现 '//parser-runtime/' 这种重复斜杠。
+const resolveRuntimeBase = (): string => {
+  const raw = process.env.BASE_PATH
+  if (!raw || raw === '/') {
+    return '/parser-runtime/'
+  }
+  const withLeading = raw.startsWith('/') ? raw : `/${raw}`
+  const withTrailing = withLeading.endsWith('/') ? withLeading : `${withLeading}/`
+  return `${withTrailing}parser-runtime/`.replace(/\/+/g, '/')
+}
+
 export default defineConfig({
-  base: '/parser-runtime/',
+  base: resolveRuntimeBase(),
   plugins: [interceptPdfjsImportPlugin(), ensurePdfParserStandardFontUrlPlugin()],
   optimizeDeps: {
     exclude: ['@hamster-note/pdf-parser']

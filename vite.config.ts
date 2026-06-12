@@ -153,8 +153,26 @@ const parserRuntimeDevServerPlugin = (): Plugin => ({
   }
 })
 
+// 通过 BASE_PATH 环境变量切换部署根路径：
+// - 默认根部署：BASE_PATH 未设置 → '/'，资源指向 /assets/...
+// - GitHub Pages beta 子路径部署：BASE_PATH=/beta/ → '/beta/'，资源指向 /beta/assets/...
+// 一定保证以 '/' 开头并以 '/' 结尾，否则 Vite 输出的资源路径会拼接出错。
+const resolveBasePath = (): string => {
+  const raw = process.env.BASE_PATH
+  if (!raw || raw === '/') {
+    return '/'
+  }
+  // 容错处理：用户可能传 'beta' / '/beta' / 'beta/' 等，统一规范成 '/beta/'
+  const withLeading = raw.startsWith('/') ? raw : `/${raw}`
+  const withTrailing = withLeading.endsWith('/') ? withLeading : `${withLeading}/`
+  return withTrailing.replace(/\/+/g, '/')
+}
+
+const basePath = resolveBasePath()
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: basePath,
   plugins: [
     interceptPdfjsImportPlugin(),
     ensurePdfParserStandardFontUrlPlugin(),

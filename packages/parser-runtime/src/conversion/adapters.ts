@@ -1,4 +1,9 @@
-import type { IntermediateDocument } from '@hamster-note/types'
+import type {
+  IntermediateContent,
+  IntermediateDocument,
+  IntermediateImage,
+  IntermediatePage
+} from '@hamster-note/types'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { stripExifCategories } from './exif'
 import type { ConversionRequest, ConversionResult } from './index'
@@ -25,11 +30,13 @@ import {
 type PdfParserModule = typeof import('@hamster-note/pdf-parser')
 type ImageParserModule = typeof import('@hamster-note/image-parser')
 type HtmlParserModule = typeof import('@hamster-note/html-parser')
+type DocxParserModule = typeof import('@hamster-note/docx-parser')
 type PdfParserApi = {
   encode: (arrayBuffer: ArrayBuffer) => Promise<IntermediateDocument | undefined>
 }
 type HtmlParserDecodeOptions = Parameters<HtmlParserModule['HtmlParser']['decodeToHtml']>[1]
 type HtmlParserDecodeResultOptions = Parameters<HtmlParserModule['HtmlParser']['decode']>[1]
+type HtmlParserEncodeOptions = Parameters<HtmlParserModule['HtmlParser']['encode']>[1]
 type JsPdfModule = typeof import('jspdf')
 type JsPdfDocument = InstanceType<JsPdfModule['jsPDF']>
 
@@ -59,6 +66,9 @@ type ImageDimensions = { height: number; width: number }
 type ImageOptions = NonNullable<NonNullable<ConversionRequest['options']>['image']>
 type ImageToPdfOptions = NonNullable<NonNullable<ConversionRequest['options']>['imageToPdf']>
 type PdfPageBox = { height: number; width: number }
+type ThumbnailPage = IntermediatePage & {
+  getThumbnail: (scale?: number) => Promise<IntermediateImage | undefined>
+}
 
 const A4_PORTRAIT_PT: PdfPageBox = { width: 595.28, height: 841.89 }
 const A4_LANDSCAPE_PT: PdfPageBox = { width: 841.89, height: 595.28 }
@@ -263,6 +273,71 @@ const getSelectedPdfBuffer = async (
   return extractPdfPages(buffer, pageNumbers)
 }
 
+const isIntermediateImage = (item: IntermediateContent): item is IntermediateImage => 'src' in item
+
+const hasRenderableImageSourceValue = (src: string): boolean => {
+  const trimmed = src.trim()
+
+  if (!trimmed) {
+    return false
+  }
+
+  if (trimmed.toLowerCase().startsWith('data:')) {
+    const commaIndex = trimmed.indexOf(',')
+    return commaIndex >= 0 && trimmed.slice(commaIndex + 1).trim().length > 0
+  }
+
+  return true
+}
+
+const hasRenderableImageSource = (item: IntermediateContent): boolean =>
+  !isIntermediateImage(item) || hasRenderableImageSourceValue(item.src)
+
+const canSanitizeThumbnail = (page: IntermediatePage): page is ThumbnailPage =>
+  typeof page.getThumbnail === 'function'
+
+const sanitizePageThumbnail = (page: IntermediatePage): void => {
+  if (!canSanitizeThumbnail(page)) {
+    return
+  }
+
+  const getThumbnail = page.getThumbnail.bind(page)
+  page.getThumbnail = async scale => {
+    const thumbnail = await getThumbnail(scale)
+    return thumbnail && hasRenderableImageSourceValue(thumbnail.src) ? thumbnail : undefined
+  }
+}
+
+const sanitizePdfHtmlBackgrounds = (html: string): string => {
+  const document = new DOMParser().parseFromString(html, 'text/html')
+
+  document.querySelectorAll<HTMLElement>('[style]').forEach(element => {
+    const backgroundImage = element.style.backgroundImage
+    const invalidDataBackground =
+      backgroundImage.startsWith('url("data:') || backgroundImage.startsWith("url('data:")
+
+    if (invalidDataBackground && !hasRenderableImageSourceValue(backgroundImage.slice(5, -2))) {
+      element.style.removeProperty('background-image')
+    }
+  })
+
+  return document.body.innerHTML
+}
+
+const preparePdfIntermediateForHtml = async (intermediate: IntermediateDocument): Promise<void> => {
+  const pages = await intermediate.pages
+  const hydratedPages = await Promise.all(
+    pages.map(async page => {
+      const content = await page.getContent()
+      page.content = content.filter(hasRenderableImageSource)
+      sanitizePageThumbnail(page)
+      return page
+    })
+  )
+
+  intermediate.pages = hydratedPages
+}
+
 export const convertPdfToHtml = async (request: ConversionRequest): Promise<ConversionResult[]> => {
   const selectedPages = request.options?.pdf?.selectedPages
   const effectiveBuffer = await getSelectedPdfBuffer(request.buffer, selectedPages)
@@ -276,9 +351,10 @@ export const convertPdfToHtml = async (request: ConversionRequest): Promise<Conv
     throw new Error('PDF parser returned no intermediate document')
   }
 
-  const html = await HtmlParser.decodeToHtml(
-    intermediate,
-    request.options?.decode as HtmlParserDecodeOptions
+  await preparePdfIntermediateForHtml(intermediate)
+
+  const html = sanitizePdfHtmlBackgrounds(
+    await HtmlParser.decodeToHtml(intermediate, request.options?.decode as HtmlParserDecodeOptions)
   )
   const mimeType = 'text/html;charset=utf-8'
   return [
@@ -292,6 +368,61 @@ export const convertPdfToHtml = async (request: ConversionRequest): Promise<Conv
       warnings: []
     }
   ]
+}
+
+const intermediateToHtmlResult = async (
+  request: ConversionRequest,
+  intermediate: IntermediateDocument
+): Promise<ConversionResult[]> => {
+  const { HtmlParser } = (await import('@hamster-note/html-parser')) as HtmlParserModule
+  const html = await HtmlParser.decodeToHtml(
+    intermediate,
+    request.options?.decode as HtmlParserDecodeOptions
+  )
+  const mimeType = 'text/html;charset=utf-8'
+  return [
+    {
+      buffer: await blobToArrayBuffer(
+        textToBlob(applyHtmlLayout(html, request.options?.layout), mimeType)
+      ),
+      filename: replaceExtension(request.filename, 'html'),
+      mimeType,
+      targetFormat: 'html'
+    }
+  ]
+}
+
+const intermediateToTxtResult = async (
+  request: ConversionRequest,
+  intermediate: IntermediateDocument
+): Promise<ConversionResult[]> => {
+  const text = extractIntermediateText(intermediate)
+  const mimeType = 'text/plain;charset=utf-8'
+  return [
+    {
+      buffer: await blobToArrayBuffer(textToBlob(text, mimeType)),
+      filename: replaceExtension(request.filename, 'txt'),
+      mimeType,
+      targetFormat: 'txt'
+    }
+  ]
+}
+
+const encodeDocxIntermediate = async (arrayBuffer: ArrayBuffer): Promise<IntermediateDocument> => {
+  const { DocxParser } = (await import('@hamster-note/docx-parser')) as DocxParserModule
+  return DocxParser.encodeToIntermediate(arrayBuffer)
+}
+
+export const convertDocxToHtml = async (
+  request: ConversionRequest
+): Promise<ConversionResult[]> => {
+  const intermediate = await encodeDocxIntermediate(request.buffer)
+  return intermediateToHtmlResult(request, intermediate)
+}
+
+export const convertDocxToTxt = async (request: ConversionRequest): Promise<ConversionResult[]> => {
+  const intermediate = await encodeDocxIntermediate(request.buffer)
+  return intermediateToTxtResult(request, intermediate)
 }
 
 export const convertPdfToTxt = async (request: ConversionRequest): Promise<ConversionResult[]> => {
@@ -801,7 +932,10 @@ export const convertTxtToHtml = async (request: ConversionRequest): Promise<Conv
 
 export const convertHtmlToTxt = async (request: ConversionRequest): Promise<ConversionResult[]> => {
   const { HtmlParser } = await import('@hamster-note/html-parser')
-  const htmlDocument = await HtmlParser.encode(request.buffer)
+  const htmlDocument = await HtmlParser.encode(
+    request.buffer,
+    request.options?.encode as HtmlParserEncodeOptions
+  )
   const pages = await htmlDocument.getPages()
   const pageTexts: string[] = []
 

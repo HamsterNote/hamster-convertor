@@ -80,6 +80,7 @@
     "includeBackground": "Include Background",
     "backgroundQuality": "Background Quality",
     "excludeTextFromBackground": "Exclude Text from Background",
+    "excludeImagesFromBackground": "Exclude Images from Background",
     "textControls": "Text Controls",
     "htmlTextControls": "HTML Text Controls",
     "textControlsDefault": "Default text",
@@ -146,6 +147,7 @@
     "pdfPagesTitle": "PDF Pages",
     "pdfOcrTitle": "PDF OCR",
     "htmlOptionsTitle": "HTML Options",
+    "htmlEncodeOptionsTitle": "HTML Input Options",
     "imageOptionsTitle": "Image Options",
     "imageToPdfTitle": "Image to PDF Options",
     "maxWidth": "Max width",
@@ -177,7 +179,11 @@
     "rotation": "Rotation",
     "rotationDegrees": "{{degrees}}°",
     "scale": "Scale (%)",
-    "imageToPdfTransformHelp": "Rotation is limited to right angles; scale accepts 10% to 300%."
+    "imageToPdfTransformHelp": "Rotation is limited to right angles; scale accepts 10% to 300%.",
+    "excludeSelectors": "Exclude selectors",
+    "excludeSelectorsHelp": "Separate CSS selectors with commas or new lines. Matching elements are skipped while encoding HTML input.",
+    "snapshotWidth": "Snapshot width",
+    "snapshotWidthHelp": "Set the HTML input snapshot width. Leave empty to use the parser default."
   },
   "confirmations": {
     "title": "Please confirm",

@@ -49,7 +49,7 @@ describe('SettingsModal', () => {
   })
 
   it('renders nothing when no sections apply', () => {
-    render(<SettingsModal {...defaultProps} source="html" target="pdf" />)
+    render(<SettingsModal {...defaultProps} source="txt" target="pdf" />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -96,6 +96,36 @@ describe('SettingsModal', () => {
     const htmlOptionsElements = screen.getAllByText('HTML Options')
     expect(htmlOptionsElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Background options')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Exclude Images from Background' })).toBeInTheDocument()
+  })
+
+  it('renders HTML input options when source is html', () => {
+    render(<SettingsModal {...defaultProps} source="html" target="txt" fileName="test.html" />)
+    const htmlEncodeElements = screen.getAllByText('HTML Input Options')
+    expect(htmlEncodeElements.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole('textbox', { name: 'Exclude selectors' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Snapshot width' })).toBeInTheDocument()
+  })
+
+  it('returns normalized HTML input options when confirmed', () => {
+    render(<SettingsModal {...defaultProps} source="html" target="txt" fileName="test.html" />)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Exclude selectors' }), {
+      target: { value: 'script, .skip\n#ad, script' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Snapshot width' }), {
+      target: { value: '1024.8' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        htmlEncode: {
+          excludeSelectors: ['script', '.skip', '#ad'],
+          snapshotWidth: 1024
+        }
+      })
+    )
   })
 
   it('renders image target options when target is png', () => {
@@ -163,14 +193,16 @@ describe('SettingsModal', () => {
       btn.classList.contains('pdf-page-selector-inline__header')
     )
     expect(pdfCollapseBtn).toBeDefined()
-    fireEvent.click(pdfCollapseBtn!)
+    if (!pdfCollapseBtn) return
+    fireEvent.click(pdfCollapseBtn)
     expect(screen.queryByRole('button', { name: 'Page 1' })).not.toBeInTheDocument()
     const expandButtons = screen.getAllByRole('button', { name: 'Expand' })
     const pdfExpandBtn = expandButtons.find(btn =>
       btn.classList.contains('pdf-page-selector-inline__header')
     )
     expect(pdfExpandBtn).toBeDefined()
-    fireEvent.click(pdfExpandBtn!)
+    if (!pdfExpandBtn) return
+    fireEvent.click(pdfExpandBtn)
     expect(screen.getByRole('button', { name: 'Page 1' })).toBeInTheDocument()
   })
 
@@ -302,7 +334,9 @@ describe('SettingsModal', () => {
     render(<SettingsModal {...defaultProps} source="pdf" target="html" />)
     const dialog = screen.getByRole('dialog')
     const body = dialog.querySelector('.settings-modal__body')
-    const sections = body!.querySelectorAll('.settings-modal__section')
+    expect(body).toBeInTheDocument()
+    if (!body) return
+    const sections = body.querySelectorAll('.settings-modal__section')
     expect(sections.length).toBeGreaterThanOrEqual(2)
   })
 
@@ -391,11 +425,12 @@ describe('SettingsModal', () => {
       header.textContent?.includes('HTML Options')
     )
     expect(htmlOptionsHeader).toBeDefined()
+    if (!htmlOptionsHeader) return
 
-    fireEvent.click(htmlOptionsHeader!)
+    fireEvent.click(htmlOptionsHeader)
     expect(screen.queryByText('Background options')).not.toBeInTheDocument()
 
-    fireEvent.click(htmlOptionsHeader!)
+    fireEvent.click(htmlOptionsHeader)
     expect(screen.getByText('Background options')).toBeInTheDocument()
   })
 
@@ -413,8 +448,13 @@ describe('SettingsModal', () => {
 
 describe('getSettingsSections', () => {
   it('returns empty array when no sections apply', () => {
-    const sections = getSettingsSections('html', 'pdf', 'test.html', 'ready')
+    const sections = getSettingsSections('txt', 'pdf', 'test.txt', 'ready')
     expect(sections).toEqual([])
+  })
+
+  it('returns htmlEncodeOptions for html source', () => {
+    const sections = getSettingsSections('html', 'txt', 'test.html', 'ready')
+    expect(sections).toEqual(['htmlEncodeOptions'])
   })
 
   it('returns single section for pdf source with html target', () => {

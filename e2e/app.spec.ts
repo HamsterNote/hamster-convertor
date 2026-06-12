@@ -541,17 +541,11 @@ test.describe('converter app', () => {
   test('shows feedback when selected files are unsupported', async ({ page }) => {
     await page
       .locator(dropzoneFileInput)
-      .setInputFiles(
-        filePayload(
-          'report.docx',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'fake docx'
-        )
-      )
+      .setInputFiles(filePayload('book.epub', 'application/epub+zip', 'fake epub'))
 
     const alert = page.getByRole('alert')
     await expect(alert).toContainText('Unsupported file type')
-    await expect(alert).toContainText('report.docx')
+    await expect(alert).toContainText('book.epub')
     await expect(page.locator('table.file-table')).toBeHidden()
     await expect(page.getByRole('button', { name: 'Convert all' })).toBeDisabled()
   })

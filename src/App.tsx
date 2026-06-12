@@ -18,9 +18,11 @@ import {
   type ExifCategory,
   getSupportedTargets,
   type HtmlDecodeOptions,
+  type HtmlEncodeOptions,
   type SourceFormat,
   type TargetFormat
 } from './lib/converter'
+import { assetUrl } from './lib/assets'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
 import { truncateMiddle } from './lib/filename'
 import { convertViaBridge } from './lib/parser-bridge/proxy'
@@ -42,6 +44,7 @@ type ConversionOptions = {
       widthMode?: 'actual' | 'fit'
     }
   }
+  htmlEncode?: HtmlEncodeOptions
   image?: {
     quality: number
     maxWidth?: number
@@ -54,8 +57,8 @@ type ConversionOptions = {
   }
   imageToPdf?: {
     marginPt: number
-    fit: 'cover'
-    pageMode: 'auto'
+    fit: 'cover' | 'contain'
+    pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: number
   }
@@ -64,7 +67,8 @@ type ConversionOptions = {
 const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
   includeBackground: true,
   backgroundQuality: 0.85,
-  excludeTextFromBackground: true
+  excludeTextFromBackground: true,
+  excludeImagesFromBackground: false
 }
 
 const DEFAULT_IMAGE_OPTIONS: NonNullable<ConversionOptions['image']> = {
@@ -73,7 +77,7 @@ const DEFAULT_IMAGE_OPTIONS: NonNullable<ConversionOptions['image']> = {
   removeExif: { enabled: false, categories: [] }
 }
 
-const DEFAULT_IMAGE_TO_PDF_OPTIONS: NonNullable<ConversionOptions['imageToPdf']> = {
+const DEFAULT_IMAGE_TO_PDF_OPTIONS: Required<NonNullable<ConversionOptions['imageToPdf']>> = {
   marginPt: 24,
   fit: 'cover',
   pageMode: 'auto',
@@ -117,7 +121,8 @@ const SUPPORTED_FORMATS = [
   'bmp',
   'svg',
   'html',
-  'htm'
+  'htm',
+  'docx'
 ]
 const SUPPORTED_FORMAT_LIST = SUPPORTED_FORMATS.map(format => `.${format}`).join(', ')
 
@@ -134,7 +139,8 @@ const extToFormat = (name: string): SourceFormat | 'unsupported' => {
     bmp: 'image',
     svg: 'image',
     html: 'html',
-    htm: 'html'
+    htm: 'html',
+    docx: 'docx'
   }
 
   if (ext && ext in extMap) {
@@ -355,6 +361,7 @@ function App() {
         if (next.html) {
           conversionOptions.html = { ...next.html }
         }
+        conversionOptions.htmlEncode = next.htmlEncode ? { ...next.htmlEncode } : undefined
         if (next.image) {
           const maxWidth = normalizeImageDimension(next.image.maxWidth)
           const maxHeight = normalizeImageDimension(next.image.maxHeight)
@@ -471,6 +478,7 @@ function App() {
           : undefined
       const result = await convertViaBridge(bridge, current.file, current.source, current.target, {
         pdf: current.conversionOptions.pdf,
+        encode: current.conversionOptions.htmlEncode,
         decode: htmlOptions,
         layout: current.conversionOptions.html?.htmlLayout,
         image: imageOptions,
@@ -559,7 +567,11 @@ function App() {
       <main className="container">
         <section className="hero">
           <div className="hero__brand">
-            <img src="/logos/hamster_logo.png" alt="Hamster" className="hero__brand__logo" />
+            <img
+              src={assetUrl('logos/hamster_logo.png')}
+              alt="Hamster"
+              className="hero__brand__logo"
+            />
           </div>
           <h1 className="hero__title">{t('appName')}</h1>
           <p className="hero__subtitle">{t('tagline')}</p>
@@ -823,6 +835,7 @@ function App() {
           options={{
             pdf: activeSettingsItem.conversionOptions.pdf,
             html: activeSettingsItem.conversionOptions.html,
+            htmlEncode: activeSettingsItem.conversionOptions.htmlEncode,
             image: activeSettingsItem.conversionOptions.image,
             imageToPdf: activeSettingsItem.conversionOptions.imageToPdf
               ? {

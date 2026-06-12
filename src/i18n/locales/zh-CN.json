@@ -80,6 +80,7 @@
     "includeBackground": "包含背景",
     "backgroundQuality": "背景质量",
     "excludeTextFromBackground": "从背景中排除文字",
+    "excludeImagesFromBackground": "从背景中排除图片",
     "textControls": "文字控制",
     "htmlTextControls": "HTML 文字控制",
     "textControlsDefault": "默认文字",
@@ -146,6 +147,7 @@
     "pdfPagesTitle": "PDF 页面",
     "pdfOcrTitle": "PDF OCR",
     "htmlOptionsTitle": "HTML 选项",
+    "htmlEncodeOptionsTitle": "HTML 输入选项",
     "imageOptionsTitle": "图片选项",
     "imageToPdfTitle": "图片转 PDF 选项",
     "maxWidth": "最大宽度",
@@ -177,7 +179,11 @@
     "rotation": "旋转",
     "rotationDegrees": "{{degrees}}°",
     "scale": "缩放 (%)",
-    "imageToPdfTransformHelp": "旋转仅支持直角；缩放范围为 10% 到 300%。"
+    "imageToPdfTransformHelp": "旋转仅支持直角；缩放范围为 10% 到 300%。",
+    "excludeSelectors": "排除选择器",
+    "excludeSelectorsHelp": "多个 CSS 选择器可用逗号或换行分隔，编码 HTML 输入时会跳过匹配元素。",
+    "snapshotWidth": "快照宽度",
+    "snapshotWidthHelp": "设置 HTML 输入快照宽度；留空时使用解析器默认值。"
   },
   "confirmations": {
     "title": "请确认",

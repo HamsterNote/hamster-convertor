@@ -1,3 +1,14 @@
+import {
+  type ConversionOptions,
+  type ConversionResult,
+  convertRuntime,
+  type ExifCategory,
+  type ImageOptions,
+  type ImageToPdfOptions,
+  type SourceFormat,
+  type TargetFormat
+} from './conversion'
+
 type ParserBridgeRequest = {
   requestId: string
   type: 'convert'
@@ -127,7 +138,7 @@ const ROTATION_DEGREES = [
 ] as const satisfies readonly ImageToPdfOptions['rotationDeg'][]
 
 const isSourceFormat = (value: string): value is SourceFormat =>
-  ['pdf', 'txt', 'image', 'html'].includes(value)
+  ['pdf', 'txt', 'image', 'html', 'docx'].includes(value)
 
 const isTargetFormat = (value: string): value is TargetFormat =>
   ['html', 'txt', 'png', 'jpg', 'webp', 'pdf'].includes(value)
@@ -612,13 +623,3 @@ export function createProtocolServer(port: MessagePort): ProtocolServer {
     }
   }
 }
-import {
-  convertRuntime,
-  type ConversionOptions,
-  type ConversionResult,
-  type ExifCategory,
-  type ImageOptions,
-  type ImageToPdfOptions,
-  type SourceFormat,
-  type TargetFormat
-} from './conversion'

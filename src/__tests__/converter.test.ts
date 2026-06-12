@@ -17,4 +17,8 @@ describe('getSupportedTargets', () => {
   it('returns exact ordered list for html source', () => {
     expect(getSupportedTargets('html')).toEqual(['txt'])
   })
+
+  it('returns exact ordered list for docx source', () => {
+    expect(getSupportedTargets('docx')).toEqual(['txt', 'html'])
+  })
 })

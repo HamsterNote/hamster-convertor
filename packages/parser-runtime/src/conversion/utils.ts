@@ -17,7 +17,13 @@ export type HtmlDecodeOptions = {
     includeBackground?: boolean
     backgroundQuality?: number
     excludeTextFromBackground?: boolean
+    excludeImagesFromBackground?: boolean
   }
+}
+
+export type HtmlEncodeOptions = {
+  excludeSelectors?: string[]
+  snapshotWidth?: number
 }
 
 export type HtmlLayoutOptions = {

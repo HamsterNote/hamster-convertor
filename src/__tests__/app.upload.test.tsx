@@ -22,7 +22,8 @@ vi.mock('../lib/converter', () => ({
       pdf: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
       txt: ['png', 'html'],
       image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
-      html: ['txt']
+      html: ['txt'],
+      docx: ['txt', 'html']
     }
     return targets[source] ?? ['txt']
   })
@@ -98,12 +99,12 @@ vi.mock('../components/TextControlModal', () => ({
 
 const getFileTargetSelects = () => {
   const table = screen.getByRole('table')
-  return table.querySelectorAll('select.file-table.select')
+  return Array.from(table.querySelectorAll<HTMLSelectElement>('select.file-table.select'))
 }
 
 const getFileRows = () => {
   const table = screen.getByRole('table')
-  return Array.from(table.querySelectorAll('tbody tr'))
+  return Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr'))
 }
 
 const changeNativeSelectValue = (select: HTMLSelectElement, value: string) => {
@@ -199,7 +200,7 @@ describe('app upload feedback', () => {
     }
   })
 
-  it('shows unsupported file feedback when no selectable row is added', async () => {
+  it('shows a file row for supported docx uploads', async () => {
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
 
@@ -215,8 +216,29 @@ describe('app upload feedback', () => {
       }
     })
 
+    expect(await screen.findByRole('cell', { name: 'report.docx' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Convert all' })).toBeEnabled()
+
+    const targetSelect = getFileTargetSelects()[0]
+    expect(within(targetSelect).getByRole('option', { name: 'TXT' })).toBeInTheDocument()
+    expect(within(targetSelect).getByRole('option', { name: 'HTML' })).toBeInTheDocument()
+  })
+
+  it('shows unsupported file feedback when no selectable row is added', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    expect(input).toBeInstanceOf(HTMLInputElement)
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: {
+        files: [new File(['fake epub'], 'book.epub', { type: 'application/epub+zip' })]
+      }
+    })
+
     expect(await screen.findByRole('alert')).toHaveTextContent('Unsupported file type')
-    expect(screen.getByRole('alert')).toHaveTextContent('report.docx')
+    expect(screen.getByRole('alert')).toHaveTextContent('book.epub')
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Convert all' })).toBeDisabled()
   })
@@ -1534,7 +1556,8 @@ describe('app upload feedback', () => {
 
     await waitFor(() => {
       const call = bridgeMocks.convert.mock.calls[0]?.[0]
-      const quality = call?.options?.image?.quality
+      const options = call?.options as { image?: { quality?: number } } | undefined
+      const quality = options?.image?.quality
       expect(quality).toBeGreaterThanOrEqual(0.1)
       expect(quality).toBeLessThanOrEqual(1.0)
     })

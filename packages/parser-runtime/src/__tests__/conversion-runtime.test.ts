@@ -1,9 +1,12 @@
+import type { IntermediateContent, IntermediateDocument } from '@hamster-note/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { convertRuntime } from '../conversion'
 
 const parserMocks = vi.hoisted(() => ({
   pdfEncode: vi.fn(),
   htmlDecodeToHtml: vi.fn(),
+  htmlEncode: vi.fn(),
+  htmlDecode: vi.fn(),
   imageEncode: vi.fn()
 }))
 
@@ -15,7 +18,9 @@ vi.mock('@hamster-note/pdf-parser', () => ({
 
 vi.mock('@hamster-note/html-parser', () => ({
   HtmlParser: {
-    decodeToHtml: parserMocks.htmlDecodeToHtml
+    decodeToHtml: parserMocks.htmlDecodeToHtml,
+    encode: parserMocks.htmlEncode,
+    decode: parserMocks.htmlDecode
   }
 }))
 
@@ -64,6 +69,54 @@ class MockImage {
 const textFromBuffer = (buffer: ArrayBuffer): string => new TextDecoder().decode(buffer)
 
 const createBuffer = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer
+
+type MockIntermediatePage = {
+  content: IntermediateContent[]
+  getThumbnail?: (scale?: number) => Promise<{ src: string } | undefined>
+  getContent: () => Promise<IntermediateContent[]>
+  setGetThumbnail?: (fn: (scale?: number) => Promise<{ src: string } | undefined>) => void
+}
+
+const createIntermediateDocument = (pages: MockIntermediatePage[]): IntermediateDocument => {
+  let currentPages = pages
+  const document = {}
+
+  Object.defineProperty(document, 'pages', {
+    configurable: true,
+    get() {
+      return Promise.resolve(currentPages)
+    },
+    set(nextPages: MockIntermediatePage[]) {
+      currentPages = nextPages
+    }
+  })
+
+  return document as IntermediateDocument
+}
+
+const createImageContent = (id: string, src: string): IntermediateContent =>
+  ({
+    id,
+    src,
+    opacity: 1,
+    polygon: [
+      [0, 0],
+      [16, 0],
+      [16, 16],
+      [0, 16]
+    ]
+  }) as IntermediateContent
+
+const imageHtmlFromIntermediate = async (intermediate: IntermediateDocument): Promise<string> => {
+  const pages = await intermediate.pages
+  const content = pages.flatMap(page => page.content)
+  const images = content
+    .filter((item): item is IntermediateContent & { src: string } => 'src' in item)
+    .map(image => `<img src="${image.src}" />`)
+    .join('')
+
+  return `<html><body>${images}</body></html>`
+}
 
 const expectPaginatedCssContract = (result: string) => {
   expect(result).toMatch(/\.hamster-note-document\s*\{[^}]*padding-top:\s*24px/i)
@@ -143,11 +196,15 @@ describe('Runtime conversion', () => {
     vi.restoreAllMocks()
     parserMocks.pdfEncode.mockReset()
     parserMocks.htmlDecodeToHtml.mockReset()
+    parserMocks.htmlEncode.mockReset()
+    parserMocks.htmlDecode.mockReset()
     parserMocks.imageEncode.mockReset()
   })
 
   it('converts mocked PDF to HTML', async () => {
-    parserMocks.pdfEncode.mockResolvedValue({ children: [{ text: 'PDF text' }] })
+    parserMocks.pdfEncode.mockResolvedValue(
+      createIntermediateDocument([{ content: [], getContent: vi.fn().mockResolvedValue([]) }])
+    )
     parserMocks.htmlDecodeToHtml.mockResolvedValue('<html><body>PDF text</body></html>')
 
     const [result] = await convertRuntime({
@@ -163,6 +220,130 @@ describe('Runtime conversion', () => {
     const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
     expect(html).toContain('PDF text')
     expectPaginatedCssContract(html)
+  })
+
+  it('passes HTML decode background options to PDF-to-HTML', async () => {
+    const decodeOptions = {
+      background: {
+        includeBackground: true,
+        backgroundQuality: 0.85,
+        excludeTextFromBackground: true,
+        excludeImagesFromBackground: true
+      }
+    }
+    parserMocks.pdfEncode.mockResolvedValue(
+      createIntermediateDocument([{ content: [], getContent: vi.fn().mockResolvedValue([]) }])
+    )
+    parserMocks.htmlDecodeToHtml.mockResolvedValue('<html><body>PDF text</body></html>')
+
+    await convertRuntime({
+      filename: 'sample.pdf',
+      sourceFormat: 'pdf',
+      targetFormat: 'html',
+      buffer: createBuffer('%PDF'),
+      options: { decode: decodeOptions }
+    })
+
+    expect(parserMocks.htmlDecodeToHtml).toHaveBeenCalledWith(expect.anything(), decodeOptions)
+  })
+
+  it('removes PDF images with empty src before HTML decode', async () => {
+    const validImage = createImageContent('valid-image', 'data:image/png;base64,ZmFrZQ==')
+    const emptyImage = createImageContent('empty-image', '')
+    const page: MockIntermediatePage = {
+      content: [],
+      getContent: vi.fn().mockResolvedValue([validImage, emptyImage])
+    }
+    const intermediate = createIntermediateDocument([page])
+    parserMocks.pdfEncode.mockResolvedValue(intermediate)
+    parserMocks.htmlDecodeToHtml.mockImplementation(imageHtmlFromIntermediate)
+
+    const [result] = await convertRuntime({
+      filename: 'sample.pdf',
+      sourceFormat: 'pdf',
+      targetFormat: 'html',
+      buffer: createBuffer('%PDF')
+    })
+
+    const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
+    expect(page.getContent).toHaveBeenCalledOnce()
+    expect(parserMocks.htmlDecodeToHtml).toHaveBeenCalledWith(intermediate, undefined)
+    expect(html).toContain('src="data:image/png;base64,ZmFrZQ=="')
+    expect(html).not.toContain('src=""')
+  })
+
+  it('removes PDF page thumbnails with empty data URL before HTML decode', async () => {
+    let getThumbnail = vi.fn().mockResolvedValue({ src: 'data:,' })
+    const page: MockIntermediatePage = {
+      content: [],
+      getContent: vi.fn().mockResolvedValue([]),
+      getThumbnail: (scale?: number) => getThumbnail(scale),
+      setGetThumbnail: fn => {
+        getThumbnail = vi.fn(fn)
+      }
+    }
+    const intermediate = createIntermediateDocument([page])
+    parserMocks.pdfEncode.mockResolvedValue(intermediate)
+    parserMocks.htmlDecodeToHtml.mockImplementation(async doc => {
+      const [preparedPage] = await doc.pages
+      const thumbnail = await preparedPage?.getThumbnail?.(0.3)
+      const backgroundStyle = thumbnail?.src ? `background-image:url('${thumbnail.src}');` : ''
+      return `<div class="hamster-note-page" style="width:427.92px;height:619.68px;${backgroundStyle}"></div>`
+    })
+
+    const [result] = await convertRuntime({
+      filename: 'sample.pdf',
+      sourceFormat: 'pdf',
+      targetFormat: 'html',
+      buffer: createBuffer('%PDF')
+    })
+
+    const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
+    expect(html).not.toContain("background-image:url('data:,')")
+  })
+
+  it('removes empty data URL page backgrounds from generated PDF HTML', async () => {
+    parserMocks.pdfEncode.mockResolvedValue(
+      createIntermediateDocument([{ content: [], getContent: vi.fn().mockResolvedValue([]) }])
+    )
+    parserMocks.htmlDecodeToHtml.mockResolvedValue(
+      `<div class="hamster-note-page" style="width:427.92px;height:619.68px;background-image:url('data:,');"></div>`
+    )
+
+    const [result] = await convertRuntime({
+      filename: 'sample.pdf',
+      sourceFormat: 'pdf',
+      targetFormat: 'html',
+      buffer: createBuffer('%PDF')
+    })
+
+    const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
+    expect(html).toContain('class="hamster-note-page"')
+    expect(html).not.toContain("background-image:url('data:,')")
+  })
+
+  it('passes HTML encode options to HTML-to-text', async () => {
+    const getPages = vi
+      .fn()
+      .mockResolvedValue([
+        { getPureText: () => 'Visible text' },
+        { getPureText: () => 'More text' }
+      ])
+    const encodeOptions = { excludeSelectors: ['script', '.skip'], snapshotWidth: 1024 }
+    const buffer = createBuffer('<html><body>Visible text</body></html>')
+    parserMocks.htmlEncode.mockResolvedValue({ getPages })
+
+    const [result] = await convertRuntime({
+      filename: 'page.html',
+      sourceFormat: 'html',
+      targetFormat: 'txt',
+      buffer,
+      options: { encode: encodeOptions }
+    })
+
+    expect(parserMocks.htmlEncode).toHaveBeenCalledWith(buffer, encodeOptions)
+    expect(getPages).toHaveBeenCalled()
+    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toBe('Visible text\nMore text')
   })
 
   it('converts image to PNG', async () => {

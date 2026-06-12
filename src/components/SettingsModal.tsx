@@ -1,17 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import PdfPageSelectorInline from './PdfPageSelectorInline'
 import type {
-  HtmlDecodeOptions,
-  HtmlLayoutOptions,
   ExifCategory,
+  HtmlDecodeOptions,
+  HtmlEncodeOptions,
+  HtmlLayoutOptions,
   SourceFormat,
   TargetFormat
 } from '../lib/converter'
+import PdfPageSelectorInline from './PdfPageSelectorInline'
 
 type BackgroundDecodeOptions = NonNullable<HtmlDecodeOptions['background']>
 
-type SettingsSection = 'pdfPages' | 'pdfOcr' | 'htmlOptions' | 'imageTarget' | 'imageToPdf'
+type SettingsSection =
+  | 'pdfPages'
+  | 'pdfOcr'
+  | 'htmlOptions'
+  | 'htmlEncodeOptions'
+  | 'imageTarget'
+  | 'imageToPdf'
 
 type ImageTargetOptions = {
   maxWidth?: number
@@ -42,6 +49,7 @@ type SettingsOptions = {
     background?: BackgroundDecodeOptions
     htmlLayout?: HtmlLayoutOptions
   }
+  htmlEncode?: HtmlEncodeOptions
   image?: ImageTargetOptions
   imageToPdf?: ImageToPdfOptions
 }
@@ -74,6 +82,12 @@ type BackgroundDraft = {
   includeBackground: boolean
   backgroundQuality: number
   excludeTextFromBackground: boolean
+  excludeImagesFromBackground: boolean
+}
+
+type HtmlEncodeDraft = {
+  excludeSelectors: string
+  snapshotWidth: string
 }
 
 type LayoutDraft = {
@@ -88,6 +102,7 @@ type Draft = {
   }
   textControl: TextControlDraft
   background: BackgroundDraft
+  htmlEncode: HtmlEncodeDraft
   layout: LayoutDraft
   image: {
     maxWidth: string
@@ -127,7 +142,13 @@ const HTML_BACKGROUND_QUALITY_OPTIONS = [
 const DEFAULT_BACKGROUND: BackgroundDraft = {
   includeBackground: true,
   backgroundQuality: 0.85,
-  excludeTextFromBackground: true
+  excludeTextFromBackground: true,
+  excludeImagesFromBackground: false
+}
+
+const DEFAULT_HTML_ENCODE: HtmlEncodeDraft = {
+  excludeSelectors: '',
+  snapshotWidth: ''
 }
 
 const DEFAULT_LAYOUT: LayoutDraft = {
@@ -197,7 +218,15 @@ const createDraft = (options?: SettingsModalProps['options']): Draft => ({
       options?.html?.background?.backgroundQuality ?? DEFAULT_BACKGROUND.backgroundQuality,
     excludeTextFromBackground:
       options?.html?.background?.excludeTextFromBackground ??
-      DEFAULT_BACKGROUND.excludeTextFromBackground
+      DEFAULT_BACKGROUND.excludeTextFromBackground,
+    excludeImagesFromBackground:
+      options?.html?.background?.excludeImagesFromBackground ??
+      DEFAULT_BACKGROUND.excludeImagesFromBackground
+  },
+  htmlEncode: {
+    excludeSelectors:
+      options?.htmlEncode?.excludeSelectors?.join('\n') ?? DEFAULT_HTML_ENCODE.excludeSelectors,
+    snapshotWidth: options?.htmlEncode?.snapshotWidth?.toString() ?? DEFAULT_HTML_ENCODE.snapshotWidth
   },
   layout: {
     mode: options?.html?.htmlLayout?.mode ?? DEFAULT_LAYOUT.mode,
@@ -258,6 +287,24 @@ const cleanTextControl = (
   return Object.keys(next).length > 0 ? next : undefined
 }
 
+const cleanHtmlEncode = (draft: HtmlEncodeDraft): HtmlEncodeOptions | undefined => {
+  const excludeSelectors = [
+    ...new Set(
+      draft.excludeSelectors
+        .split(/[\n,]+/)
+        .map(selector => selector.trim())
+        .filter(Boolean)
+    )
+  ]
+  const snapshotWidth = optionalImageDimension(draft.snapshotWidth)
+  const output: HtmlEncodeOptions = {}
+
+  if (excludeSelectors.length > 0) output.excludeSelectors = excludeSelectors
+  if (snapshotWidth !== undefined) output.snapshotWidth = snapshotWidth
+
+  return Object.keys(output).length > 0 ? output : undefined
+}
+
 const cleanOutput = (draft: Draft): SettingsOptions => {
   const output: SettingsOptions = {}
 
@@ -277,6 +324,11 @@ const cleanOutput = (draft: Draft): SettingsOptions => {
     htmlOutput.textControl = textControl
   }
   output.html = htmlOutput
+
+  const htmlEncode = cleanHtmlEncode(draft.htmlEncode)
+  if (htmlEncode) {
+    output.htmlEncode = htmlEncode
+  }
 
   // Image options
   const maxWidth = optionalImageDimension(draft.image.maxWidth)
@@ -329,6 +381,10 @@ function getSettingsSections(
     sections.push('htmlOptions')
   }
 
+  if (source === 'html') {
+    sections.push('htmlEncodeOptions')
+  }
+
   if (['png', 'jpg', 'webp'].includes(target)) {
     sections.push('imageTarget')
   }
@@ -344,6 +400,7 @@ const SECTION_ID_MAP: Record<SettingsSection, string> = {
   pdfPages: 'settings-section-pdf-pages',
   pdfOcr: 'settings-section-pdf-ocr',
   htmlOptions: 'settings-section-html-options',
+  htmlEncodeOptions: 'settings-section-html-encode-options',
   imageTarget: 'settings-section-image-target',
   imageToPdf: 'settings-section-image-to-pdf'
 }
@@ -352,6 +409,7 @@ const SECTION_TITLE_KEY_MAP: Record<SettingsSection, string> = {
   pdfPages: 'settingsModal.pdfPagesTitle',
   pdfOcr: 'settingsModal.pdfOcrTitle',
   htmlOptions: 'settingsModal.htmlOptionsTitle',
+  htmlEncodeOptions: 'settingsModal.htmlEncodeOptionsTitle',
   imageTarget: 'settingsModal.imageOptionsTitle',
   imageToPdf: 'settingsModal.imageToPdfTitle'
 }
@@ -377,6 +435,7 @@ export default function SettingsModal({
     pdfPages: false,
     pdfOcr: false,
     htmlOptions: false,
+    htmlEncodeOptions: false,
     imageTarget: false,
     imageToPdf: false
   })
@@ -427,6 +486,13 @@ export default function SettingsModal({
     value: BackgroundDraft[Key]
   ) => {
     setDraft(prev => ({ ...prev, background: { ...prev.background, [key]: value } }))
+  }
+
+  const updateHtmlEncode = <Key extends keyof HtmlEncodeDraft>(
+    key: Key,
+    value: HtmlEncodeDraft[Key]
+  ) => {
+    setDraft(prev => ({ ...prev, htmlEncode: { ...prev.htmlEncode, [key]: value } }))
   }
 
   const updateLayout = <Key extends keyof LayoutDraft>(key: Key, value: LayoutDraft[Key]) => {
@@ -515,7 +581,7 @@ export default function SettingsModal({
           <div className="settings-modal__body">
             {/* PDF Pages Section */}
             {sections.includes('pdfPages') && (
-              <div id={SECTION_ID_MAP['pdfPages']} className="settings-modal__section">
+              <div id={SECTION_ID_MAP.pdfPages} className="settings-modal__section">
                 <PdfPageSelectorInline
                   file={file}
                   selectedPages={draft.pdf.selectedPages ?? []}
@@ -527,7 +593,7 @@ export default function SettingsModal({
 
             {/* PDF OCR Section */}
             {sections.includes('pdfOcr') && (
-              <div id={SECTION_ID_MAP['pdfOcr']} className="settings-modal__section">
+              <div id={SECTION_ID_MAP.pdfOcr} className="settings-modal__section">
                 <button
                   type="button"
                   className="settings-modal__section-header"
@@ -560,7 +626,7 @@ export default function SettingsModal({
 
             {/* HTML Options Section */}
             {sections.includes('htmlOptions') && (
-              <div id={SECTION_ID_MAP['htmlOptions']} className="settings-modal__section">
+              <div id={SECTION_ID_MAP.htmlOptions} className="settings-modal__section">
                 <button
                   type="button"
                   className="settings-modal__section-header"
@@ -621,6 +687,18 @@ export default function SettingsModal({
                         disabled={readOnly}
                       />
                       <span>{t('options.excludeTextFromBackground')}</span>
+                    </label>
+
+                    <label className="settings-modal__checkbox settings-modal__field--wide">
+                      <input
+                        type="checkbox"
+                        checked={draft.background.excludeImagesFromBackground}
+                        onChange={event =>
+                          updateBackground('excludeImagesFromBackground', event.target.checked)
+                        }
+                        disabled={readOnly}
+                      />
+                      <span>{t('options.excludeImagesFromBackground')}</span>
                     </label>
 
                     {/* Text Controls */}
@@ -790,9 +868,64 @@ export default function SettingsModal({
               </div>
             )}
 
+            {sections.includes('htmlEncodeOptions') && (
+              <div id={SECTION_ID_MAP.htmlEncodeOptions} className="settings-modal__section">
+                <button
+                  type="button"
+                  className="settings-modal__section-header"
+                  onClick={() => toggleSection('htmlEncodeOptions')}
+                  aria-expanded={!collapsedSections.htmlEncodeOptions}
+                  aria-label={collapsedSections.htmlEncodeOptions ? 'Expand' : 'Collapse'}
+                >
+                  <span className="settings-modal__collapse-btn" aria-hidden="true">
+                    {collapsedSections.htmlEncodeOptions ? '▶' : '▼'}
+                  </span>
+                  <span className="settings-modal__section-title">
+                    {t('settingsModal.htmlEncodeOptionsTitle')}
+                  </span>
+                </button>
+                {!collapsedSections.htmlEncodeOptions && (
+                  <div className="settings-modal__section-content">
+                    <label className="settings-modal__field settings-modal__field--wide">
+                      <span>{t('settingsModal.excludeSelectors')}</span>
+                      <textarea
+                        value={draft.htmlEncode.excludeSelectors}
+                        onChange={event => updateHtmlEncode('excludeSelectors', event.target.value)}
+                        placeholder="script, style, .ads"
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.excludeSelectors')}
+                      />
+                    </label>
+
+                    <div className="settings-modal__estimate settings-modal__field--wide">
+                      {t('settingsModal.excludeSelectorsHelp')}
+                    </div>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.snapshotWidth')}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        inputMode="numeric"
+                        value={draft.htmlEncode.snapshotWidth}
+                        onChange={event => updateHtmlEncode('snapshotWidth', event.target.value)}
+                        placeholder={t('options.defaultValue')}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.snapshotWidth')}
+                      />
+                    </label>
+
+                    <div className="settings-modal__estimate settings-modal__field--wide">
+                      {t('settingsModal.snapshotWidthHelp')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Image Target Options Section */}
             {sections.includes('imageTarget') && (
-              <div id={SECTION_ID_MAP['imageTarget']} className="settings-modal__section">
+              <div id={SECTION_ID_MAP.imageTarget} className="settings-modal__section">
                 <button
                   type="button"
                   className="settings-modal__section-header"
@@ -904,7 +1037,7 @@ export default function SettingsModal({
 
             {/* Image to PDF Options Section */}
             {sections.includes('imageToPdf') && (
-              <div id={SECTION_ID_MAP['imageToPdf']} className="settings-modal__section">
+              <div id={SECTION_ID_MAP.imageToPdf} className="settings-modal__section">
                 <button
                   type="button"
                   className="settings-modal__section-header"

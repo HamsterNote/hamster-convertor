@@ -75,27 +75,27 @@ class MockHtmlDocument {
   }
 }
 
-export class HtmlParser {
-  static readonly exts = ['html'] as const
-  static readonly ext = 'html' as const
+export const HtmlParser = {
+  exts: ['html'] as const,
+  ext: 'html' as const,
 
-  static async encode(_input: File | ArrayBuffer): Promise<MockHtmlDocument> {
+  async encode(_input: File | ArrayBuffer, _options?: unknown): Promise<MockHtmlDocument> {
     const pageTexts = ['Page 1: Hamster Note Sample', 'Page 2: Nested Content with Script']
     return new MockHtmlDocument(pageTexts)
-  }
+  },
 
-  static async decode(
+  async decode(
     _intermediateDocument: IntermediateDocument,
     _options?: unknown
   ): Promise<File> {
     const file = new File([html], 'converted.html', { type: 'text/html' })
     return file
-  }
+  },
 
-  static async decodeToHtml(
+  async decodeToHtml(
     _intermediateDocument: IntermediateDocument,
     _options?: unknown
   ): Promise<string> {
     return html
-  }
+  },
 }

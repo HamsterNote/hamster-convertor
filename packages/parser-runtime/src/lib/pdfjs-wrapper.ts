@@ -29,9 +29,16 @@ const wrappedGetDocument = (src?: GetDocumentSrc) => {
     const params = src as CMapParams
 
     if (!params.cMapUrl) {
+      // 此模块运行在 parser-runtime iframe 内部，import.meta.env.BASE_URL 形如：
+      //   - 默认根部署：'/parser-runtime/'
+      //   - 子路径部署：'/beta/parser-runtime/'
+      // CMap 资源由主站 public/cmaps/ 提供，所以把末尾的 'parser-runtime/' 换成 'cmaps/'，
+      // 即可在两种部署形态下都正确指向 '/cmaps/' 或 '/beta/cmaps/'。
+      const baseUrl = import.meta.env.BASE_URL || '/'
+      const cMapUrl = baseUrl.replace(/parser-runtime\/?$/, 'cmaps/')
       return originalGetDocument({
         ...params,
-        cMapUrl: '/cmaps/',
+        cMapUrl,
         cMapPacked: true,
         useWorkerFetch: true
       } as unknown as GetDocumentSrc)

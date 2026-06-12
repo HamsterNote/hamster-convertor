@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { assetUrl } from '../lib/assets'
 
 const LANGS = [
   { code: 'zh-CN', labelKey: 'languages.zhCN' },
@@ -14,7 +15,11 @@ function Header() {
       <div className="container header__inner">
         <div className="brand" aria-label={t('appName')}>
           <span className="brand__logo" aria-hidden>
-            <img src="/logos/hamster_logo.png" alt="Hamster" className="hero__brand__logo" />
+            <img
+              src={assetUrl('logos/hamster_logo.png')}
+              alt="Hamster"
+              className="hero__brand__logo"
+            />
           </span>
           <span className="brand__title">{t('appName')}</span>
         </div>

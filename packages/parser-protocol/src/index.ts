@@ -19,7 +19,7 @@ export type ParserBridgeRequest = {
   sourceFormat: string
   targetFormat: string
   buffer: ArrayBuffer
-  options?: Record<string, unknown>
+  options?: ParserBridgeConversionOptions
 }
 
 /**
@@ -109,22 +109,31 @@ export type ParserBridgeConversionOptions = {
   maxPages?: number
   /** 页面加载超时时间（毫秒） */
   pageLoadTimeoutMs?: number
-  /** 文本控制选项（HTML 解码） */
-  textControl?: {
-    fontSize?: number
-    lineHeight?: number
-    fontWeight?: number
-    italic?: boolean
-    color?: string
-    fontFamily?: string
-    vertical?: string
-    dir?: string
+  encode?: {
+    excludeSelectors?: string[]
+    snapshotWidth?: number
   }
-  /** 背景选项（HTML 解码） */
-  background?: {
-    includeBackground?: boolean
-    backgroundQuality?: number
-    excludeTextFromBackground?: boolean
+  decode?: {
+    textControl?: {
+      fontSize?: number
+      lineHeight?: number
+      fontWeight?: number
+      italic?: boolean
+      color?: string
+      fontFamily?: string
+      vertical?: string
+      dir?: string
+    }
+    background?: {
+      includeBackground?: boolean
+      backgroundQuality?: number
+      excludeTextFromBackground?: boolean
+      excludeImagesFromBackground?: boolean
+    }
+  }
+  layout?: {
+    mode: 'paginated' | 'continuous'
+    widthMode?: 'actual' | 'fit'
   }
   image?: {
     quality: number
@@ -138,8 +147,8 @@ export type ParserBridgeConversionOptions = {
   }
   imageToPdf?: {
     marginPt: number
-    fit: 'cover'
-    pageMode: 'auto'
+    fit: 'cover' | 'contain'
+    pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: number
   }
@@ -369,6 +378,10 @@ export function isParserBridgeConversionOptions(
 export type HtmlParserEncodeInput = Parameters<
   typeof import('@hamster-note/html-parser').HtmlParser.encode
 >[0]
+
+export type HtmlParserEncodeOptions = ParserBridgeConversionOptions['encode']
+
+export type HtmlParserDecodeOptions = ParserBridgeConversionOptions['decode']
 
 /**
  * 从 @hamster-note/html-parser 的 decode 返回类型推断
