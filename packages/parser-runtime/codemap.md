@@ -65,15 +65,15 @@ packages/parser-runtime/
 
 ### 错误体系
 
-| 错误码 | 触发场景 |
-|---|---|
-| `UNSUPPORTED_CONVERSION` | 不支持的源→目标格式对 |
-| `DUPLICATE_REQUEST_ID` | 重复的请求 ID |
-| `INVALID_PROTOCOL_MESSAGE` | 不符合协议的消息格式 |
-| `CONVERSION_FAILED` | 转换过程中的一般性失败 |
-| `OCR_REQUIRED` | PDF 文本提取失败，需要 OCR |
-| `EMPTY_OCR` | OCR 处理后无文本 |
-| `NO_PAGES_SELECTED` | 页码过滤后为空 |
+| 错误码                     | 触发场景                   |
+| -------------------------- | -------------------------- |
+| `UNSUPPORTED_CONVERSION`   | 不支持的源→目标格式对      |
+| `DUPLICATE_REQUEST_ID`     | 重复的请求 ID              |
+| `INVALID_PROTOCOL_MESSAGE` | 不符合协议的消息格式       |
+| `CONVERSION_FAILED`        | 转换过程中的一般性失败     |
+| `OCR_REQUIRED`             | PDF 文本提取失败，需要 OCR |
+| `EMPTY_OCR`                | OCR 处理后无文本           |
+| `NO_PAGES_SELECTED`        | 页码过滤后为空             |
 | `UNSUPPORTED_IMAGE_FORMAT` | SVG/GIF 等不支持的图片格式 |
 
 ## Flow
@@ -170,34 +170,34 @@ pdf.js 使用 CMap 数据正确解码 CJK 文本
 
 ### 上游依赖（被此包消费）
 
-| 依赖 | 用途 | 加载方式 |
-|---|---|---|
-| `@hamster-note/document-parser` | 文档解析器 | 动态 import |
-| `@hamster-note/html-parser` | HTML 编解码器 | 动态 import（本地 yalc 链接） |
-| `@hamster-note/image-parser` | 图片 OCR 解析器 | 动态 import |
-| `@hamster-note/pdf-parser` | PDF 解析器 | 动态 import |
-| `@hamster-note/txt-parser` | 文本解析器 | 动态 import |
-| `@hamster-note/types` | 共享类型定义（IntermediateDocument 等） | 静态 import（仅类型） |
-| `pdfjs-dist` | PDF 文本提取与页面渲染 | 动态 import（经 wrapper 适配） |
-| `pdf-lib` | PDF 页面裁剪/合并 | 动态 import |
-| `jspdf` | PDF 输出生成 | 动态 import |
-| `@system-ui-js/development-base` | 共享 ESLint/Prettier/TSConfig 配置 | devDependency |
+| 依赖                             | 用途                                    | 加载方式                       |
+| -------------------------------- | --------------------------------------- | ------------------------------ |
+| `@hamster-note/document-parser`  | 文档解析器                              | 动态 import                    |
+| `@hamster-note/html-parser`      | HTML 编解码器                           | 动态 import（本地 yalc 链接）  |
+| `@hamster-note/image-parser`     | 图片 OCR 解析器                         | 动态 import                    |
+| `@hamster-note/pdf-parser`       | PDF 解析器                              | 动态 import                    |
+| `@hamster-note/txt-parser`       | 文本解析器                              | 动态 import                    |
+| `@hamster-note/types`            | 共享类型定义（IntermediateDocument 等） | 静态 import（仅类型）          |
+| `pdfjs-dist`                     | PDF 文本提取与页面渲染                  | 动态 import（经 wrapper 适配） |
+| `pdf-lib`                        | PDF 页面裁剪/合并                       | 动态 import                    |
+| `jspdf`                          | PDF 输出生成                            | 动态 import                    |
+| `@system-ui-js/development-base` | 共享 ESLint/Prettier/TSConfig 配置      | devDependency                  |
 
 ### 下游消费者（消费此包的代码）
 
-| 消费者 | 文件路径 | 交互方式 |
-|---|---|---|
+| 消费者                          | 文件路径                                | 交互方式                                                                                   |
+| ------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
 | ParserIframeBridge（Host 组件） | `src/components/ParserIframeBridge.tsx` | 通过 `<iframe>` 加载运行时，建立 `MessagePort` 通道，调用 `sendConvert()` / `sendCancel()` |
-| BridgeClient | `src/lib/parser-bridge/client.ts` | 封装 `MessagePort` 通信协议，提供 Promise 化的 `sendConvert()` API |
-| Host App | `src/App.tsx` | 通过 `ParserIframeBridge` ref 调用转换功能 |
+| BridgeClient                    | `src/lib/parser-bridge/client.ts`       | 封装 `MessagePort` 通信协议，提供 Promise 化的 `sendConvert()` API                         |
+| Host App                        | `src/App.tsx`                           | 通过 `ParserIframeBridge` ref 调用转换功能                                                 |
 
 ### 构建与部署
 
-| 项目 | 值 |
-|---|---|
-| 开发端口 | 5074（独立于 Host 的 5073） |
-| 构建输出 | `dist/parser-runtime/`（相对于 monorepo 根） |
-| Base URL | `/parser-runtime/` |
+| 项目     | 值                                            |
+| -------- | --------------------------------------------- |
+| 开发端口 | 5074（独立于 Host 的 5073）                   |
+| 构建输出 | `dist/parser-runtime/`（相对于 monorepo 根）  |
+| Base URL | `/parser-runtime/`                            |
 | 构建命令 | `yarn build:parser-runtime`（从 monorepo 根） |
 
 ### 通信协议概览
@@ -234,9 +234,9 @@ pdf.js 使用 CMap 数据正确解码 CJK 文本
 
 ### 子目录 codemap 索引
 
-| 子目录 | codemap 路径 | 核心职责 |
-|---|---|---|
-| `src/` | `src/codemap.md` | 运行时源码入口 |
+| 子目录            | codemap 路径                | 核心职责                                    |
+| ----------------- | --------------------------- | ------------------------------------------- |
+| `src/`            | `src/codemap.md`            | 运行时源码入口                              |
 | `src/conversion/` | `src/conversion/codemap.md` | 格式转换引擎：13 个适配器、路由表、工具函数 |
-| `src/lib/` | `src/lib/codemap.md` | pdfjs-dist 适配层：Worker 配置 + CMap 注入 |
-| `src/types/` | `src/types/codemap.md` | TypeScript 模块声明 |
+| `src/lib/`        | `src/lib/codemap.md`        | pdfjs-dist 适配层：Worker 配置 + CMap 注入  |
+| `src/types/`      | `src/types/codemap.md`      | TypeScript 模块声明                         |

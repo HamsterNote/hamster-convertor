@@ -28,6 +28,6 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     testTimeout: 30000,
     hookTimeout: 10000,
-    exclude: [...configDefaults.exclude, 'e2e/**']
+    exclude: [...configDefaults.exclude, 'e2e/**', '.omo/**']
   }
 })

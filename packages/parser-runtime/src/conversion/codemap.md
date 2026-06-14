@@ -7,22 +7,22 @@
 支持的转换矩阵：
 
 | 源格式 \ 目标 | html | txt | png | jpg | webp | pdf |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **pdf** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **txt** | ✓ | — | ✓ | ✓ | ✓ | — |
-| **image** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **html** | — | ✓ | — | — | — | — |
+| :-----------: | :--: | :-: | :-: | :-: | :--: | :-: |
+|    **pdf**    |  ✓   |  ✓  |  ✓  |  ✓  |  ✓   |  ✓  |
+|    **txt**    |  ✓   |  —  |  ✓  |  ✓  |  ✓   |  —  |
+|   **image**   |  ✓   |  ✓  |  ✓  |  ✓  |  ✓   |  ✓  |
+|   **html**    |  —   |  ✓  |  —  |  —  |  —   |  —  |
 
 ## Design
 
 ### 文件结构与职责划分
 
-| 文件 | 职责 | 行数 |
-|---|---|---|
-| `index.ts` | 类型定义 + 适配器路由表 + 统一入口 `convertRuntime()` | ~150 |
-| `adapters.ts` | 所有 13 个转换适配器的具体实现 | ~823 |
-| `exif.ts` | JPEG EXIF 元数据按类别剥离 | ~176 |
-| `utils.ts` | 通用工具函数（blob/缓冲区互转、HTML 布局注入、Canvas 编码、PDF 页面提取等） | ~363 |
+| 文件          | 职责                                                                        | 行数 |
+| ------------- | --------------------------------------------------------------------------- | ---- |
+| `index.ts`    | 类型定义 + 适配器路由表 + 统一入口 `convertRuntime()`                       | ~150 |
+| `adapters.ts` | 所有 13 个转换适配器的具体实现                                              | ~823 |
+| `exif.ts`     | JPEG EXIF 元数据按类别剥离                                                  | ~176 |
+| `utils.ts`    | 通用工具函数（blob/缓冲区互转、HTML 布局注入、Canvas 编码、PDF 页面提取等） | ~363 |
 
 ### 核心设计模式
 
@@ -45,12 +45,12 @@
 
 ### 错误体系
 
-| 错误类 | code | 触发场景 |
-|---|---|---|
-| `UnsupportedConversionError` | `UNSUPPORTED_CONVERSION` | 不支持的格式对 |
-| `OcrRequiredError` | `OCR_REQUIRED` | PDF 文本提取失败，需要 OCR |
-| `EmptyOcrError` | `EMPTY_OCR` | OCR 处理后无文本 |
-| `NoPagesSelectedError` | `NO_PAGES_SELECTED` | 页码过滤后为空 |
+| 错误类                        | code                       | 触发场景                   |
+| ----------------------------- | -------------------------- | -------------------------- |
+| `UnsupportedConversionError`  | `UNSUPPORTED_CONVERSION`   | 不支持的格式对             |
+| `OcrRequiredError`            | `OCR_REQUIRED`             | PDF 文本提取失败，需要 OCR |
+| `EmptyOcrError`               | `EMPTY_OCR`                | OCR 处理后无文本           |
+| `NoPagesSelectedError`        | `NO_PAGES_SELECTED`        | 页码过滤后为空             |
 | `UnsupportedImageFormatError` | `UNSUPPORTED_IMAGE_FORMAT` | SVG/GIF 等不支持的图片格式 |
 
 ## Flow
@@ -132,27 +132,27 @@ convertPdfToPdf(request)
 
 ### 上游依赖（被此模块消费）
 
-| 依赖 | 用途 | 加载方式 |
-|---|---|---|
-| `@hamster-note/types` | `IntermediateDocument` 类型 | 静态 import（仅类型） |
-| `@hamster-note/pdf-parser` | PDF 解析为中间文档 | 动态 import |
-| `@hamster-note/image-parser` | 图片 OCR 为中间文档 | 动态 import |
-| `@hamster-note/html-parser` | HTML 编解码 | 动态 import |
-| `@hamster-note/txt-parser` | TXT 解析为中间文档 | 动态 import |
-| `pdfjs-dist` | PDF 文本提取 & 页面渲染 | 动态 import |
-| `pdf-lib` | PDF 页面裁剪/合并 | 动态 import |
-| `jspdf` | 生成 PDF 输出 | 动态 import |
-| `piexifjs` | JPEG EXIF 元数据读写 | 静态 import |
+| 依赖                         | 用途                        | 加载方式              |
+| ---------------------------- | --------------------------- | --------------------- |
+| `@hamster-note/types`        | `IntermediateDocument` 类型 | 静态 import（仅类型） |
+| `@hamster-note/pdf-parser`   | PDF 解析为中间文档          | 动态 import           |
+| `@hamster-note/image-parser` | 图片 OCR 为中间文档         | 动态 import           |
+| `@hamster-note/html-parser`  | HTML 编解码                 | 动态 import           |
+| `@hamster-note/txt-parser`   | TXT 解析为中间文档          | 动态 import           |
+| `pdfjs-dist`                 | PDF 文本提取 & 页面渲染     | 动态 import           |
+| `pdf-lib`                    | PDF 页面裁剪/合并           | 动态 import           |
+| `jspdf`                      | 生成 PDF 输出               | 动态 import           |
+| `piexifjs`                   | JPEG EXIF 元数据读写        | 静态 import           |
 
 ### 下游消费者（消费此模块的代码）
 
-| 文件 | 用途 |
-|---|---|
-| `src/server.ts` | 主要消费者：在 iframe 内接收 postMessage 请求，调用 `convertRuntime()` 执行转换，返回结果 |
-| `src/__tests__/conversion-runtime.test.ts` | 单元测试：覆盖所有格式对的转换逻辑 |
-| `src/__tests__/exif.test.ts` | 单元测试：覆盖 EXIF 剥离逻辑 |
-| `src/__tests__/server-integration.test.ts` | 集成测试：mock `convertRuntime` 测试 server 层 |
-| `src/__tests__/queue.test.ts` | 队列测试：mock `convertRuntime` 测试并发/取消语义 |
+| 文件                                       | 用途                                                                                      |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `src/server.ts`                            | 主要消费者：在 iframe 内接收 postMessage 请求，调用 `convertRuntime()` 执行转换，返回结果 |
+| `src/__tests__/conversion-runtime.test.ts` | 单元测试：覆盖所有格式对的转换逻辑                                                        |
+| `src/__tests__/exif.test.ts`               | 单元测试：覆盖 EXIF 剥离逻辑                                                              |
+| `src/__tests__/server-integration.test.ts` | 集成测试：mock `convertRuntime` 测试 server 层                                            |
+| `src/__tests__/queue.test.ts`              | 队列测试：mock `convertRuntime` 测试并发/取消语义                                         |
 
 ### 与 Host 的通信路径
 

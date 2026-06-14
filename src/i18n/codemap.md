@@ -7,22 +7,26 @@
 ## Design
 
 **核心依赖**
+
 - `i18next` — 国际化框架核心
 - `react-i18next` — React 绑定，提供 `useTranslation()` hook
 - `i18next-browser-languagedetector` — 浏览器语言自动检测
 
 **架构模式**
+
 - 静态导入：三个 JSON 翻译文件在 `index.ts` 中作为 ES module 静态导入，打包时内联
 - 单例初始化：`i18n` 实例在模块加载时立即初始化，全局唯一
 - 命名空间：所有翻译统一放在 `translation` 命名空间下
 
 **语言检测优先级**（`detection.order`）
+
 1. `querystring` — URL 参数 `?lng=zh-CN`
 2. `localStorage` — 缓存的 `i18nextLng` 值
 3. `navigator` — 浏览器语言设置
 4. `htmlTag` — `<html lang="...">` 属性
 
 **翻译文件结构**（每个 locale 约 195 个 key）
+
 ```
 ├── appName, tagline, language        — 全局元数据
 ├── nav                               — 导航
@@ -47,6 +51,7 @@
 ## Flow
 
 **初始化流程**
+
 ```
 main.tsx
   └─ import './i18n'           //  side-effect 导入，触发初始化
@@ -63,6 +68,7 @@ main.tsx
 ```
 
 **组件使用流程**
+
 ```
 任意组件
   └─ const { t, i18n } = useTranslation()
@@ -73,6 +79,7 @@ main.tsx
 ```
 
 **语言切换实时生效**
+
 - `Header.tsx` 通过 `i18n.changeLanguage()` 切换
 - 切换后所有使用 `useTranslation()` 的组件自动重渲染
 - 用户选择持久化到 `localStorage`
@@ -87,17 +94,17 @@ main.tsx
 **消费者（使用 `useTranslation()` 的组件）**
 | 文件 | 使用的翻译 key |
 |------|----------------|
-| `src/App.tsx` | appName, tagline, upload.*, formats.*, actions.*, table.*, status.*, loading.*, errors.*, output.*, confirmations.* |
+| `src/App.tsx` | appName, tagline, upload._, formats._, actions._, table._, status._, loading._, errors._, output._, confirmations._ |
 | `src/components/Header.tsx` | appName, language — 含 `i18n.changeLanguage()` |
-| `src/components/Footer.tsx` | footer.* |
-| `src/components/FileDropzone.tsx` | upload.* |
-| `src/components/ConfirmModal.tsx` | confirmations.*, actions.cancel, actions.continue |
-| `src/components/SettingsModal.tsx` | settingsModal.*, options.* |
-| `src/components/HtmlOptionsModal.tsx` | htmlOptionsModal.*, options.* |
-| `src/components/HtmlDecodeOptionsModal.tsx` | options.* |
-| `src/components/PdfPageSelectorModal.tsx` | pdfPageSelector.* |
-| `src/components/PdfPageSelectorInline.tsx` | settingsModal.pdfPagesTitle, options.pdfPages.*, pdfPageSelector.* |
-| `src/components/PreviewModal.tsx` | preview.* |
+| `src/components/Footer.tsx` | footer._ |
+| `src/components/FileDropzone.tsx` | upload._ |
+| `src/components/ConfirmModal.tsx` | confirmations._, actions.cancel, actions.continue |
+| `src/components/SettingsModal.tsx` | settingsModal._, options._ |
+| `src/components/HtmlOptionsModal.tsx` | htmlOptionsModal._, options._ |
+| `src/components/HtmlDecodeOptionsModal.tsx` | options._ |
+| `src/components/PdfPageSelectorModal.tsx` | pdfPageSelector._ |
+| `src/components/PdfPageSelectorInline.tsx` | settingsModal.pdfPagesTitle, options.pdfPages._, pdfPageSelector._ |
+| `src/components/PreviewModal.tsx` | preview.\* |
 
 **测试依赖**
 | 文件 | 关系 | 说明 |

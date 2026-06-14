@@ -5,6 +5,7 @@
 parser-bridge 是宿主应用与 iframe 隔离的解析器运行时之间的通信桥梁。它封装了基于 `MessagePort` 的双向消息协议，提供类型安全的请求-响应机制，使应用层无需关心底层 postMessage 细节即可发起文档转换请求。
 
 核心职责：
+
 - 管理 MessagePort 连接的生命周期（创建、就绪检测、销毁）
 - 维护待处理请求队列，支持超时、取消、进度查询
 - 将底层消息协议抽象为 Promise-based API
@@ -41,7 +42,9 @@ url.ts（工具：解析器运行时 URL 解析）
 ```typescript
 // 客户端接口
 type BridgeClient = {
-  sendConvert(request: ParserBridgeRequest): Promise<ConversionResultPayload | ConversionResultPayload[]>
+  sendConvert(
+    request: ParserBridgeRequest
+  ): Promise<ConversionResultPayload | ConversionResultPayload[]>
   sendCancel(requestId: string): Promise<void>
   getProgress(): ParserBridgeProgress | null
   dispose(): void
@@ -60,6 +63,7 @@ type ConversionResult = {
 ### 错误处理
 
 `BridgeErrorCode` 枚举了五种错误场景：
+
 - `IFRAME_LOAD_TIMEOUT`：iframe 加载超时
 - `BRIDGE_DISPOSED`：桥接已销毁
 - `DUPLICATE_REQUEST_ID`：重复请求 ID
@@ -118,26 +122,26 @@ BridgeClient.sendCancel() 清除 pending 条目，reject Promise
 
 ### 上游依赖
 
-| 依赖 | 用途 |
-|------|------|
-| `@hamster-note/parser-protocol` | 定义协议消息类型（`ParserBridgeRequest`、`ParserBridgeProgress`、`ParserBridgeConversionResultPayload` 等） |
-| `src/lib/converter.ts` | 提供 `TargetFormat` 类型定义 |
-| `src/components/ParserIframeBridge.tsx` | React 组件层，管理 iframe 生命周期并暴露 `ParserIframeBridgeRef` 接口 |
+| 依赖                                    | 用途                                                                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `@hamster-note/parser-protocol`         | 定义协议消息类型（`ParserBridgeRequest`、`ParserBridgeProgress`、`ParserBridgeConversionResultPayload` 等） |
+| `src/lib/converter.ts`                  | 提供 `TargetFormat` 类型定义                                                                                |
+| `src/components/ParserIframeBridge.tsx` | React 组件层，管理 iframe 生命周期并暴露 `ParserIframeBridgeRef` 接口                                       |
 
 ### 下游消费者
 
-| 消费者 | 使用方式 |
-|--------|----------|
-| `src/App.tsx` | 导入 `convertViaBridge`，在 `convertAll()` 中调用；渲染 `<ParserIframeBridge>` 组件 |
-| `ParserIframeBridge.tsx` | 导入 `createBridgeClient`、`BridgeError`、`BridgeErrorCode`、`getParserRuntimeUrl` |
+| 消费者                   | 使用方式                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `src/App.tsx`            | 导入 `convertViaBridge`，在 `convertAll()` 中调用；渲染 `<ParserIframeBridge>` 组件 |
+| `ParserIframeBridge.tsx` | 导入 `createBridgeClient`、`BridgeError`、`BridgeErrorCode`、`getParserRuntimeUrl`  |
 
 ### 文件职责映射
 
-| 文件 | 职责 |
-|------|------|
-| `client.ts` | 底层 MessagePort 客户端：请求收发、超时管理、错误处理 |
-| `proxy.ts` | 高层代理：File → ArrayBuffer → Request → Response → ConversionResult[] |
-| `url.ts` | 工具函数：根据 BASE_URL 解析 parser-runtime/index.html 路径 |
+| 文件        | 职责                                                                   |
+| ----------- | ---------------------------------------------------------------------- |
+| `client.ts` | 底层 MessagePort 客户端：请求收发、超时管理、错误处理                  |
+| `proxy.ts`  | 高层代理：File → ArrayBuffer → Request → Response → ConversionResult[] |
+| `url.ts`    | 工具函数：根据 BASE_URL 解析 parser-runtime/index.html 路径            |
 
 ### 外部系统
 

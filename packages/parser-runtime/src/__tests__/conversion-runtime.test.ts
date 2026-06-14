@@ -4,10 +4,17 @@ import { convertRuntime } from '../conversion'
 
 const parserMocks = vi.hoisted(() => ({
   pdfEncode: vi.fn(),
+  txtEncode: vi.fn(),
   htmlDecodeToHtml: vi.fn(),
   htmlEncode: vi.fn(),
   htmlDecode: vi.fn(),
-  imageEncode: vi.fn()
+  imageEncode: vi.fn(),
+  // Markdown parser mocks - encode 把 buffer 转为 IntermediateDocument，
+  // decodeToMarkdown 反向把 IntermediateDocument 输出为 markdown 字符串
+  markdownEncode: vi.fn(),
+  markdownDecodeToMarkdown: vi.fn(),
+  // html2canvas 默认导出函数 mock - 单测里渲染用到
+  html2canvas: vi.fn()
 }))
 
 vi.mock('@hamster-note/pdf-parser', () => ({
@@ -24,10 +31,29 @@ vi.mock('@hamster-note/html-parser', () => ({
   }
 }))
 
+vi.mock('@hamster-note/txt-parser', () => ({
+  TxtParser: {
+    encode: parserMocks.txtEncode
+  }
+}))
+
 vi.mock('@hamster-note/image-parser', () => ({
   ImageParser: {
     encode: parserMocks.imageEncode
   }
+}))
+
+// Markdown parser mock - 与 PdfParser/HtmlParser 同模式：导出一个有 static 方法的类
+vi.mock('@hamster-note/markdown-parser', () => ({
+  MarkdownParser: {
+    encode: parserMocks.markdownEncode,
+    decodeToMarkdown: parserMocks.markdownDecodeToMarkdown
+  }
+}))
+
+// html2canvas 是 default export 的函数；包装为 default 字段
+vi.mock('html2canvas', () => ({
+  default: parserMocks.html2canvas
 }))
 
 const jsPdfMocks = vi.hoisted(() => ({
@@ -107,6 +133,18 @@ const createImageContent = (id: string, src: string): IntermediateContent =>
     ]
   }) as IntermediateContent
 
+// 构造仿真 TXT 解析结果：真实 TxtParser.encode 把整段文本放在
+// pages[0].content[0].content（IntermediateText 节点）。adapters.ts 的
+// extractTextFromIntermediate 通过 await pages → page.getContent() 读取，
+// 所以 mock 必须复刻这条链路而不是返回旧的 { text } 顶层结构。
+const createTxtIntermediateDocument = (text: string): IntermediateDocument =>
+  createIntermediateDocument([
+    {
+      content: [{ content: text } as unknown as IntermediateContent],
+      getContent: async () => [{ content: text } as unknown as IntermediateContent]
+    }
+  ])
+
 const imageHtmlFromIntermediate = async (intermediate: IntermediateDocument): Promise<string> => {
   const pages = await intermediate.pages
   const content = pages.flatMap(page => page.content)
@@ -126,14 +164,52 @@ const expectPaginatedCssContract = (result: string) => {
   expect(result).not.toMatch(/:last-child\s*\{[^}]*box-shadow:\s*none/i)
 }
 
+const getTxtImageCanvas = (state: MockCanvasState): MockCanvasRecord => {
+  const canvas = state.canvases.find(item =>
+    item.operations.some(operation => operation.method === 'fillText')
+  )
+  if (!canvas) {
+    throw new Error('Expected TXT image canvas with text drawing')
+  }
+  return canvas
+}
+
+const getFirstOperation = (
+  canvas: MockCanvasRecord,
+  method: MockCanvasOperation['method']
+): MockCanvasOperation => {
+  const operation = canvas.operations.find(item => item.method === method)
+  if (!operation) {
+    throw new Error(`Expected ${method} operation`)
+  }
+  return operation
+}
+
+type MockCanvasOperation = {
+  method: 'drawImage' | 'fillRect' | 'fillText'
+  args: unknown[]
+  fillStyle: string
+  font: string
+}
+
+type MockCanvasRecord = {
+  height: number
+  operations: MockCanvasOperation[]
+  width: number
+}
+
 type MockCanvasState = {
-  lastCanvas: { width: number; height: number } | null
+  canvases: MockCanvasRecord[]
+  lastCanvas: MockCanvasRecord | null
+  lastToBlobCanvas: MockCanvasRecord | null
   lastToBlobArgs: { type: string | undefined; quality: number | undefined }
 }
 
 const installCanvasAndImageMocks = (): { restore: () => void; state: MockCanvasState } => {
   const state: MockCanvasState = {
+    canvases: [],
     lastCanvas: null,
+    lastToBlobCanvas: null,
     lastToBlobArgs: { type: undefined, quality: undefined }
   }
 
@@ -150,25 +226,51 @@ const installCanvasAndImageMocks = (): { restore: () => void; state: MockCanvasS
       return originalCreateElement(tagName)
     }
 
-    const canvas = {
+    const canvas: MockCanvasRecord & {
+      getContext: () => CanvasRenderingContext2D
+      toBlob: (callback: BlobCallback, type?: string, quality?: number) => void
+    } = {
       width: 0,
       height: 0,
-      getContext: () => ({
-        drawImage: vi.fn(),
-        fillRect: vi.fn(),
-        fillStyle: '',
-        fillText: vi.fn(),
-        font: '',
-        measureText: (text: string) => ({ width: text.length * 8 })
-      }),
+      operations: [],
+      getContext: () => {
+        let fillStyle = ''
+        let font = ''
+        return {
+          drawImage: vi.fn((...args: unknown[]) => {
+            canvas.operations.push({ method: 'drawImage', args, fillStyle, font })
+          }),
+          fillRect: vi.fn((...args: unknown[]) => {
+            canvas.operations.push({ method: 'fillRect', args, fillStyle, font })
+          }),
+          get fillStyle() {
+            return fillStyle
+          },
+          set fillStyle(value: string) {
+            fillStyle = value
+          },
+          fillText: vi.fn((...args: unknown[]) => {
+            canvas.operations.push({ method: 'fillText', args, fillStyle, font })
+          }),
+          get font() {
+            return font
+          },
+          set font(value: string) {
+            font = value
+          },
+          measureText: (text: string) => ({ width: text.length * 8 })
+        } as unknown as CanvasRenderingContext2D
+      },
       toBlob: (callback: BlobCallback, type?: string, quality?: number) => {
         state.lastToBlobArgs = { type, quality }
+        state.lastToBlobCanvas = canvas
         callback(new Blob(['mock png'], { type: type ?? 'image/png' }))
       }
-    } as unknown as HTMLCanvasElement
+    }
 
     state.lastCanvas = canvas
-    return canvas
+    state.canvases.push(canvas)
+    return canvas as unknown as HTMLCanvasElement
   })
 
   globalThis.Image = MockImage as unknown as typeof Image
@@ -190,15 +292,20 @@ describe('Runtime conversion', () => {
   beforeEach(() => {
     mockImageWidth = 32
     mockImageHeight = 16
+    parserMocks.txtEncode.mockResolvedValue(createTxtIntermediateDocument('mock txt content'))
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     parserMocks.pdfEncode.mockReset()
+    parserMocks.txtEncode.mockReset()
     parserMocks.htmlDecodeToHtml.mockReset()
     parserMocks.htmlEncode.mockReset()
     parserMocks.htmlDecode.mockReset()
     parserMocks.imageEncode.mockReset()
+    parserMocks.markdownEncode.mockReset()
+    parserMocks.markdownDecodeToMarkdown.mockReset()
+    parserMocks.html2canvas.mockReset()
   })
 
   it('converts mocked PDF to HTML', async () => {
@@ -226,9 +333,7 @@ describe('Runtime conversion', () => {
     const decodeOptions = {
       background: {
         includeBackground: true,
-        backgroundQuality: 0.85,
-        excludeTextFromBackground: true,
-        excludeImagesFromBackground: true
+        backgroundQuality: 0.85
       }
     }
     parserMocks.pdfEncode.mockResolvedValue(
@@ -344,6 +449,391 @@ describe('Runtime conversion', () => {
     expect(parserMocks.htmlEncode).toHaveBeenCalledWith(buffer, encodeOptions)
     expect(getPages).toHaveBeenCalled()
     expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toBe('Visible text\nMore text')
+  })
+
+  it('separates HTML page paragraphs with deterministic blank lines', async () => {
+    parserMocks.htmlEncode.mockResolvedValue({
+      getPages: vi.fn().mockResolvedValue([{ getPureText: () => 'A\n\nB\n\nC\nD' }])
+    })
+
+    const [result] = await convertRuntime({
+      filename: 'article.html',
+      sourceFormat: 'html',
+      targetFormat: 'txt',
+      buffer: createBuffer('<p>A</p><p>B</p><div>C<br>D</div>')
+    })
+
+    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0)).trim()).toBe('A\n\nB\n\nC\nD')
+  })
+
+  it('wraps TXT-to-HTML output with readable 16px defaults and strips abnormal scale styles', async () => {
+    const intermediate = {
+      outline: undefined,
+      text: 'Hello\nWorld',
+      children: [{ text: 'Hello' }, { text: 'World' }]
+    }
+    parserMocks.txtEncode.mockResolvedValue(intermediate)
+    parserMocks.htmlDecode.mockResolvedValue(
+      new File(
+        [
+          '<!doctype html><html><head><title>Converted</title></head><body style="transform: scale(0.06); font-size: 2px;"><p style="transform:scale(0.06)">Hello</p><p>World</p></body></html>'
+        ],
+        'converted.html',
+        { type: 'text/html' }
+      )
+    )
+
+    const [result] = await convertRuntime({
+      filename: 'note.txt',
+      sourceFormat: 'txt',
+      targetFormat: 'html',
+      buffer: createBuffer('Hello\nWorld'),
+      mimeType: 'text/plain'
+    })
+
+    const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
+    expect(parserMocks.txtEncode).toHaveBeenCalledWith(createBuffer('Hello\nWorld'))
+    expect(parserMocks.htmlDecode).toHaveBeenCalledWith(intermediate, undefined)
+    expect(html).toContain('<p>Hello</p><p>World</p>')
+    expect(html).toContain('data-hamster-txt-html-wrapper')
+    expect(html).toContain('font-size:16px')
+    expect(html).toContain('line-height:1.5')
+    expect(html).not.toContain('scale(')
+    expect(html).not.toContain('data-hamster-html-layout')
+  })
+
+  it('preserves PDF-to-TXT page, paragraph, and line separation from intermediate structure', async () => {
+    parserMocks.pdfEncode.mockResolvedValue({
+      pages: [
+        {
+          children: [{ text: 'A' }, { text: 'B' }]
+        },
+        {
+          children: [{ text: 'C' }]
+        }
+      ]
+    })
+
+    const [result] = await convertRuntime({
+      filename: 'sample.pdf',
+      sourceFormat: 'pdf',
+      targetFormat: 'txt',
+      buffer: createBuffer('%PDF')
+    })
+
+    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0)).trim()).toBe('A\nB\n\nC')
+  })
+
+  it('renders TXT-to-PNG with dedicated visible canvas options', async () => {
+    const { restore, state } = installCanvasAndImageMocks()
+    parserMocks.txtEncode.mockResolvedValue(createTxtIntermediateDocument('Alpha\nBeta'))
+
+    try {
+      const [result] = await convertRuntime({
+        filename: 'note.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('Alpha\nBeta'),
+        mimeType: 'text/plain',
+        options: {
+          txtImage: {
+            textColor: '#ff0000',
+            backgroundColor: '#00ff00',
+            fontSizePx: 22,
+            imageWidthPx: 640,
+            paddingPx: 32,
+            lineHeightPx: 36
+          }
+        }
+      })
+
+      const canvas = getTxtImageCanvas(state)
+      const background = getFirstOperation(canvas, 'fillRect')
+      const firstText = getFirstOperation(canvas, 'fillText')
+      const secondText = canvas.operations.filter(operation => operation.method === 'fillText')[1]
+      expect(result?.filename).toBe('note.png')
+      expect(result?.mimeType).toBe('image/png')
+      expect(result?.targetFormat).toBe('png')
+      expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toBe('mock png')
+      expect(canvas.width).toBe(640)
+      expect(canvas.height).toBe(136)
+      expect(background.fillStyle).toBe('#00ff00')
+      expect(background.args).toEqual([0, 0, 640, 136])
+      expect(firstText.fillStyle).toBe('#ff0000')
+      expect(firstText.font).toBe('22px sans-serif')
+      expect(firstText.args).toEqual(['Alpha', 32, 68])
+      expect(secondText?.args).toEqual(['Beta', 32, 104])
+      expect(state.lastToBlobArgs).toEqual({ type: 'image/png', quality: undefined })
+    } finally {
+      restore()
+    }
+  })
+
+  it.each([
+    ['jpg', 'image/jpeg', 'note.jpg', 0.92],
+    ['webp', 'image/webp', 'note.webp', 0.92]
+  ] as const)(
+    'converts TXT to %s with non-empty output',
+    async (targetFormat, mimeType, filename, quality) => {
+      const { restore, state } = installCanvasAndImageMocks()
+
+      try {
+        const [result] = await convertRuntime({
+          filename: 'note.txt',
+          sourceFormat: 'txt',
+          targetFormat,
+          buffer: createBuffer('hello'),
+          mimeType: 'text/plain',
+          options: {
+            txtImage: {
+              textColor: '#111111',
+              backgroundColor: '#eeeeee',
+              fontSizePx: 18,
+              imageWidthPx: 500,
+              paddingPx: 24,
+              lineHeightPx: 30
+            }
+          }
+        })
+
+        expect(result?.filename).toBe(filename)
+        expect(result?.mimeType).toBe(mimeType)
+        expect(result?.targetFormat).toBe(targetFormat)
+        expect((result?.buffer.byteLength ?? 0) > 0).toBe(true)
+        expect(state.lastToBlobArgs).toEqual({ type: mimeType, quality })
+      } finally {
+        restore()
+      }
+    }
+  )
+
+  it('uses TXT image defaults for missing, NaN, and Infinity numeric options', async () => {
+    const { restore, state } = installCanvasAndImageMocks()
+
+    try {
+      await convertRuntime({
+        filename: 'note.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('hello'),
+        mimeType: 'text/plain',
+        options: {
+          txtImage: {
+            textColor: '#123456',
+            backgroundColor: '#abcdef',
+            fontSizePx: Number.NaN,
+            imageWidthPx: Number.POSITIVE_INFINITY,
+            paddingPx: Number.NEGATIVE_INFINITY,
+            lineHeightPx: undefined as unknown as number
+          }
+        }
+      })
+
+      const canvas = getTxtImageCanvas(state)
+      const text = getFirstOperation(canvas, 'fillText')
+      expect(canvas.width).toBe(800)
+      expect(canvas.height).toBe(100)
+      expect(text.font).toBe('16px sans-serif')
+      expect(text.args).toEqual(['mock txt content', 20, 44])
+    } finally {
+      restore()
+    }
+  })
+
+  it('rounds and clamps TXT image numeric options with padding and line-height safeguards', async () => {
+    const { restore, state } = installCanvasAndImageMocks()
+
+    try {
+      await convertRuntime({
+        filename: 'note.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('hello'),
+        mimeType: 'text/plain',
+        options: {
+          txtImage: {
+            textColor: '#000000',
+            backgroundColor: '#ffffff',
+            fontSizePx: 7.6,
+            imageWidthPx: 319.4,
+            paddingPx: 300.2,
+            lineHeightPx: 7.2
+          }
+        }
+      })
+
+      const minCanvas = getTxtImageCanvas(state)
+      const minText = getFirstOperation(minCanvas, 'fillText')
+      const minSecondText = minCanvas.operations.filter(
+        operation => operation.method === 'fillText'
+      )[1]
+      expect(minCanvas.width).toBe(320)
+      expect(minText.font).toBe('8px sans-serif')
+      expect(minText.args).toEqual(['mock', 140, 148])
+      expect(minSecondText?.args).toEqual(['txt', 140, 156])
+
+      await convertRuntime({
+        filename: 'note.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('hello'),
+        mimeType: 'text/plain',
+        options: {
+          txtImage: {
+            textColor: '#000000',
+            backgroundColor: '#ffffff',
+            fontSizePx: 200.2,
+            imageWidthPx: 5000.8,
+            paddingPx: -1.2,
+            lineHeightPx: 12.1
+          }
+        }
+      })
+
+      const maxCanvas = getTxtImageCanvas({ ...state, canvases: state.canvases.slice(2) })
+      const maxText = getFirstOperation(maxCanvas, 'fillText')
+      expect(maxCanvas.width).toBe(4096)
+      expect(maxText.font).toBe('96px sans-serif')
+      expect(maxText.args).toEqual(['mock txt content', 0, 96])
+    } finally {
+      restore()
+    }
+  })
+
+  // ---- Regression: TXT-to-PNG must wrap CJK text without spaces ----
+  // 用户反馈：TXT 文件包含中文/日文/韩文（无空格）时 PNG 输出空白，
+  // 因为 wrapText 仅按空格切分，CJK 整段被当成一个 token，永远不换行，
+  // 一行被绘制到画布外导致看似空白。以下 4 个用例锁定修复后的行为。
+
+  it('wraps CJK paragraphs without spaces into multiple lines (TXT→PNG)', async () => {
+    // S1 - Happy path: 200 个汉字无空格，必须换行成 ≥2 行；
+    // 默认 imageWidthPx=800、padding=20 → maxWidth=760；
+    // 在 mock 下每字符宽 8px → 95 字符/行；200 字符必须 ≥ 3 行。
+    const longChinese = '你好世界'.repeat(50) // 200 chars, no spaces
+    parserMocks.txtEncode.mockResolvedValueOnce(createTxtIntermediateDocument(longChinese))
+    const { restore, state } = installCanvasAndImageMocks()
+
+    try {
+      await convertRuntime({
+        filename: 'cjk.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('cjk-bytes'),
+        mimeType: 'text/plain'
+      })
+
+      const canvas = getTxtImageCanvas(state)
+      const fillTextOps = canvas.operations.filter(op => op.method === 'fillText')
+      expect(fillTextOps.length).toBeGreaterThanOrEqual(2)
+      // 每一行的可视宽度（chars*8）必须 ≤ maxWidth=760
+      for (const op of fillTextOps) {
+        const line = op.args[0] as string
+        expect(line.length * 8).toBeLessThanOrEqual(760)
+      }
+    } finally {
+      restore()
+    }
+  })
+
+  it('wraps mixed CJK + Latin text on character boundaries when no space fits (TXT→PNG)', async () => {
+    // S2 - 中英混排：CJK 段无空格 + 一个英文单词
+    // 输入 '你好世界你好世界 hello' — 在 maxWidth=40 时
+    // 'hello' 单词宽 5*8=40 ≤ 40 可以 fit，但 8 个汉字一段 64>40 必须按字符切。
+    parserMocks.txtEncode.mockResolvedValueOnce(
+      createTxtIntermediateDocument('你好世界你好世界 hello')
+    )
+    const { restore, state } = installCanvasAndImageMocks()
+
+    try {
+      await convertRuntime({
+        filename: 'mixed.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('mix-bytes'),
+        mimeType: 'text/plain',
+        options: {
+          txtImage: {
+            textColor: '#000000',
+            backgroundColor: '#ffffff',
+            fontSizePx: 16,
+            imageWidthPx: 320,
+            paddingPx: 140,
+            lineHeightPx: 24
+          }
+        }
+      })
+
+      const canvas = getTxtImageCanvas(state)
+      const fillTextOps = canvas.operations.filter(op => op.method === 'fillText')
+      // 8 个汉字 + 'hello'，maxWidth=40 → 至少 3 行（5字符CJK + 3字符CJK + hello）
+      expect(fillTextOps.length).toBeGreaterThanOrEqual(2)
+      for (const op of fillTextOps) {
+        const line = op.args[0] as string
+        if (line === '') continue
+        expect(line.length * 8).toBeLessThanOrEqual(40)
+      }
+    } finally {
+      restore()
+    }
+  })
+
+  it('wraps a long single-token Latin word by character fallback (TXT→PNG)', async () => {
+    // S3 - 极端长单词：200 个 'a' 无空格，仍必须换行
+    const longWord = 'a'.repeat(200)
+    parserMocks.txtEncode.mockResolvedValueOnce(createTxtIntermediateDocument(longWord))
+    const { restore, state } = installCanvasAndImageMocks()
+
+    try {
+      await convertRuntime({
+        filename: 'long.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('long-bytes'),
+        mimeType: 'text/plain'
+      })
+
+      const canvas = getTxtImageCanvas(state)
+      const fillTextOps = canvas.operations.filter(op => op.method === 'fillText')
+      // 默认 maxWidth=760，每字符 8px → 95/行 → 200 字符 ≥ 3 行
+      expect(fillTextOps.length).toBeGreaterThanOrEqual(2)
+      for (const op of fillTextOps) {
+        const line = op.args[0] as string
+        expect(line.length * 8).toBeLessThanOrEqual(760)
+      }
+    } finally {
+      restore()
+    }
+  })
+
+  it('preserves blank paragraphs between text lines (TXT→PNG)', async () => {
+    // S5 - 段间空行：'A\n\nB' 必须保留中间空行
+    parserMocks.txtEncode.mockResolvedValueOnce(createTxtIntermediateDocument('A\n\nB'))
+    const { restore, state } = installCanvasAndImageMocks()
+
+    try {
+      await convertRuntime({
+        filename: 'blank.txt',
+        sourceFormat: 'txt',
+        targetFormat: 'png',
+        buffer: createBuffer('blank-bytes'),
+        mimeType: 'text/plain'
+      })
+
+      const canvas = getTxtImageCanvas(state)
+      const fillTextOps = canvas.operations.filter(op => op.method === 'fillText')
+      expect(fillTextOps).toHaveLength(3)
+      const [op0, op1, op2] = fillTextOps
+      expect(op0?.args[0]).toBe('A')
+      expect(op1?.args[0]).toBe('')
+      expect(op2?.args[0]).toBe('B')
+      const y0 = op0?.args[2] as number
+      const y1 = op1?.args[2] as number
+      const y2 = op2?.args[2] as number
+      expect(y1).toBeGreaterThan(y0)
+      expect(y2).toBeGreaterThan(y1)
+    } finally {
+      restore()
+    }
   })
 
   it('converts image to PNG', async () => {
@@ -1097,5 +1587,174 @@ describe('Image-to-PDF A4 sizing', () => {
     })
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-image')
+  })
+})
+
+describe('Markdown conversion', () => {
+  beforeEach(() => {
+    mockImageWidth = 32
+    mockImageHeight = 16
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    parserMocks.markdownEncode.mockReset()
+    parserMocks.markdownDecodeToMarkdown.mockReset()
+    parserMocks.htmlDecodeToHtml.mockReset()
+    parserMocks.htmlEncode.mockReset()
+    parserMocks.html2canvas.mockReset()
+    jsPdfMocks.addImage.mockClear()
+    jsPdfMocks.output.mockClear()
+    jsPdfMocks.constructor.mockClear()
+  })
+
+  it('converts mocked Markdown to HTML via paginated layout', async () => {
+    parserMocks.markdownEncode.mockResolvedValue(
+      createIntermediateDocument([{ content: [], getContent: vi.fn().mockResolvedValue([]) }])
+    )
+    parserMocks.htmlDecodeToHtml.mockResolvedValue('<html><body><h1>Hello</h1></body></html>')
+
+    const [result] = await convertRuntime({
+      filename: 'doc.md',
+      sourceFormat: 'markdown',
+      targetFormat: 'html',
+      buffer: createBuffer('# Hello')
+    })
+
+    expect(parserMocks.markdownEncode).toHaveBeenCalledOnce()
+    expect(result?.filename).toBe('doc.html')
+    expect(result?.mimeType).toBe('text/html;charset=utf-8')
+    expect(result?.targetFormat).toBe('html')
+    const html = textFromBuffer(result?.buffer ?? new ArrayBuffer(0))
+    expect(html).toContain('<h1>Hello</h1>')
+    expectPaginatedCssContract(html)
+  })
+
+  it('preserves original markdown when txtMode=raw', async () => {
+    const source = '# Title\n\n- item one\n- item two\n'
+
+    const [result] = await convertRuntime({
+      filename: 'note.md',
+      sourceFormat: 'markdown',
+      targetFormat: 'txt',
+      buffer: createBuffer(source),
+      options: { markdown: { txtMode: 'raw' } }
+    })
+
+    expect(parserMocks.markdownEncode).not.toHaveBeenCalled()
+    expect(result?.filename).toBe('note.txt')
+    expect(result?.mimeType).toBe('text/plain;charset=utf-8')
+    expect(result?.targetFormat).toBe('txt')
+    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toBe(source)
+  })
+
+  it('extracts plain text when txtMode=plain (default)', async () => {
+    // intermediateToTxtResult 走同步 extractIntermediateText，需要同步的 pages 数组
+    // 与 node.text 字段才能提取出文本（详见 utils.ts collectIntermediateTextBlocks）
+    parserMocks.markdownEncode.mockResolvedValue({
+      pages: [{ text: 'Plain extracted text' }]
+    } as unknown as IntermediateDocument)
+
+    const [result] = await convertRuntime({
+      filename: 'note.md',
+      sourceFormat: 'markdown',
+      targetFormat: 'txt',
+      buffer: createBuffer('# Title\n\nbody')
+    })
+
+    expect(parserMocks.markdownEncode).toHaveBeenCalledOnce()
+    expect(result?.filename).toBe('note.txt')
+    expect(result?.targetFormat).toBe('txt')
+    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toContain('Plain extracted text')
+  })
+
+  it('renders Markdown to PNG via html2canvas', async () => {
+    const canvasMocks = installCanvasAndImageMocks()
+    try {
+      parserMocks.markdownEncode.mockResolvedValue(
+        createIntermediateDocument([{ content: [], getContent: vi.fn().mockResolvedValue([]) }])
+      )
+      parserMocks.htmlDecodeToHtml.mockResolvedValue('<html><body><p>Snap</p></body></html>')
+      const fakeCanvas = document.createElement('canvas') as HTMLCanvasElement
+      ;(fakeCanvas as unknown as { width: number }).width = 800
+      ;(fakeCanvas as unknown as { height: number }).height = 600
+      parserMocks.html2canvas.mockResolvedValue(fakeCanvas)
+
+      const [result] = await convertRuntime({
+        filename: 'note.md',
+        sourceFormat: 'markdown',
+        targetFormat: 'png',
+        buffer: createBuffer('# Snap')
+      })
+
+      expect(parserMocks.html2canvas).toHaveBeenCalledOnce()
+      expect(result?.filename).toBe('note.png')
+      expect(result?.mimeType).toBe('image/png')
+      expect(result?.targetFormat).toBe('png')
+      expect(canvasMocks.state.lastToBlobArgs.type).toBe('image/png')
+    } finally {
+      canvasMocks.restore()
+    }
+  })
+
+  it('renders Markdown to PDF by addImage on jsPDF', async () => {
+    const canvasMocks = installCanvasAndImageMocks()
+    jsPdfMocks.addImage.mockClear()
+    jsPdfMocks.output.mockClear()
+    jsPdfMocks.constructor.mockClear()
+    jsPdfMocks.constructor.mockImplementation(() => ({
+      addImage: jsPdfMocks.addImage,
+      output: jsPdfMocks.output
+    }))
+    jsPdfMocks.output.mockReturnValue(new Blob(['pdf'], { type: 'application/pdf' }))
+    try {
+      parserMocks.markdownEncode.mockResolvedValue(
+        createIntermediateDocument([{ content: [], getContent: vi.fn().mockResolvedValue([]) }])
+      )
+      parserMocks.htmlDecodeToHtml.mockResolvedValue('<html><body><p>PDF</p></body></html>')
+      const fakeCanvas = document.createElement('canvas') as HTMLCanvasElement
+      ;(fakeCanvas as unknown as { width: number }).width = 800
+      ;(fakeCanvas as unknown as { height: number }).height = 600
+      parserMocks.html2canvas.mockResolvedValue(fakeCanvas)
+
+      const [result] = await convertRuntime({
+        filename: 'note.md',
+        sourceFormat: 'markdown',
+        targetFormat: 'pdf',
+        buffer: createBuffer('# pdf')
+      })
+
+      expect(jsPdfMocks.addImage).toHaveBeenCalledOnce()
+      expect(jsPdfMocks.output).toHaveBeenCalledWith('blob')
+      expect(result?.filename).toBe('note.pdf')
+      expect(result?.mimeType).toBe('application/pdf')
+      expect(result?.targetFormat).toBe('pdf')
+    } finally {
+      canvasMocks.restore()
+    }
+  })
+
+  it('converts HTML to Markdown via HtmlParser.encode + MarkdownParser.decodeToMarkdown', async () => {
+    const intermediateDocument = createIntermediateDocument([
+      { content: [], getContent: vi.fn().mockResolvedValue([]) }
+    ])
+    parserMocks.htmlEncode.mockResolvedValue({
+      getIntermediateDocument: () => intermediateDocument
+    })
+    parserMocks.markdownDecodeToMarkdown.mockResolvedValue('# converted markdown\n')
+
+    const [result] = await convertRuntime({
+      filename: 'page.html',
+      sourceFormat: 'html',
+      targetFormat: 'md',
+      buffer: createBuffer('<h1>converted markdown</h1>')
+    })
+
+    expect(parserMocks.htmlEncode).toHaveBeenCalledOnce()
+    expect(parserMocks.markdownDecodeToMarkdown).toHaveBeenCalledWith(intermediateDocument)
+    expect(result?.filename).toBe('page.md')
+    expect(result?.mimeType).toBe('text/markdown;charset=utf-8')
+    expect(result?.targetFormat).toBe('md')
+    expect(textFromBuffer(result?.buffer ?? new ArrayBuffer(0))).toContain('# converted markdown')
   })
 })

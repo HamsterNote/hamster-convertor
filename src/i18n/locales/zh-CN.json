@@ -20,7 +20,8 @@
       "jpg": "JPG",
       "webp": "WEBP",
       "pdf": "PDF",
-      "html": "HTML"
+      "html": "HTML",
+      "md": "Markdown"
     }
   },
   "actions": {
@@ -79,8 +80,6 @@
     "htmlBackground": "HTML 背景选项",
     "includeBackground": "包含背景",
     "backgroundQuality": "背景质量",
-    "excludeTextFromBackground": "从背景中排除文字",
-    "excludeImagesFromBackground": "从背景中排除图片",
     "textControls": "文字控制",
     "htmlTextControls": "HTML 文字控制",
     "textControlsDefault": "默认文字",
@@ -149,7 +148,15 @@
     "htmlOptionsTitle": "HTML 选项",
     "htmlEncodeOptionsTitle": "HTML 输入选项",
     "imageOptionsTitle": "图片选项",
+    "txtImageOptionsTitle": "TXT 图片选项",
     "imageToPdfTitle": "图片转 PDF 选项",
+    "txtImageTextColor": "文字颜色",
+    "txtImageBackgroundColor": "背景颜色",
+    "txtImageFontSize": "字号 (px)",
+    "txtImageWidth": "图片宽度 (px)",
+    "txtImagePadding": "内边距 (px)",
+    "txtImageLineHeight": "行高 (px)",
+    "txtImageHelp": "仅用于 TXT 转 PNG、JPG 或 WebP；这些值会独立保存，不会写入通用图片选项。",
     "maxWidth": "最大宽度",
     "maxHeight": "最大高度",
     "keepAspectRatio": "保持宽高比",
@@ -180,6 +187,11 @@
     "rotationDegrees": "{{degrees}}°",
     "scale": "缩放 (%)",
     "imageToPdfTransformHelp": "旋转仅支持直角；缩放范围为 10% 到 300%。",
+    "markdownTitle": "Markdown 选项",
+    "markdownTxtMode": "TXT 输出模式",
+    "markdownTxtModeRaw": "保留原始 Markdown",
+    "markdownTxtModePlain": "提取纯文本",
+    "markdownTxtModeHelp": "「保留原始」直接输出 Markdown 语法（标题、列表等）；「提取纯文本」会先解析文档再提取纯文本内容。",
     "excludeSelectors": "排除选择器",
     "excludeSelectorsHelp": "多个 CSS 选择器可用逗号或换行分隔，编码 HTML 输入时会跳过匹配元素。",
     "snapshotWidth": "快照宽度",
@@ -197,5 +209,25 @@
     "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
     "feedback": " 问题反馈",
     "feedbackUrl": "mailto:convertor@hamster-note.com"
+  },
+  "multiSelect": {
+    "toggle": "多选",
+    "cancel": "取消选择",
+    "selectedCount": "已选择 {{count}} 个",
+    "bulkDelete": "删除所选",
+    "bulkTarget": "设置目标格式",
+    "noCommonTarget": "所选文件没有共同的目标格式",
+    "selectionUnavailable": "无法选择已转换或转换中的文件"
+  },
+  "group": {
+    "create": "创建分组",
+    "title": "分组 {{index}} · {{count}} 个文件",
+    "expand": "展开分组",
+    "collapse": "收起分组",
+    "settings": "分组设置",
+    "convert": "转换分组",
+    "selectAll": "全选分组内文件",
+    "noSettingsForTarget": "该目标格式没有可用设置",
+    "alreadyInGroup": "无法将已在分组中的文件创建新分组"
   }
 }

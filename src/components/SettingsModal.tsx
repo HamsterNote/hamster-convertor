@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   ExifCategory,
@@ -6,7 +6,8 @@ import type {
   HtmlEncodeOptions,
   HtmlLayoutOptions,
   SourceFormat,
-  TargetFormat
+  TargetFormat,
+  TxtImageOptions
 } from '../lib/converter'
 import PdfPageSelectorInline from './PdfPageSelectorInline'
 
@@ -18,7 +19,9 @@ type SettingsSection =
   | 'htmlOptions'
   | 'htmlEncodeOptions'
   | 'imageTarget'
+  | 'txtImage'
   | 'imageToPdf'
+  | 'markdown'
 
 type ImageTargetOptions = {
   maxWidth?: number
@@ -51,11 +54,16 @@ type SettingsOptions = {
   }
   htmlEncode?: HtmlEncodeOptions
   image?: ImageTargetOptions
+  txtImage?: TxtImageOptions
   imageToPdf?: ImageToPdfOptions
+  markdown?: {
+    txtMode?: 'raw' | 'plain'
+  }
 }
 
-type SettingsModalProps = {
+type SettingsModalFileProps = {
   open: boolean
+  settingsScope?: never
   source: SourceFormat
   target: TargetFormat
   fileName: string
@@ -66,6 +74,19 @@ type SettingsModalProps = {
   onCancel: () => void
   onConfirm: (next: SettingsOptions) => void
 }
+
+type SettingsModalGroupTargetProps = {
+  open: boolean
+  settingsScope: 'group-target'
+  visibleSectionsOverride: SettingsSection[]
+  target: TargetFormat
+  options?: SettingsOptions
+  readOnly?: boolean
+  onCancel: () => void
+  onConfirm: (next: SettingsOptions) => void
+}
+
+type SettingsModalProps = SettingsModalFileProps | SettingsModalGroupTargetProps
 
 type TextControlDraft = {
   fontSize: string
@@ -81,8 +102,6 @@ type TextControlDraft = {
 type BackgroundDraft = {
   includeBackground: boolean
   backgroundQuality: number
-  excludeTextFromBackground: boolean
-  excludeImagesFromBackground: boolean
 }
 
 type HtmlEncodeDraft = {
@@ -112,12 +131,23 @@ type Draft = {
     removeExifEnabled: boolean
     removeExifCategories: ExifCategory[]
   }
+  txtImage: {
+    textColor: string
+    backgroundColor: string
+    fontSizePx: string
+    imageWidthPx: string
+    paddingPx: string
+    lineHeightPx: string
+  }
   imageToPdf: {
     margin: string
     fit: 'cover' | 'contain'
     pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: string
+  }
+  markdown: {
+    txtMode: 'raw' | 'plain'
   }
 }
 
@@ -141,9 +171,7 @@ const HTML_BACKGROUND_QUALITY_OPTIONS = [
 
 const DEFAULT_BACKGROUND: BackgroundDraft = {
   includeBackground: true,
-  backgroundQuality: 0.85,
-  excludeTextFromBackground: true,
-  excludeImagesFromBackground: false
+  backgroundQuality: 0.85
 }
 
 const DEFAULT_HTML_ENCODE: HtmlEncodeDraft = {
@@ -171,6 +199,15 @@ const DEFAULT_IMAGE_TO_PDF_OPTIONS = {
   pageMode: 'auto' as const,
   rotationDeg: 0 as const,
   scalePercent: '100'
+}
+
+const DEFAULT_TXT_IMAGE_OPTIONS: TxtImageOptions = {
+  textColor: '#000000',
+  backgroundColor: '#ffffff',
+  fontSizePx: 16,
+  imageWidthPx: 800,
+  paddingPx: 20,
+  lineHeightPx: 24
 }
 
 const normalizeExifCategories = (categories: ExifCategory[]): ExifCategory[] =>
@@ -215,18 +252,13 @@ const createDraft = (options?: SettingsModalProps['options']): Draft => ({
     includeBackground:
       options?.html?.background?.includeBackground ?? DEFAULT_BACKGROUND.includeBackground,
     backgroundQuality:
-      options?.html?.background?.backgroundQuality ?? DEFAULT_BACKGROUND.backgroundQuality,
-    excludeTextFromBackground:
-      options?.html?.background?.excludeTextFromBackground ??
-      DEFAULT_BACKGROUND.excludeTextFromBackground,
-    excludeImagesFromBackground:
-      options?.html?.background?.excludeImagesFromBackground ??
-      DEFAULT_BACKGROUND.excludeImagesFromBackground
+      options?.html?.background?.backgroundQuality ?? DEFAULT_BACKGROUND.backgroundQuality
   },
   htmlEncode: {
     excludeSelectors:
       options?.htmlEncode?.excludeSelectors?.join('\n') ?? DEFAULT_HTML_ENCODE.excludeSelectors,
-    snapshotWidth: options?.htmlEncode?.snapshotWidth?.toString() ?? DEFAULT_HTML_ENCODE.snapshotWidth
+    snapshotWidth:
+      options?.htmlEncode?.snapshotWidth?.toString() ?? DEFAULT_HTML_ENCODE.snapshotWidth
   },
   layout: {
     mode: options?.html?.htmlLayout?.mode ?? DEFAULT_LAYOUT.mode,
@@ -246,6 +278,19 @@ const createDraft = (options?: SettingsModalProps['options']): Draft => ({
       options?.image?.removeExif?.categories ?? DEFAULT_IMAGE_OPTIONS.removeExifCategories
     )
   },
+  txtImage: {
+    textColor: options?.txtImage?.textColor ?? DEFAULT_TXT_IMAGE_OPTIONS.textColor,
+    backgroundColor:
+      options?.txtImage?.backgroundColor ?? DEFAULT_TXT_IMAGE_OPTIONS.backgroundColor,
+    fontSizePx: (options?.txtImage?.fontSizePx ?? DEFAULT_TXT_IMAGE_OPTIONS.fontSizePx).toString(),
+    imageWidthPx: (
+      options?.txtImage?.imageWidthPx ?? DEFAULT_TXT_IMAGE_OPTIONS.imageWidthPx
+    ).toString(),
+    paddingPx: (options?.txtImage?.paddingPx ?? DEFAULT_TXT_IMAGE_OPTIONS.paddingPx).toString(),
+    lineHeightPx: (
+      options?.txtImage?.lineHeightPx ?? DEFAULT_TXT_IMAGE_OPTIONS.lineHeightPx
+    ).toString()
+  },
   imageToPdf: {
     margin: options?.imageToPdf?.margin?.toString() ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.margin,
     fit: options?.imageToPdf?.fit ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.fit,
@@ -253,6 +298,9 @@ const createDraft = (options?: SettingsModalProps['options']): Draft => ({
     rotationDeg: options?.imageToPdf?.rotationDeg ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.rotationDeg,
     scalePercent:
       options?.imageToPdf?.scalePercent?.toString() ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.scalePercent
+  },
+  markdown: {
+    txtMode: options?.markdown?.txtMode ?? 'plain'
   }
 })
 
@@ -347,6 +395,17 @@ const cleanOutput = (draft: Draft): SettingsOptions => {
   if (maxHeight !== undefined) imageOutput.maxHeight = maxHeight
   output.image = imageOutput
 
+  output.txtImage = {
+    textColor: draft.txtImage.textColor,
+    backgroundColor: draft.txtImage.backgroundColor,
+    fontSizePx: optionalNumber(draft.txtImage.fontSizePx) ?? DEFAULT_TXT_IMAGE_OPTIONS.fontSizePx,
+    imageWidthPx:
+      optionalNumber(draft.txtImage.imageWidthPx) ?? DEFAULT_TXT_IMAGE_OPTIONS.imageWidthPx,
+    paddingPx: optionalNumber(draft.txtImage.paddingPx) ?? DEFAULT_TXT_IMAGE_OPTIONS.paddingPx,
+    lineHeightPx:
+      optionalNumber(draft.txtImage.lineHeightPx) ?? DEFAULT_TXT_IMAGE_OPTIONS.lineHeightPx
+  }
+
   // Image to PDF options
   const margin = optionalNumber(draft.imageToPdf.margin)
   const scalePercent = optionalNumber(draft.imageToPdf.scalePercent)
@@ -358,6 +417,10 @@ const cleanOutput = (draft: Draft): SettingsOptions => {
   }
   if (margin !== undefined) imageToPdfOutput.margin = margin
   output.imageToPdf = imageToPdfOutput
+
+  output.markdown = {
+    txtMode: draft.markdown.txtMode
+  }
 
   return output
 }
@@ -385,12 +448,18 @@ function getSettingsSections(
     sections.push('htmlEncodeOptions')
   }
 
-  if (['png', 'jpg', 'webp'].includes(target)) {
+  if (source === 'txt' && ['png', 'jpg', 'webp'].includes(target)) {
+    sections.push('txtImage')
+  } else if (['png', 'jpg', 'webp'].includes(target)) {
     sections.push('imageTarget')
   }
 
   if (source === 'image' && target === 'pdf') {
     sections.push('imageToPdf')
+  }
+
+  if (source === 'markdown' && target === 'txt') {
+    sections.push('markdown')
   }
 
   return sections
@@ -402,7 +471,9 @@ const SECTION_ID_MAP: Record<SettingsSection, string> = {
   htmlOptions: 'settings-section-html-options',
   htmlEncodeOptions: 'settings-section-html-encode-options',
   imageTarget: 'settings-section-image-target',
-  imageToPdf: 'settings-section-image-to-pdf'
+  txtImage: 'settings-section-txt-image',
+  imageToPdf: 'settings-section-image-to-pdf',
+  markdown: 'settings-section-markdown'
 }
 
 const SECTION_TITLE_KEY_MAP: Record<SettingsSection, string> = {
@@ -411,36 +482,142 @@ const SECTION_TITLE_KEY_MAP: Record<SettingsSection, string> = {
   htmlOptions: 'settingsModal.htmlOptionsTitle',
   htmlEncodeOptions: 'settingsModal.htmlEncodeOptionsTitle',
   imageTarget: 'settingsModal.imageOptionsTitle',
-  imageToPdf: 'settingsModal.imageToPdfTitle'
+  txtImage: 'settingsModal.txtImageOptionsTitle',
+  imageToPdf: 'settingsModal.imageToPdfTitle',
+  markdown: 'settingsModal.markdownTitle'
 }
 
 export type { SettingsModalProps, SettingsOptions, SettingsSection }
 export { getSettingsSections }
 
-export default function SettingsModal({
-  open,
-  source,
-  target,
-  fileName,
-  file,
-  status,
-  options,
-  readOnly = false,
-  onCancel,
-  onConfirm
-}: SettingsModalProps) {
-  const { t } = useTranslation()
-  const [draft, setDraft] = useState<Draft>(() => createDraft(options))
-  const [collapsedSections, setCollapsedSections] = useState<Record<SettingsSection, boolean>>({
-    pdfPages: false,
-    pdfOcr: false,
-    htmlOptions: false,
-    htmlEncodeOptions: false,
-    imageTarget: false,
-    imageToPdf: false
-  })
+type SettingsModalNavProps = {
+  sections: SettingsSection[]
+  t: (key: string) => string
+}
 
-  const sections = getSettingsSections(source, target, fileName, status)
+function SettingsModalNav({ sections, t }: SettingsModalNavProps) {
+  if (sections.length <= 1) return null
+
+  return (
+    <nav className="settings-modal__nav">
+      {sections.map(section => (
+        <button
+          key={section}
+          type="button"
+          className="settings-modal__nav-button"
+          aria-controls={SECTION_ID_MAP[section]}
+          onClick={() => {
+            const el = document.getElementById(SECTION_ID_MAP[section])
+            el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+          }}
+        >
+          {t(SECTION_TITLE_KEY_MAP[section])}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+const getLayoutClassName = (hasNav: boolean): string =>
+  hasNav ? 'settings-modal__layout' : 'settings-modal__layout settings-modal__layout--no-nav'
+
+const getLayoutStyle = (hasNav: boolean): CSSProperties | undefined =>
+  hasNav ? undefined : { gridTemplateColumns: 'minmax(0, 1fr)' }
+
+const resolveSections = (props: SettingsModalProps): SettingsSection[] =>
+  props.settingsScope === 'group-target'
+    ? props.visibleSectionsOverride
+    : getSettingsSections(props.source, props.target, props.fileName, props.status)
+
+const createInitialCollapsedSections = (): Record<SettingsSection, boolean> => ({
+  pdfPages: false,
+  pdfOcr: false,
+  htmlOptions: false,
+  htmlEncodeOptions: false,
+  imageTarget: false,
+  txtImage: false,
+  imageToPdf: false,
+  markdown: false
+})
+
+// Markdown 设置段（抽出以降低 SettingsModal 主函数认知复杂度）
+type MarkdownSectionProps = {
+  t: (key: string) => string
+  collapsed: boolean
+  onToggle: () => void
+  txtMode: 'raw' | 'plain'
+  onTxtModeChange: (mode: 'raw' | 'plain') => void
+  readOnly: boolean
+}
+
+const MarkdownSection = ({
+  t,
+  collapsed,
+  onToggle,
+  txtMode,
+  onTxtModeChange,
+  readOnly
+}: MarkdownSectionProps) => (
+  <div id={SECTION_ID_MAP.markdown} className="settings-modal__section">
+    <header className="settings-modal__section-header">
+      <button
+        type="button"
+        className="settings-modal__section-toggle"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? 'Expand' : 'Collapse'}
+      >
+        {collapsed ? '▶' : '▼'}
+      </button>
+      <h3 className="settings-modal__section-title">{t('settingsModal.markdownTitle')}</h3>
+    </header>
+    {!collapsed && (
+      <div className="settings-modal__field-group">
+        <label className="settings-modal__field settings-modal__field--wide">
+          <span>{t('settingsModal.markdownTxtMode')}</span>
+          <div className="settings-modal__radio-group">
+            <label className="settings-modal__radio">
+              <input
+                type="radio"
+                name="markdown-txt-mode"
+                value="raw"
+                checked={txtMode === 'raw'}
+                onChange={() => onTxtModeChange('raw')}
+                disabled={readOnly}
+              />
+              <span>{t('settingsModal.markdownTxtModeRaw')}</span>
+            </label>
+            <label className="settings-modal__radio">
+              <input
+                type="radio"
+                name="markdown-txt-mode"
+                value="plain"
+                checked={txtMode === 'plain'}
+                onChange={() => onTxtModeChange('plain')}
+                disabled={readOnly}
+              />
+              <span>{t('settingsModal.markdownTxtModePlain')}</span>
+            </label>
+          </div>
+        </label>
+        <div className="settings-modal__estimate settings-modal__field--wide">
+          {t('settingsModal.markdownTxtModeHelp')}
+        </div>
+      </div>
+    )}
+  </div>
+)
+
+export default function SettingsModal(props: SettingsModalProps) {
+  const { t } = useTranslation()
+  const { open, target, options, readOnly: readOnlyProp, onCancel, onConfirm } = props
+  const readOnly = readOnlyProp ?? false
+  const sections = resolveSections(props)
+
+  const [draft, setDraft] = useState<Draft>(() => createDraft(options))
+  const [collapsedSections, setCollapsedSections] = useState<Record<SettingsSection, boolean>>(
+    createInitialCollapsedSections
+  )
 
   const toggleSection = (section: SettingsSection) => {
     setCollapsedSections(prev => ({
@@ -509,6 +686,13 @@ export default function SettingsModal({
     setDraft(prev => ({ ...prev, image: { ...prev.image, [key]: value } }))
   }
 
+  const updateTxtImage = <Key extends keyof Draft['txtImage']>(
+    key: Key,
+    value: Draft['txtImage'][Key]
+  ) => {
+    setDraft(prev => ({ ...prev, txtImage: { ...prev.txtImage, [key]: value } }))
+  }
+
   const toggleExifCategory = (category: ExifCategory, checked: boolean) => {
     setDraft(prev => {
       const current = prev.image.removeExifCategories
@@ -529,6 +713,14 @@ export default function SettingsModal({
     value: Draft['imageToPdf'][Key]
   ) => {
     setDraft(prev => ({ ...prev, imageToPdf: { ...prev.imageToPdf, [key]: value } }))
+  }
+
+  // 更新 Markdown 设置（如 txt 输出模式）
+  const updateMarkdown = <Key extends keyof Draft['markdown']>(
+    key: Key,
+    value: Draft['markdown'][Key]
+  ) => {
+    setDraft(prev => ({ ...prev, markdown: { ...prev.markdown, [key]: value } }))
   }
 
   const handleOverlayClick = () => onCancel()
@@ -560,30 +752,18 @@ export default function SettingsModal({
           <h2 id={titleId}>{readOnly ? t('settingsModal.viewTitle') : t('settingsModal.title')}</h2>
         </div>
 
-        <div className="settings-modal__layout">
-          <nav className="settings-modal__nav">
-            {sections.map(section => (
-              <button
-                key={section}
-                type="button"
-                className="settings-modal__nav-button"
-                aria-controls={SECTION_ID_MAP[section]}
-                onClick={() => {
-                  const el = document.getElementById(SECTION_ID_MAP[section])
-                  el?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-                }}
-              >
-                {t(SECTION_TITLE_KEY_MAP[section])}
-              </button>
-            ))}
-          </nav>
+        <div
+          className={getLayoutClassName(sections.length > 1)}
+          style={getLayoutStyle(sections.length > 1)}
+        >
+          <SettingsModalNav sections={sections} t={t} />
 
           <div className="settings-modal__body">
             {/* PDF Pages Section */}
-            {sections.includes('pdfPages') && (
+            {sections.includes('pdfPages') && 'file' in props && (
               <div id={SECTION_ID_MAP.pdfPages} className="settings-modal__section">
                 <PdfPageSelectorInline
-                  file={file}
+                  file={props.file}
                   selectedPages={draft.pdf.selectedPages ?? []}
                   readOnly={readOnly}
                   onSelectedPagesChange={pages => updatePdf('selectedPages', pages)}
@@ -675,30 +855,6 @@ export default function SettingsModal({
                           </option>
                         ))}
                       </select>
-                    </label>
-
-                    <label className="settings-modal__checkbox settings-modal__field--wide">
-                      <input
-                        type="checkbox"
-                        checked={draft.background.excludeTextFromBackground}
-                        onChange={event =>
-                          updateBackground('excludeTextFromBackground', event.target.checked)
-                        }
-                        disabled={readOnly}
-                      />
-                      <span>{t('options.excludeTextFromBackground')}</span>
-                    </label>
-
-                    <label className="settings-modal__checkbox settings-modal__field--wide">
-                      <input
-                        type="checkbox"
-                        checked={draft.background.excludeImagesFromBackground}
-                        onChange={event =>
-                          updateBackground('excludeImagesFromBackground', event.target.checked)
-                        }
-                        disabled={readOnly}
-                      />
-                      <span>{t('options.excludeImagesFromBackground')}</span>
                     </label>
 
                     {/* Text Controls */}
@@ -1035,6 +1191,110 @@ export default function SettingsModal({
               </div>
             )}
 
+            {sections.includes('txtImage') && (
+              <div id={SECTION_ID_MAP.txtImage} className="settings-modal__section">
+                <button
+                  type="button"
+                  className="settings-modal__section-header"
+                  onClick={() => toggleSection('txtImage')}
+                  aria-expanded={!collapsedSections.txtImage}
+                  aria-label={collapsedSections.txtImage ? 'Expand' : 'Collapse'}
+                >
+                  <span className="settings-modal__collapse-btn" aria-hidden="true">
+                    {collapsedSections.txtImage ? '▶' : '▼'}
+                  </span>
+                  <span className="settings-modal__section-title">
+                    {t('settingsModal.txtImageOptionsTitle')}
+                  </span>
+                </button>
+                {!collapsedSections.txtImage && (
+                  <div className="settings-modal__section-content">
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.txtImageTextColor')}</span>
+                      <input
+                        type="color"
+                        value={draft.txtImage.textColor}
+                        onChange={event => updateTxtImage('textColor', event.target.value)}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.txtImageTextColor')}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.txtImageBackgroundColor')}</span>
+                      <input
+                        type="color"
+                        value={draft.txtImage.backgroundColor}
+                        onChange={event => updateTxtImage('backgroundColor', event.target.value)}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.txtImageBackgroundColor')}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.txtImageFontSize')}</span>
+                      <input
+                        type="number"
+                        min="8"
+                        max="96"
+                        inputMode="numeric"
+                        value={draft.txtImage.fontSizePx}
+                        onChange={event => updateTxtImage('fontSizePx', event.target.value)}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.txtImageFontSize')}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.txtImageWidth')}</span>
+                      <input
+                        type="number"
+                        min="320"
+                        max="4096"
+                        inputMode="numeric"
+                        value={draft.txtImage.imageWidthPx}
+                        onChange={event => updateTxtImage('imageWidthPx', event.target.value)}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.txtImageWidth')}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.txtImagePadding')}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="256"
+                        inputMode="numeric"
+                        value={draft.txtImage.paddingPx}
+                        onChange={event => updateTxtImage('paddingPx', event.target.value)}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.txtImagePadding')}
+                      />
+                    </label>
+
+                    <label className="settings-modal__field">
+                      <span>{t('settingsModal.txtImageLineHeight')}</span>
+                      <input
+                        type="number"
+                        min="8"
+                        max="160"
+                        inputMode="numeric"
+                        value={draft.txtImage.lineHeightPx}
+                        onChange={event => updateTxtImage('lineHeightPx', event.target.value)}
+                        disabled={readOnly}
+                        aria-label={t('settingsModal.txtImageLineHeight')}
+                      />
+                    </label>
+
+                    <div className="settings-modal__estimate settings-modal__field--wide">
+                      {t('settingsModal.txtImageHelp')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Image to PDF Options Section */}
             {sections.includes('imageToPdf') && (
               <div id={SECTION_ID_MAP.imageToPdf} className="settings-modal__section">
@@ -1142,18 +1402,29 @@ export default function SettingsModal({
                 )}
               </div>
             )}
+
+            {sections.includes('markdown') && (
+              <MarkdownSection
+                t={t}
+                collapsed={collapsedSections.markdown}
+                onToggle={() => toggleSection('markdown')}
+                txtMode={draft.markdown.txtMode}
+                onTxtModeChange={mode => updateMarkdown('txtMode', mode)}
+                readOnly={readOnly}
+              />
+            )}
           </div>
         </div>
 
         <div className="pdf-modal__actions">
           {readOnly ? (
-            <button type="button" className="btn btn--primary" onClick={onCancel}>
+            <button type="button" className="btn btn--primary" onClick={props.onCancel}>
               {t('actions.done')}
             </button>
           ) : (
             <>
               <div className="pdf-modal__actions__spacer" />
-              <button type="button" className="btn btn--secondary" onClick={onCancel}>
+              <button type="button" className="btn btn--secondary" onClick={props.onCancel}>
                 {t('actions.cancel')}
               </button>
               <button type="button" className="btn btn--primary" onClick={handleConfirm}>

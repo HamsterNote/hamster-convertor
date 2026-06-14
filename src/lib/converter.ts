@@ -14,8 +14,6 @@ export type HtmlDecodeOptions = {
   background?: {
     includeBackground?: boolean
     backgroundQuality?: number
-    excludeTextFromBackground?: boolean
-    excludeImagesFromBackground?: boolean
   }
 }
 
@@ -43,9 +41,9 @@ export type ConvertPdfToHtml = (
   }
 ) => Promise<PdfToHtmlResult>
 
-export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html' | 'docx'
+export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html' | 'docx' | 'markdown'
 
-export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
+export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf' | 'md'
 
 export type ExifCategory =
   | 'all'
@@ -54,6 +52,15 @@ export type ExifCategory =
   | 'datetime'
   | 'software'
   | 'authorCopyright'
+
+export type TxtImageOptions = {
+  textColor: string
+  backgroundColor: string
+  fontSizePx: number
+  imageWidthPx: number
+  paddingPx: number
+  lineHeightPx: number
+}
 
 export type ConversionResult = {
   blob: Blob
@@ -94,6 +101,7 @@ export type ConversionRequest = {
       rotationDeg: 0 | 90 | 180 | 270
       scalePercent: number
     }
+    txtImage?: TxtImageOptions
   }
 }
 
@@ -111,10 +119,12 @@ export class UnsupportedConversionError extends Error {
 
 const supportedTargets = {
   pdf: ['txt', 'png', 'jpg', 'webp', 'pdf', 'html'],
-  txt: ['png', 'html'],
+  txt: ['png', 'jpg', 'webp', 'html'],
   image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
-  html: ['txt'],
-  docx: ['txt', 'html']
+  html: ['txt', 'md'],
+  docx: ['txt', 'html'],
+  // markdown：对应 .md 文件，可输出 html/txt/图片/pdf。md→md 不开放（无意义）。
+  markdown: ['html', 'txt', 'png', 'jpg', 'webp', 'pdf']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
 
 export const getSupportedTargets = (source: SourceFormat): TargetFormat[] => [

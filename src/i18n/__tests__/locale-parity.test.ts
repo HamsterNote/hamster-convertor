@@ -52,7 +52,23 @@ const requiredConversionUiKeys = [
   'settingsModal.imageToPdfTransformHelp',
   'preview.title',
   'preview.close',
-  'preview.loading'
+  'preview.loading',
+  'multiSelect.toggle',
+  'multiSelect.cancel',
+  'multiSelect.selectedCount',
+  'multiSelect.bulkDelete',
+  'multiSelect.bulkTarget',
+  'multiSelect.noCommonTarget',
+  'multiSelect.selectionUnavailable',
+  'group.create',
+  'group.title',
+  'group.expand',
+  'group.collapse',
+  'group.settings',
+  'group.convert',
+  'group.selectAll',
+  'group.noSettingsForTarget',
+  'group.alreadyInGroup'
 ] as const
 
 const isRecord = (value: unknown): value is LocaleRecord =>

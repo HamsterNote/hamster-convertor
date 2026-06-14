@@ -20,7 +20,7 @@ vi.mock('../lib/converter', () => ({
   getSupportedTargets: vi.fn((source: string) => {
     const targets: Record<string, string[]> = {
       pdf: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
-      txt: ['png', 'html'],
+      txt: ['png', 'jpg', 'webp', 'html'],
       image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
       html: ['txt'],
       docx: ['txt', 'html']
@@ -105,6 +105,25 @@ const getFileTargetSelects = () => {
 const getFileRows = () => {
   const table = screen.getByRole('table')
   return Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr'))
+}
+
+const getGroupHeaders = () => {
+  const table = screen.getByRole('table')
+  return Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr.group-header'))
+}
+
+const getGroupMemberRows = () => {
+  const table = screen.getByRole('table')
+  return Array.from(
+    table.querySelectorAll<HTMLTableRowElement>('tbody tr.file-table__row--group-member')
+  )
+}
+
+const enterMultiSelectMode = async () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Multi-select' }))
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Cancel selection' })).toBeInTheDocument()
+  })
 }
 
 const changeNativeSelectValue = (select: HTMLSelectElement, value: string) => {
@@ -773,6 +792,107 @@ describe('app upload feedback', () => {
     expect(svgOptions).toContain('txt')
   })
 
+  it('shows PNG/JPG/WebP/HTML and excludes PDF/TXT for TXT target selection', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    const txtOptions = Array.from(getFileTargetSelects()[0].querySelectorAll('option')).map(
+      option => option.value
+    )
+
+    expect(txtOptions).toEqual(['png', 'jpg', 'webp', 'html'])
+    expect(txtOptions).not.toContain('pdf')
+    expect(txtOptions).not.toContain('txt')
+  })
+
+  it('passes edited TXT image settings to the bridge as txtImage options', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'webp-bytes',
+        filename: 'notes.webp',
+        mimeType: 'image/webp',
+        targetFormat: 'webp'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'webp' } })
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    fireEvent.change(screen.getByLabelText('Text color'), { target: { value: '#13579b' } })
+    fireEvent.change(screen.getByLabelText('Background color'), { target: { value: '#f0e0d0' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Font size (px)' }), {
+      target: { value: '24' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Image width (px)' }), {
+      target: { value: '960' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Padding (px)' }), {
+      target: { value: '36' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Line height (px)' }), {
+      target: { value: '42' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'txt',
+          targetFormat: 'webp',
+          options: expect.objectContaining({
+            txtImage: {
+              textColor: '#13579b',
+              backgroundColor: '#f0e0d0',
+              fontSizePx: 24,
+              imageWidthPx: 960,
+              paddingPx: 36,
+              lineHeightPx: 42
+            }
+          })
+        })
+      )
+    })
+
+    const callOptions = bridgeMocks.convert.mock.calls[0]?.[0].options as {
+      image?: Record<string, unknown>
+      txtImage?: Record<string, unknown>
+    }
+    expect(callOptions.txtImage).toEqual({
+      textColor: '#13579b',
+      backgroundColor: '#f0e0d0',
+      fontSizePx: 24,
+      imageWidthPx: 960,
+      paddingPx: 36,
+      lineHeightPx: 42
+    })
+    expect(callOptions.image).not.toMatchObject({
+      textColor: '#13579b',
+      backgroundColor: '#f0e0d0',
+      fontSizePx: 24,
+      imageWidthPx: 960,
+      paddingPx: 36,
+      lineHeightPx: 42
+    })
+  })
+
   it('selects PDF pages via Settings handoff and passes them to the bridge', async () => {
     bridgeMocks.convert.mockResolvedValue(
       createBridgeResult({ filename: 'page-001.png', mimeType: 'image/png', targetFormat: 'png' })
@@ -819,10 +939,16 @@ describe('app upload feedback', () => {
     const input = container.querySelector('.dropzone + input[type="file"]')
 
     fireEvent.change(input as HTMLInputElement, {
-      target: { files: [new File(['<p>hi</p>'], 'index.html', { type: 'text/html' })] }
+      target: {
+        files: [
+          new File(['docx'], 'notes.docx', {
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          })
+        ]
+      }
     })
 
-    await screen.findByRole('row', { name: /index\.html/ })
+    await screen.findByRole('row', { name: /notes\.docx/ })
     const settingsButton = screen.getByRole('button', { name: /settings/i })
     expect(settingsButton).toBeInTheDocument()
     expect(settingsButton).toBeDisabled()
@@ -912,6 +1038,76 @@ describe('app upload feedback', () => {
     expect(downloadResult.blob).toBeInstanceOf(Blob)
     expect(downloadResult.blob.type).toBe('text/plain')
     expect(downloadResult.blob.size).toBe(4)
+  })
+
+  it('passes TXT to JPG and WebP targets to the bridge and downloads WebP output', async () => {
+    const { downloadBlobFile } = await import('../lib/download')
+    bridgeMocks.convert
+      .mockResolvedValueOnce(
+        createBridgeResult({
+          contents: 'jpg-bytes',
+          filename: 'notes.jpg',
+          mimeType: 'image/jpeg',
+          targetFormat: 'jpg'
+        })
+      )
+      .mockResolvedValueOnce(
+        createBridgeResult({
+          contents: 'webp-bytes',
+          filename: 'notes.webp',
+          mimeType: 'image/webp',
+          targetFormat: 'webp'
+        })
+      )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['hello'], 'notes.txt', { type: 'text/plain' })] }
+    })
+
+    await screen.findByRole('row', { name: /notes\.txt/ })
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'jpg' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'txt',
+          targetFormat: 'jpg'
+        })
+      )
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    const selectsAfterCopy = getFileTargetSelects()
+    expect(selectsAfterCopy[1]).toHaveValue('jpg')
+    fireEvent.change(selectsAfterCopy[1], { target: { value: 'webp' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'txt',
+          targetFormat: 'webp'
+        })
+      )
+    })
+
+    const webpRow = getFileRows()[1]
+    expect(within(webpRow).getByText('Done')).toBeInTheDocument()
+    fireEvent.click(within(webpRow).getByRole('button', { name: 'Download' }))
+
+    await waitFor(() => {
+      expect(downloadBlobFile).toHaveBeenCalledTimes(1)
+    })
+
+    const downloadResult = vi.mocked(downloadBlobFile).mock.calls[0]?.[0]
+    if (!downloadResult) throw new Error('Expected TXT to WebP download result')
+
+    expect(downloadResult.filename).toBe('notes.webp')
+    expect(downloadResult.targetFormat).toBe('webp')
+    expect(downloadResult.blob.type).toBe('image/webp')
   })
 
   it('removes a completed row when delete is clicked', async () => {
@@ -1050,16 +1246,18 @@ describe('app upload feedback', () => {
     const includeBackgroundCheckbox = screen.getByRole('checkbox', {
       name: /include background/i
     })
-    const excludeTextCheckbox = screen.getByRole('checkbox', {
-      name: /exclude text from background/i
-    })
     const backgroundQualitySelect = screen.getByRole('combobox', {
       name: /background quality/i
     })
 
     expect(dialog).toContainElement(includeBackgroundCheckbox)
-    expect(dialog).toContainElement(excludeTextCheckbox)
     expect(dialog).toContainElement(backgroundQualitySelect)
+    expect(
+      screen.queryByRole('checkbox', { name: /exclude text from background/i })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: /exclude images from background/i })
+    ).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /done/i }))
 
@@ -1209,7 +1407,6 @@ describe('app upload feedback', () => {
               }),
               background: {
                 includeBackground: true,
-                excludeTextFromBackground: true,
                 backgroundQuality: 0.6
               }
             },
@@ -1702,6 +1899,807 @@ describe('app upload feedback', () => {
 
     await waitFor(() => {
       expect(downloadBlobFile).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('multi-select mode', () => {
+    const getRowCheckboxes = () => {
+      const table = screen.getByRole('table')
+      return Array.from(table.querySelectorAll<HTMLInputElement>('tbody tr input[type="checkbox"]'))
+    }
+
+    it('enters multi-select mode and clears previous selection when toggle is clicked', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Multi-select' }))
+
+      expect(screen.getByRole('button', { name: 'Cancel selection' })).toBeInTheDocument()
+      expect(screen.getByText('0 selected')).toBeInTheDocument()
+    })
+
+    it('renders checkboxes only while in multi-select mode', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      expect(getRowCheckboxes()).toHaveLength(0)
+
+      await enterMultiSelectMode()
+      expect(getRowCheckboxes()).toHaveLength(1)
+    })
+
+    it('toggles selection by clicking a selectable row', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      const row = getFileRows()[0]
+      fireEvent.click(row)
+      expect(getRowCheckboxes()[0]).toBeChecked()
+
+      fireEvent.click(row)
+      expect(getRowCheckboxes()[0]).not.toBeChecked()
+    })
+
+    it('toggles selection by clicking checkbox without double-toggling the row', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      const checkbox = getRowCheckboxes()[0]
+      fireEvent.click(checkbox)
+      expect(checkbox).toBeChecked()
+
+      fireEvent.click(checkbox)
+      expect(checkbox).not.toBeChecked()
+    })
+
+    it('disables checkboxes and ignores row clicks for done rows', async () => {
+      bridgeMocks.convert.mockResolvedValue(createBridgeResult())
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(screen.getByText('Done')).toBeInTheDocument()
+      })
+
+      await enterMultiSelectMode()
+      const checkbox = getRowCheckboxes()[0]
+      expect(checkbox).toBeDisabled()
+
+      fireEvent.click(getFileRows()[0])
+      expect(checkbox).not.toBeChecked()
+    })
+
+    it('disables checkboxes and ignores row clicks for converting rows', async () => {
+      let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
+      const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
+        resolveConversion = resolve
+      })
+      bridgeMocks.convert.mockReturnValue(conversionPromise)
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(screen.getByText('Converting...')).toBeInTheDocument()
+      })
+
+      await enterMultiSelectMode()
+      const checkbox = getRowCheckboxes()[0]
+      expect(checkbox).toBeDisabled()
+
+      fireEvent.click(getFileRows()[0])
+      expect(checkbox).not.toBeChecked()
+
+      resolveConversion?.(createBridgeResult())
+    })
+
+    it('clears selection and exits multi-select mode when cancel is clicked', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await screen.findByRole('row', { name: /b\.txt/ })
+
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      expect(screen.getByText('2 selected')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel selection' }))
+
+      expect(screen.queryByText('2 selected')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Multi-select' })).toBeInTheDocument()
+    })
+
+    it('keeps target select functional in multi-select mode', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      const targetSelect = getFileTargetSelects()[0]
+      changeNativeSelectValue(targetSelect, 'html')
+      expect(targetSelect).toHaveValue('html')
+    })
+
+    it('shows toolbar buttons gated by selection state in multi-select mode', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Delete selected' })).toBeDisabled()
+      expect(screen.getByRole('combobox', { name: 'Set target format' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Select all' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Deselect all' })).toBeDisabled()
+    })
+
+    it('hides row action buttons in multi-select mode', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
+
+      await enterMultiSelectMode()
+      expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    })
+
+    it('selects all eligible rows and deselects all', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      expect(screen.getByText('2 selected')).toBeInTheDocument()
+      expect(getRowCheckboxes().every(cb => cb.checked)).toBe(true)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Deselect all' }))
+      expect(screen.getByText('0 selected')).toBeInTheDocument()
+      expect(getRowCheckboxes().every(cb => !cb.checked)).toBe(true)
+    })
+
+    it('select all skips done, converting, and queued rows', async () => {
+      bridgeMocks.convert.mockResolvedValue(createBridgeResult())
+      let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
+      const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
+        resolveConversion = resolve
+      })
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['a'], 'a.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(screen.getByText('Done')).toBeInTheDocument()
+      })
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['b'], 'b.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /b\.txt/ })
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: { files: [new File(['c'], 'c.txt', { type: 'text/plain' })] }
+      })
+      await screen.findByRole('row', { name: /c\.txt/ })
+
+      bridgeMocks.convert.mockReturnValueOnce(conversionPromise)
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(screen.getByText('Converting...')).toBeInTheDocument()
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+
+      const checkboxes = getRowCheckboxes()
+      expect(checkboxes.filter(cb => cb.checked)).toHaveLength(0)
+      expect(checkboxes.filter(cb => cb.disabled)).toHaveLength(3)
+
+      resolveConversion?.(createBridgeResult())
+    })
+  })
+
+  describe('bottom toolbar actions', () => {
+    it('bulk deletes selected rows and keeps multi-select mode', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('table')).not.toBeInTheDocument()
+      })
+      expect(screen.getByRole('button', { name: 'Cancel selection' })).toBeInTheDocument()
+      expect(screen.getByText('0 selected')).toBeInTheDocument()
+    })
+
+    it('bulk target changes selected rows without resetting failed status', async () => {
+      bridgeMocks.convert.mockRejectedValue(new Error('conversion failed'))
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(screen.getByText('Failed')).toBeInTheDocument()
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+
+      const targetSelect = screen.getByRole('combobox', {
+        name: 'Set target format'
+      }) as HTMLSelectElement
+      changeNativeSelectValue(targetSelect, 'html')
+
+      await waitFor(() => {
+        expect(getFileTargetSelects()[0]).toHaveValue('html')
+        expect(getFileTargetSelects()[1]).toHaveValue('html')
+      })
+      expect(screen.getAllByText('Failed')).toHaveLength(2)
+    })
+
+    it('shows no-common-target message for incompatible selections', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['h'], 'h.html', { type: 'text/html' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await screen.findByRole('row', { name: /h\.html/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      expect(screen.getByText('No common target format for selected files')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled()
+      expect(screen.getByRole('combobox', { name: 'Set target format' })).toBeDisabled()
+    })
+
+    it('shows already-in-group message and disables Create Group for grouped selection', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' }),
+            new File(['c'], 'c.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(getFileRows()[3])
+
+      expect(
+        screen.getByText('Cannot create a Group from files that are already in a Group')
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled()
+      expect(screen.getByRole('combobox', { name: 'Set target format' })).toBeEnabled()
+    })
+  })
+
+  describe('group creation and rendering', () => {
+    it('creates a group from two selected files', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+      expect(screen.getByRole('row', { name: /Group 1 · 2 files/ })).toBeInTheDocument()
+      expect(getGroupMemberRows()).toHaveLength(2)
+    })
+
+    it('collapses and expands a group', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      const collapseBtn = screen.getByRole('button', { name: 'Collapse group' })
+      expect(collapseBtn).toHaveAttribute('aria-expanded', 'true')
+      fireEvent.click(collapseBtn)
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Expand group' })).toHaveAttribute(
+          'aria-expanded',
+          'false'
+        )
+      })
+      expect(getGroupMemberRows()).toHaveLength(0)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand group' }))
+      await waitFor(() => {
+        expect(getGroupMemberRows()).toHaveLength(2)
+      })
+    })
+
+    it('auto-removes empty groups after bulk delete', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('table')).not.toBeInTheDocument()
+      })
+    })
+
+    it('supports multiple top-level groups', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' }),
+            new File(['c'], 'c.txt', { type: 'text/plain' }),
+            new File(['d'], 'd.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[3])
+      fireEvent.click(getFileRows()[4])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(2)
+      })
+    })
+  })
+
+  describe('group target and settings', () => {
+    it('group target change propagates to members and preserves failed status', async () => {
+      bridgeMocks.convert.mockRejectedValue(new Error('conversion failed'))
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' }),
+            new File(['c'], 'c.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(screen.getByText('Failed')).toBeInTheDocument()
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      const groupHeader = getGroupHeaders()[0]
+      const groupTargetSelect = within(groupHeader).getByRole('combobox', {
+        name: 'Target'
+      }) as HTMLSelectElement
+      changeNativeSelectValue(groupTargetSelect, 'html')
+
+      await waitFor(() => {
+        expect(getFileTargetSelects()[0]).toHaveValue('html')
+        expect(getFileTargetSelects()[1]).toHaveValue('html')
+      })
+      expect(getFileTargetSelects()[2]).toHaveValue('png')
+      expect(screen.getAllByText('Failed')).toHaveLength(3)
+    })
+
+    it('group settings apply target-related options only to applicable members', async () => {
+      bridgeMocks.convert.mockResolvedValue(
+        createBridgeResult({
+          contents: 'png-bytes',
+          filename: 'photo.png',
+          mimeType: 'image/png',
+          targetFormat: 'png'
+        })
+      )
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['t'], 'notes.txt', { type: 'text/plain' }),
+            new File(['i'], 'photo.jpg', { type: 'image/jpeg' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /notes\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      const groupHeader = getGroupHeaders()[0]
+      fireEvent.click(within(groupHeader).getByRole('button', { name: 'Group settings' }))
+      const dialog = screen.getByRole('dialog', { name: /settings/i })
+
+      fireEvent.change(within(dialog).getByRole('spinbutton', { name: 'Max width' }), {
+        target: { value: '300' }
+      })
+      fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(bridgeMocks.convert).toHaveBeenCalledTimes(2)
+      })
+
+      const calls = bridgeMocks.convert.mock.calls
+      const imageCall = calls.find(call => call[0].sourceFormat === 'image')
+      const txtCall = calls.find(call => call[0].sourceFormat === 'txt')
+      expect((imageCall?.[0].options as { image?: { maxWidth?: number } }).image?.maxWidth).toBe(
+        300
+      )
+      expect((txtCall?.[0].options as { image?: { maxWidth?: number } }).image).toBeUndefined()
+    })
+
+    it('group settings use group target for section applicability even when member target diverges', async () => {
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['t'], 'notes.txt', { type: 'text/plain' }),
+            new File(['i'], 'photo.jpg', { type: 'image/jpeg' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /notes\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      // Group target defaults to first common target (png). Diverge image member's per-row target.
+      const memberSelects = getFileTargetSelects()
+      changeNativeSelectValue(memberSelects[1], 'html')
+
+      await waitFor(() => {
+        expect(memberSelects[1]).toHaveValue('html')
+      })
+
+      // Open group settings and change imageTarget option (max width).
+      const groupHeader = getGroupHeaders()[0]
+      fireEvent.click(within(groupHeader).getByRole('button', { name: 'Group settings' }))
+      const dialog = screen.getByRole('dialog', { name: /settings/i })
+
+      fireEvent.change(within(dialog).getByRole('spinbutton', { name: 'Max width' }), {
+        target: { value: '500' }
+      })
+      fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(bridgeMocks.convert).toHaveBeenCalledTimes(2)
+      })
+
+      const calls = bridgeMocks.convert.mock.calls
+      const imageCall = calls.find(call => call[0].sourceFormat === 'image')
+      const txtCall = calls.find(call => call[0].sourceFormat === 'txt')
+
+      // (source=image, groupTarget=png) is applicable for imageTarget even though member target is html
+      expect((imageCall?.[0].options as { image?: { maxWidth?: number } }).image?.maxWidth).toBe(
+        500
+      )
+      // (source=txt, groupTarget=png) is not applicable for imageTarget
+      expect((txtCall?.[0].options as { image?: { maxWidth?: number } }).image).toBeUndefined()
+    })
+  })
+
+  describe('group conversion and select-all', () => {
+    it('group select all selects only eligible members', async () => {
+      bridgeMocks.convert.mockResolvedValue(createBridgeResult())
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' }),
+            new File(['c'], 'c.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(getFileRows()[2])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      bridgeMocks.convert.mockRejectedValueOnce(new Error('fail'))
+      bridgeMocks.convert.mockResolvedValue(createBridgeResult())
+      fireEvent.click(within(getGroupHeaders()[0]).getByRole('button', { name: 'Convert Group' }))
+      await waitFor(() => {
+        expect(screen.getByText('Failed')).toBeInTheDocument()
+      })
+      await waitFor(() => {
+        expect(screen.getAllByText('Done')).toHaveLength(2)
+      })
+
+      await enterMultiSelectMode()
+      const groupHeader = getGroupHeaders()[0]
+      fireEvent.click(within(groupHeader).getByRole('checkbox', { name: 'Select all in group' }))
+
+      const memberCheckboxes = getGroupMemberRows().map(row => within(row).getByRole('checkbox'))
+      expect(memberCheckboxes[0]).toBeChecked()
+      expect(memberCheckboxes[1]).not.toBeChecked()
+      expect(memberCheckboxes[2]).not.toBeChecked()
+    })
+
+    it('convert group converts only eligible members', async () => {
+      bridgeMocks.convert.mockResolvedValue(createBridgeResult())
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      const groupHeader = getGroupHeaders()[0]
+      fireEvent.click(within(groupHeader).getByRole('button', { name: 'Convert Group' }))
+
+      await waitFor(() => {
+        expect(bridgeMocks.convert).toHaveBeenCalledTimes(2)
+      })
+      expect(screen.getAllByText('Done')).toHaveLength(2)
+    })
+
+    it('blocks group controls while any member is converting', async () => {
+      let resolveConversion: ((value: ParserBridgeConversionResultPayload) => void) | undefined
+      const conversionPromise = new Promise<ParserBridgeConversionResultPayload>(resolve => {
+        resolveConversion = resolve
+      })
+      bridgeMocks.convert.mockReturnValue(conversionPromise)
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      fireEvent.click(within(getGroupHeaders()[0]).getByRole('button', { name: 'Convert Group' }))
+      await waitFor(() => {
+        expect(screen.getByText('Converting...')).toBeInTheDocument()
+      })
+
+      const groupHeader = getGroupHeaders()[0]
+      expect(within(groupHeader).getByRole('combobox', { name: 'Target' })).toBeDisabled()
+      expect(within(groupHeader).getByRole('button', { name: 'Group settings' })).toBeDisabled()
+      expect(within(groupHeader).getByRole('button', { name: 'Convert Group' })).toBeDisabled()
+
+      resolveConversion?.(createBridgeResult())
     })
   })
 })

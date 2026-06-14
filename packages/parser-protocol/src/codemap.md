@@ -15,12 +15,12 @@
 
 采用 **请求-响应 + 进度推送** 的消息模式，所有消息通过 `postMessage` 在主框架与 iframe 之间传递：
 
-| 方向 | 类型 | 用途 |
-|------|------|------|
-| host → iframe | `ParserBridgeRequest` | 发起转换请求，携带文件 ArrayBuffer |
-| host → iframe | `ParserBridgeCancelRequest` | 取消进行中的转换 |
-| iframe → host | `ParserBridgeReadyMessage` | iframe 加载完成，声明就绪 |
-| iframe → host | `ParserBridgeResponse` | 转换结果 / 错误 / 进度报告 |
+| 方向          | 类型                        | 用途                               |
+| ------------- | --------------------------- | ---------------------------------- |
+| host → iframe | `ParserBridgeRequest`       | 发起转换请求，携带文件 ArrayBuffer |
+| host → iframe | `ParserBridgeCancelRequest` | 取消进行中的转换                   |
+| iframe → host | `ParserBridgeReadyMessage`  | iframe 加载完成，声明就绪          |
+| iframe → host | `ParserBridgeResponse`      | 转换结果 / 错误 / 进度报告         |
 
 ### 进度报告阶段枚举
 
@@ -92,34 +92,34 @@
 
 ### 上游依赖
 
-| 依赖 | 类型 | 说明 |
-|------|------|------|
-| `@hamster-note/html-parser` | 类型推断源 | 通过 `types/html-parser.d.ts` 提供类型声明 |
-| `@hamster-note/pdf-parser` | 类型推断源 | 通过 `types/pdf-parser.d.ts` 提供类型声明 |
-| `@hamster-note/image-parser` | 类型推断源 | 通过 `types/image-parser.d.ts` 提供类型声明 |
-| `@hamster-note/txt-parser` | 类型推断源 | 通过 `types/txt-parser.d.ts` 提供类型声明 |
+| 依赖                            | 类型       | 说明                                           |
+| ------------------------------- | ---------- | ---------------------------------------------- |
+| `@hamster-note/html-parser`     | 类型推断源 | 通过 `types/html-parser.d.ts` 提供类型声明     |
+| `@hamster-note/pdf-parser`      | 类型推断源 | 通过 `types/pdf-parser.d.ts` 提供类型声明      |
+| `@hamster-note/image-parser`    | 类型推断源 | 通过 `types/image-parser.d.ts` 提供类型声明    |
+| `@hamster-note/txt-parser`      | 类型推断源 | 通过 `types/txt-parser.d.ts` 提供类型声明      |
 | `@hamster-note/document-parser` | 类型推断源 | 通过 `types/document-parser.d.ts` 提供类型声明 |
 
 无运行时依赖，全部为编译期类型引用。
 
 ### 下游消费者
 
-| 消费者 | 导入内容 | 用途 |
-|--------|----------|------|
-| `src/lib/parser-bridge/proxy.ts` | `ParserBridgeRequest` | 向 iframe 发送转换请求时的类型约束 |
-| `src/lib/parser-bridge/client.ts` | 协议消息类型 + 守卫函数 | iframe 端接收/验证/发送消息 |
-| `src/components/ParserIframeBridge.tsx` | `ParserBridgeReadyMessage`, `ParserBridgeResponse` | React 组件中处理 iframe 消息 |
-| `src/__tests__/app.upload.test.tsx` | `ParserBridgeConversionResultPayload` | 测试中构造模拟响应数据 |
-| `parser-runtime/src/conversion/adapters.ts` | 类型别名 | 调用各解析器 encode/decode 时的类型安全 |
+| 消费者                                      | 导入内容                                           | 用途                                    |
+| ------------------------------------------- | -------------------------------------------------- | --------------------------------------- |
+| `src/lib/parser-bridge/proxy.ts`            | `ParserBridgeRequest`                              | 向 iframe 发送转换请求时的类型约束      |
+| `src/lib/parser-bridge/client.ts`           | 协议消息类型 + 守卫函数                            | iframe 端接收/验证/发送消息             |
+| `src/components/ParserIframeBridge.tsx`     | `ParserBridgeReadyMessage`, `ParserBridgeResponse` | React 组件中处理 iframe 消息            |
+| `src/__tests__/app.upload.test.tsx`         | `ParserBridgeConversionResultPayload`              | 测试中构造模拟响应数据                  |
+| `parser-runtime/src/conversion/adapters.ts` | 类型别名                                           | 调用各解析器 encode/decode 时的类型安全 |
 
 ### 文件清单
 
-| 文件 | 职责 |
-|------|------|
-| `index.ts` | 桥接协议类型定义、类型守卫函数、解析器类型别名 |
-| `types/document-parser.d.ts` | `@hamster-note/document-parser` 类型声明 |
-| `types/html-parser.d.ts` | `@hamster-note/html-parser` 类型声明（含 DecodeOptions） |
-| `types/pdf-parser.d.ts` | `@hamster-note/pdf-parser` 类型声明（含 EncodeOptions/DecodeOptions/onProgress） |
-| `types/image-parser.d.ts` | `@hamster-note/image-parser` 类型声明 |
-| `types/txt-parser.d.ts` | `@hamster-note/txt-parser` 类型声明 |
-| `types/codemap.md` | types 子目录的架构文档 |
+| 文件                         | 职责                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `index.ts`                   | 桥接协议类型定义、类型守卫函数、解析器类型别名                                   |
+| `types/document-parser.d.ts` | `@hamster-note/document-parser` 类型声明                                         |
+| `types/html-parser.d.ts`     | `@hamster-note/html-parser` 类型声明（含 DecodeOptions）                         |
+| `types/pdf-parser.d.ts`      | `@hamster-note/pdf-parser` 类型声明（含 EncodeOptions/DecodeOptions/onProgress） |
+| `types/image-parser.d.ts`    | `@hamster-note/image-parser` 类型声明                                            |
+| `types/txt-parser.d.ts`      | `@hamster-note/txt-parser` 类型声明                                              |
+| `types/codemap.md`           | types 子目录的架构文档                                                           |

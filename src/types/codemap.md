@@ -1,9 +1,11 @@
 # src/types/
 
 ## Responsibility
-为文档转换器提供 TypeScript 类型声明，解决第三方库（pdfjs-dist、jszip）和内部解析器模块（@hamster-note/*）缺少类型定义的问题。定义解析器的统一接口契约和中间文档格式。
+
+为文档转换器提供 TypeScript 类型声明，解决第三方库（pdfjs-dist、jszip）和内部解析器模块（@hamster-note/\*）缺少类型定义的问题。定义解析器的统一接口契约和中间文档格式。
 
 ## Design
+
 **模式：模块声明 + 统一解析器接口**
 
 - **模块声明**：使用 `declare module` 为无类型的第三方库提供类型（pdfjs-dist、jszip）
@@ -15,6 +17,7 @@
 - **进度报告**：`ProgressReport` + `ProgressReporter` 支持长时间操作的进度回调
 
 **核心类型层次**：
+
 ```
 IntermediateDocument (基础文档)
     ├── PdfParser (PDF 编解码)
@@ -22,21 +25,27 @@ IntermediateDocument (基础文档)
 ```
 
 ## Flow
+
 **数据流向**：
+
 1. 文件输入 → `ParserInput` (ArrayBuffer/ArrayBufferView/Blob)
 2. 解析器 `encode()` → `IntermediateDocument` (中间表示)
 3. 解析器 `decode()` → 目标格式输出
 4. HTML 特殊路径：`IntermediateDocument` → `HtmlDocument` → `HtmlPage` → DOM 渲染
 
 **进度流**：
+
 - 解析器调用 → `ProgressReporter` 回调 → `ProgressReport` (stage/current/total)
 
 ## Integration
+
 **依赖**：
+
 - `pdfjs-dist`：PDF 解析底层库（提供 PDFDocumentProxy、PDFPageProxy 等）
 - `@hamster-note/types`：核心类型定义（IntermediateDocument、Number2）
 
 **消费者**：
+
 - `src/services/` 下的解析器实现使用这些类型
 - `src/App.tsx` 的 `convertAll()` 通过解析器 API 进行文档转换
 - iframe parser-runtime 使用这些类型进行文档解析和渲染

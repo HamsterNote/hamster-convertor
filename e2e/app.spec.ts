@@ -14,6 +14,9 @@ type ParserRuntimeReadyMessage = {
 type E2EWindow = Window & {
   __downloadNames?: string[]
   __downloadTypes?: string[]
+  // 保存每次下载的原始 blob，便于像素级断言（CJK TXT→PNG 渲染验证）。
+  // 使用真实 Blob 而非 base64：浏览器端解码到 ImageBitmap 不需要额外转换。
+  __downloadBlobs?: Blob[]
   __E2E__?: boolean
   __parserReadyMessages?: ParserRuntimeReadyMessage[]
 }
@@ -307,6 +310,7 @@ test.describe('converter app', () => {
       e2eWindow.__E2E__ = true
       e2eWindow.__downloadNames = []
       e2eWindow.__downloadTypes = []
+      e2eWindow.__downloadBlobs = []
       e2eWindow.__parserReadyMessages = []
       window.addEventListener('message', event => {
         const data = event.data as Partial<ParserRuntimeReadyMessage>
@@ -320,6 +324,7 @@ test.describe('converter app', () => {
       })
       URL.createObjectURL = (blob: Blob) => {
         e2eWindow.__downloadTypes?.push(blob.type)
+        e2eWindow.__downloadBlobs?.push(blob)
         return `blob:e2e-${e2eWindow.__downloadTypes?.length ?? 0}`
       }
       URL.revokeObjectURL = () => undefined
@@ -550,12 +555,116 @@ test.describe('converter app', () => {
     await expect(page.getByRole('button', { name: 'Convert all' })).toBeDisabled()
   })
 
-  test('shows only image as TXT target option', async ({ page }) => {
+  test('shows PNG, JPG, WEBP, and HTML as TXT target options', async ({ page }) => {
     await page
       .locator(dropzoneFileInput)
       .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
 
-    await expect(await optionValues(targetSelectForRow(page, 'notes.txt'))).toEqual(['png', 'html'])
+    await expect(await optionValues(targetSelectForRow(page, 'notes.txt'))).toEqual([
+      'png',
+      'jpg',
+      'webp',
+      'html'
+    ])
+  })
+
+  test('edits TXT image settings and converts TXT to WebP', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('notes.txt', 'text/plain', 'hello text'))
+
+    const txtRow = rowForFile(page, 'notes.txt')
+    const targetSelect = targetSelectForRow(page, 'notes.txt')
+    await expect(await optionValues(targetSelect)).toEqual(['png', 'jpg', 'webp', 'html'])
+    await targetSelect.selectOption('webp')
+
+    await txtRow.getByRole('button', { name: 'Settings' }).click()
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+    await expect(settingsDialog).toBeVisible()
+    await expect(settingsDialog).toContainText('TXT Image Options')
+
+    await settingsDialog.getByLabel('Text color').fill('#13579b')
+    await settingsDialog.getByLabel('Background color').fill('#f0e0d0')
+    await settingsDialog.getByRole('spinbutton', { name: 'Font size (px)' }).fill('24')
+    await settingsDialog.getByRole('spinbutton', { name: 'Image width (px)' }).fill('960')
+    await settingsDialog.getByRole('spinbutton', { name: 'Padding (px)' }).fill('36')
+    await settingsDialog.getByRole('spinbutton', { name: 'Line height (px)' }).fill('42')
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
+
+    await txtRow.getByRole('button', { name: 'Settings' }).click()
+    await expect(settingsDialog.getByLabel('Text color')).toHaveValue('#13579b')
+    await expect(settingsDialog.getByLabel('Background color')).toHaveValue('#f0e0d0')
+    await expect(settingsDialog.getByRole('spinbutton', { name: 'Font size (px)' })).toHaveValue(
+      '24'
+    )
+    await expect(settingsDialog.getByRole('spinbutton', { name: 'Image width (px)' })).toHaveValue(
+      '960'
+    )
+    await expect(settingsDialog.getByRole('spinbutton', { name: 'Padding (px)' })).toHaveValue('36')
+    await expect(settingsDialog.getByRole('spinbutton', { name: 'Line height (px)' })).toHaveValue(
+      '42'
+    )
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+    await expect(txtRow.locator('.status')).toContainText('Done', {
+      timeout: 15000
+    })
+
+    await txtRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['notes.webp'])
+    const downloadedTypes = () => page.evaluate(() => (window as E2EWindow).__downloadTypes ?? [])
+    await expect.poll(downloadedTypes).toContain('image/webp')
+  })
+
+  test('renders CJK paragraph into a non-blank PNG (TXT→PNG regression)', async ({ page }) => {
+    // 回归测试：CJK 文本（无空格）必须真实渲染到 PNG 像素。
+    // 历史 bug：wrapText 仅按空格切词，整段汉字成为一个超宽行，被画布裁剪 → 空白 PNG。
+    // 单元测试已锁定 wrap 算法；此处在真实浏览器里跑全栈，并对解码后的像素做暗色像素计数断言。
+    const cjkContent = '你好世界'.repeat(40)
+
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles(filePayload('cjk.txt', 'text/plain', cjkContent))
+
+    const txtRow = rowForFile(page, 'cjk.txt')
+    await targetSelectForRow(page, 'cjk.txt').selectOption('png')
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+    await expect(txtRow.locator('.status')).toContainText('Done', { timeout: 15000 })
+
+    await txtRow.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['cjk.png'])
+    const downloadedTypes = () => page.evaluate(() => (window as E2EWindow).__downloadTypes ?? [])
+    await expect.poll(downloadedTypes).toContain('image/png')
+
+    // 解码下载的 PNG 并统计"暗色"像素数量。默认 16px 黑字白底，
+    // 任一被字形覆盖的像素其 R+G+B 都会显著低于 600（白色 = 765）。
+    // 阈值 50 远低于 40 段 × 4 字 × 几像素笔画的合理量级，但远高于
+    // "整张白底"误判的 0 像素，足以区分 bug-before/after。
+    const stats = await page.evaluate(async () => {
+      const blob = (window as E2EWindow).__downloadBlobs?.at(-1)
+      if (!blob) return { width: 0, height: 0, darkPixels: 0 }
+      const bitmap = await createImageBitmap(blob)
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return { width: bitmap.width, height: bitmap.height, darkPixels: 0 }
+      ctx.drawImage(bitmap, 0, 0)
+      const { data } = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+      let darkPixels = 0
+      // 步进 4 字节（一个 RGBA 像素）逐像素扫描。R+G+B<600 视为非背景。
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] + data[i + 1] + data[i + 2] < 600) darkPixels += 1
+      }
+      return { width: bitmap.width, height: bitmap.height, darkPixels }
+    })
+
+    expect(stats.width).toBeGreaterThan(0)
+    expect(stats.height).toBeGreaterThan(0)
+    // bug 复现时 darkPixels === 0（整张白底）；修复后远大于此阈值。
+    expect(stats.darkPixels).toBeGreaterThan(50)
   })
 
   test('shows PDF, TXT, PNG, JPG, and WEBP as image target options', async ({ page }) => {
@@ -1011,5 +1120,113 @@ test.describe('converter app', () => {
     await expect(actions.getByRole('button', { name: 'Remove' })).toBeVisible()
 
     await expect(page.locator('table.file-table')).toBeHidden()
+  })
+
+  test('multi-select creates a group, changes target, and collapses members', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles([
+        filePayload('notes-a.txt', 'text/plain', 'hello a'),
+        filePayload('notes-b.txt', 'text/plain', 'hello b')
+      ])
+
+    const table = page.locator('table.file-table')
+    await expect(table).toContainText('notes-a.txt')
+    await expect(table).toContainText('notes-b.txt')
+
+    await page.getByRole('button', { name: 'Multi-select' }).click()
+    await expect(page.getByRole('button', { name: 'Cancel selection' })).toBeVisible()
+
+    const rowA = rowForFile(page, 'notes-a.txt')
+    const rowB = rowForFile(page, 'notes-b.txt')
+
+    await expect(rowA.locator('.file-table__cell--actions')).toHaveCount(0)
+    await expect(rowB.locator('.file-table__cell--actions')).toHaveCount(0)
+
+    await rowA.locator('.file-table__cell--name').click()
+    await rowB.locator('.file-table__cell--name').click()
+
+    await expect(page.getByText('2 selected')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Create Group' }).click()
+
+    const groupHeader = page.locator('tbody tr.group-header')
+    await expect(groupHeader).toHaveCount(1)
+    await expect(groupHeader).toContainText('Group 1')
+    await expect(groupHeader).toContainText('2 files')
+
+    await expect(table.locator('tbody tr.file-table__row--group-member')).toHaveCount(2)
+
+    const groupTargetSelect = groupHeader.locator('select')
+    await groupTargetSelect.selectOption('html')
+
+    await expect(targetSelectForRow(page, 'notes-a.txt')).toHaveValue('html')
+    await expect(targetSelectForRow(page, 'notes-b.txt')).toHaveValue('html')
+
+    const collapseExpandButton = groupHeader.locator('.group-header__collapse-btn')
+    await collapseExpandButton.click()
+
+    await expect(collapseExpandButton).toHaveAttribute('aria-expanded', 'false')
+    await expect(rowA).toBeHidden()
+    await expect(rowB).toBeHidden()
+
+    await collapseExpandButton.click()
+
+    await expect(collapseExpandButton).toHaveAttribute('aria-expanded', 'true')
+    await expect(rowA).toBeVisible()
+    await expect(rowB).toBeVisible()
+
+    await groupHeader.getByRole('button', { name: 'Group settings' }).click()
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+    await expect(settingsDialog).toBeVisible()
+    await expect(settingsDialog).toContainText('HTML Options')
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
+  })
+
+  test('uploads markdown file and converts to HTML via parser iframe', async ({ page }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles([filePayload('notes.md', 'text/markdown', '# Heading\n\nbody paragraph')])
+
+    const row = rowForFile(page, 'notes.md')
+    await expect(row).toBeVisible()
+
+    const targetSelect = targetSelectForRow(page, 'notes.md')
+    await expect(targetSelect).toHaveValue('html')
+    await expect(optionValues(targetSelect)).resolves.toEqual(
+      expect.arrayContaining(['html', 'txt', 'png', 'jpg', 'webp', 'pdf'])
+    )
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+    await expect(row.locator('.status')).toContainText('Done', { timeout: 30000 })
+
+    await row.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['notes.html'])
+  })
+
+  test('converts markdown to TXT with raw mode preserving the original markdown text', async ({
+    page
+  }) => {
+    await page
+      .locator(dropzoneFileInput)
+      .setInputFiles([filePayload('raw.md', 'text/markdown', '# Title\n\n- item one')])
+
+    await targetSelectForRow(page, 'raw.md').selectOption('txt')
+
+    const row = rowForFile(page, 'raw.md')
+    await row.getByRole('button', { name: 'Settings' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toContainText('Markdown Options')
+    await dialog.getByLabel('Keep raw Markdown').check()
+    await dialog.getByRole('button', { name: 'Done' }).click()
+    await expect(dialog).toBeHidden()
+
+    await page.getByRole('button', { name: 'Convert all' }).click()
+    await expect(row.locator('.status')).toContainText('Done', { timeout: 30000 })
+
+    await row.getByRole('button', { name: 'Download' }).click()
+    await expect.poll(async () => downloadNames(page)).toEqual(['raw.txt'])
   })
 })

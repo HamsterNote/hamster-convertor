@@ -32,7 +32,6 @@ type TextControlDraft = {
 type BackgroundDraft = {
   includeBackground: boolean
   backgroundQuality: number
-  excludeTextFromBackground: boolean
 }
 
 type LayoutDraft = {
@@ -55,8 +54,7 @@ const HTML_BACKGROUND_QUALITY_OPTIONS = [
 
 const DEFAULT_BACKGROUND: BackgroundDraft = {
   includeBackground: true,
-  backgroundQuality: 0.85,
-  excludeTextFromBackground: true
+  backgroundQuality: 0.85
 }
 
 const DEFAULT_LAYOUT: LayoutDraft = {
@@ -83,9 +81,7 @@ const createDraft = (options?: HtmlOptionsModalProps['options']): Draft => ({
     includeBackground:
       options?.background?.includeBackground ?? DEFAULT_BACKGROUND.includeBackground,
     backgroundQuality:
-      options?.background?.backgroundQuality ?? DEFAULT_BACKGROUND.backgroundQuality,
-    excludeTextFromBackground:
-      options?.background?.excludeTextFromBackground ?? DEFAULT_BACKGROUND.excludeTextFromBackground
+      options?.background?.backgroundQuality ?? DEFAULT_BACKGROUND.backgroundQuality
   },
   layout: {
     mode: options?.htmlLayout?.mode ?? DEFAULT_LAYOUT.mode,
@@ -188,11 +184,7 @@ export default function HtmlOptionsModal({
     })
   }
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onCancel()
-    }
-  }
+  const handleOverlayClick = () => onCancel()
 
   const handleConfirm = () => {
     onConfirm(cleanOutput(draft))
@@ -203,19 +195,19 @@ export default function HtmlOptionsModal({
   const titleId = 'html-options-modal-title'
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div
-      className="pdf-modal-overlay"
-      onClick={handleOverlayClick}
-      onKeyDown={e => e.key === 'Escape' && onCancel()}
-    >
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+    <div className="pdf-modal-overlay">
+      <button
+        type="button"
+        className="pdf-modal-overlay__backdrop"
+        aria-hidden="true"
+        tabIndex={-1}
+        onClick={handleOverlayClick}
+      />
       <div
         className="pdf-modal html-options-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        onClick={e => e.stopPropagation()}
       >
         <div className="pdf-modal__header">
           <h2 id={titleId}>
@@ -253,18 +245,6 @@ export default function HtmlOptionsModal({
                 </option>
               ))}
             </select>
-          </label>
-
-          <label className="html-options-modal__checkbox html-options-modal__field--wide">
-            <input
-              type="checkbox"
-              checked={draft.background.excludeTextFromBackground}
-              onChange={event =>
-                updateBackground('excludeTextFromBackground', event.target.checked)
-              }
-              disabled={readOnly}
-            />
-            <span>{t('options.excludeTextFromBackground')}</span>
           </label>
 
           {/* Text Control Section */}

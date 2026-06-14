@@ -19,9 +19,11 @@ import {
   extractIntermediateText,
   extractOcrText,
   extractPdfPages,
+  formatPageTextsAsReadableText,
   getSelectedPdfPageNumbers,
   isUnsupportedImageFormat,
   replaceExtension,
+  sanitizeTxtHtmlOutput,
   stripExtension,
   textToBlob,
   UnsupportedImageFormatError
@@ -31,6 +33,8 @@ type PdfParserModule = typeof import('@hamster-note/pdf-parser')
 type ImageParserModule = typeof import('@hamster-note/image-parser')
 type HtmlParserModule = typeof import('@hamster-note/html-parser')
 type DocxParserModule = typeof import('@hamster-note/docx-parser')
+type MarkdownParserModule = typeof import('@hamster-note/markdown-parser')
+type Html2CanvasModule = typeof import('html2canvas')
 type PdfParserApi = {
   encode: (arrayBuffer: ArrayBuffer) => Promise<IntermediateDocument | undefined>
 }
@@ -65,6 +69,7 @@ type PdfJsModule = {
 type ImageDimensions = { height: number; width: number }
 type ImageOptions = NonNullable<NonNullable<ConversionRequest['options']>['image']>
 type ImageToPdfOptions = NonNullable<NonNullable<ConversionRequest['options']>['imageToPdf']>
+type TxtImageOptions = NonNullable<NonNullable<ConversionRequest['options']>['txtImage']>
 type PdfPageBox = { height: number; width: number }
 type ThumbnailPage = IntermediatePage & {
   getThumbnail: (scale?: number) => Promise<IntermediateImage | undefined>
@@ -78,6 +83,14 @@ const DEFAULT_IMAGE_TO_PDF_OPTIONS: ImageToPdfOptions = {
   pageMode: 'auto',
   rotationDeg: 0,
   scalePercent: 100
+}
+const DEFAULT_TXT_IMAGE_OPTIONS: TxtImageOptions = {
+  textColor: '#000000',
+  backgroundColor: '#ffffff',
+  fontSizePx: 16,
+  imageWidthPx: 800,
+  paddingPx: 20,
+  lineHeightPx: 24
 }
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -204,6 +217,67 @@ const loadImageDimensions = async (url: string): Promise<ImageDimensions> => {
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max)
+
+const normalizeRoundedNumber = (
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.min(Math.max(Math.round(value), min), max)
+}
+
+const normalizeTxtImageOptions = (options?: Partial<TxtImageOptions>): TxtImageOptions => {
+  if (!options) {
+    return DEFAULT_TXT_IMAGE_OPTIONS
+  }
+
+  const fontSizePx = normalizeRoundedNumber(
+    options.fontSizePx,
+    DEFAULT_TXT_IMAGE_OPTIONS.fontSizePx,
+    8,
+    96
+  )
+  const imageWidthPx = normalizeRoundedNumber(
+    options.imageWidthPx,
+    DEFAULT_TXT_IMAGE_OPTIONS.imageWidthPx,
+    320,
+    4096
+  )
+  let paddingPx = normalizeRoundedNumber(
+    options.paddingPx,
+    DEFAULT_TXT_IMAGE_OPTIONS.paddingPx,
+    0,
+    256
+  )
+  const lineHeightPx = Math.max(
+    normalizeRoundedNumber(options.lineHeightPx, DEFAULT_TXT_IMAGE_OPTIONS.lineHeightPx, 8, 160),
+    fontSizePx
+  )
+
+  if (imageWidthPx - paddingPx * 2 < 40) {
+    paddingPx = Math.max(0, Math.floor((imageWidthPx - 40) / 2))
+  }
+
+  return {
+    textColor:
+      typeof options.textColor === 'string'
+        ? options.textColor
+        : DEFAULT_TXT_IMAGE_OPTIONS.textColor,
+    backgroundColor:
+      typeof options.backgroundColor === 'string'
+        ? options.backgroundColor
+        : DEFAULT_TXT_IMAGE_OPTIONS.backgroundColor,
+    fontSizePx,
+    imageWidthPx,
+    paddingPx,
+    lineHeightPx
+  }
+}
 
 const getRotatedImageDimensions = (
   dimensions: ImageDimensions,
@@ -809,39 +883,113 @@ export const convertImageToImage = async (
   }
 }
 
-const extractTextFromIntermediate = (intermediate: IntermediateDocument): string => {
-  const text = 'text' in intermediate ? intermediate.text : undefined
-  if (typeof text === 'string') {
-    return text
+// 从 IntermediateDocument 提取纯文本：真实 TxtParser.encode 把文本放在
+// pages[i].content[j].content（IntermediateText.content），而不是顶层 .text。
+// 旧实现读 intermediate.text，永远返回空串，导致 TXT→PNG/JPG/WebP 渲染空白图。
+// 本实现复刻 TxtParser.decode 的官方提取链路：await pages → page.getContent() →
+// 拼接 IntermediateText.content。仅取文本节点：IntermediateImage 没有 string content，
+// 用 typeof 守卫即可区分。
+const readTextContent = (node: unknown): string => {
+  if (typeof node !== 'object' || node === null) {
+    return ''
   }
-  return ''
+  const value = (node as { content?: unknown }).content
+  return typeof value === 'string' ? value : ''
+}
+
+const extractTextFromIntermediate = async (intermediate: IntermediateDocument): Promise<string> => {
+  const pages = await intermediate.pages
+  if (!Array.isArray(pages) || pages.length === 0) {
+    return ''
+  }
+
+  const pageTexts: string[] = []
+  for (const page of pages) {
+    const contents = await page.getContent()
+    if (!Array.isArray(contents)) {
+      continue
+    }
+    const pageText = contents.map(readTextContent).join('')
+    if (pageText.length > 0) {
+      pageTexts.push(pageText)
+    }
+  }
+
+  return pageTexts.join('\n')
+}
+
+const wrapTokenByCharacter = (
+  ctx: CanvasRenderingContext2D,
+  token: string,
+  maxWidth: number,
+  initialLine: string
+): { lines: string[]; trailing: string } => {
+  // CJK / 极长无空格 token 的字符级换行 fallback。
+  // Array.from 按 Unicode code point 切分，正确处理 emoji 等代理对。
+  const out: string[] = []
+  let line = initialLine
+  for (const char of Array.from(token)) {
+    const next = line + char
+    if (ctx.measureText(next).width > maxWidth && line !== '') {
+      out.push(line)
+      line = char
+    } else {
+      line = next
+    }
+  }
+  return { lines: out, trailing: line }
+}
+
+const appendWord = (
+  ctx: CanvasRenderingContext2D,
+  word: string,
+  maxWidth: number,
+  currentLine: string
+): { flushed: string[]; nextLine: string } => {
+  // 三种情况：1) 拼接后仍 ≤ maxWidth；2) word 自身 ≤ maxWidth 需要换新行；
+  // 3) word 自身超宽，按字符切分（CJK / 长串 token）。
+  const testLine = currentLine ? `${currentLine} ${word}` : word
+  if (ctx.measureText(testLine).width <= maxWidth) {
+    return { flushed: [], nextLine: testLine }
+  }
+
+  const flushed: string[] = []
+  if (currentLine) flushed.push(currentLine)
+
+  if (ctx.measureText(word).width <= maxWidth) {
+    return { flushed, nextLine: word }
+  }
+
+  const { lines, trailing } = wrapTokenByCharacter(ctx, word, maxWidth, '')
+  flushed.push(...lines)
+  return { flushed, nextLine: trailing }
+}
+
+const wrapParagraph = (
+  ctx: CanvasRenderingContext2D,
+  paragraph: string,
+  maxWidth: number
+): string[] => {
+  const out: string[] = []
+  let currentLine = ''
+  for (const word of paragraph.split(' ')) {
+    const { flushed, nextLine } = appendWord(ctx, word, maxWidth, currentLine)
+    out.push(...flushed)
+    currentLine = nextLine
+  }
+  if (currentLine) out.push(currentLine)
+  return out
 }
 
 const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
   const wrappedLines: string[] = []
-
   for (const paragraph of text.split('\n')) {
     if (paragraph === '') {
       wrappedLines.push('')
       continue
     }
-
-    let currentLine = ''
-    for (const word of paragraph.split(' ')) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word
-      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-        wrappedLines.push(currentLine)
-        currentLine = word
-      } else {
-        currentLine = testLine
-      }
-    }
-
-    if (currentLine) {
-      wrappedLines.push(currentLine)
-    }
+    wrappedLines.push(...wrapParagraph(ctx, paragraph, maxWidth))
   }
-
   return wrappedLines
 }
 
@@ -853,23 +1001,24 @@ export const convertTxtToImage = async (
 
   try {
     const { TxtParser } = await import('@hamster-note/txt-parser')
-    text = extractTextFromIntermediate(await TxtParser.encode(request.buffer))
+    text = await extractTextFromIntermediate(await TxtParser.encode(request.buffer))
   } catch {
     text = bufferToText(request.buffer)
     warnings.push('Used fallback text reader')
   }
 
-  const canvasWidth = 800
-  const padding = 20
-  const lineHeight = 24
-  const font = '16px sans-serif'
+  const txtImageOptions = normalizeTxtImageOptions(request.options?.txtImage)
+  const canvasWidth = txtImageOptions.imageWidthPx
+  const padding = txtImageOptions.paddingPx
+  const lineHeight = txtImageOptions.lineHeightPx
+  const font = `${txtImageOptions.fontSizePx}px sans-serif`
   const measureCtx = document.createElement('canvas').getContext('2d')
   if (!measureCtx) {
     throw new Error('Canvas 2D context not available')
   }
   measureCtx.font = font
 
-  const lines = wrapText(measureCtx, text, canvasWidth - padding * 2)
+  const lines = wrapText(measureCtx, text, Math.max(40, canvasWidth - padding * 2))
   const canvas = document.createElement('canvas')
   canvas.width = canvasWidth
   canvas.height = Math.max(lines.length * lineHeight + padding * 2, 100)
@@ -879,9 +1028,9 @@ export const convertTxtToImage = async (
     throw new Error('Canvas 2D context not available')
   }
 
-  ctx.fillStyle = 'white'
+  ctx.fillStyle = txtImageOptions.backgroundColor
   ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = 'black'
+  ctx.fillStyle = txtImageOptions.textColor
   ctx.font = font
   lines.forEach((line, index) => {
     ctx.fillText(line, padding, padding + (index + 1) * lineHeight)
@@ -892,14 +1041,10 @@ export const convertTxtToImage = async (
     throw new Error(`Unsupported text image target: ${targetFormat}`)
   }
 
-  const { blob, mimeType } = await encodeCanvasToImage(
-    canvas,
-    targetFormat,
-    request.options?.image?.quality
-  )
+  const { blob, mimeType } = await encodeCanvasToImage(canvas, targetFormat)
   return [
     {
-      buffer: await imageBlobToOutputBuffer(blob, request, targetFormat),
+      buffer: await blobToArrayBuffer(blob),
       filename: replaceExtension(request.filename, targetFormat),
       mimeType,
       targetFormat,
@@ -918,7 +1063,9 @@ export const convertTxtToHtml = async (request: ConversionRequest): Promise<Conv
     intermediate,
     request.options?.decode as HtmlParserDecodeResultOptions
   )
-  const blob = result instanceof File ? result : new Blob([result], { type: 'text/html' })
+  const html =
+    result instanceof Blob ? bufferToText(await blobToArrayBuffer(result)) : String(result)
+  const blob = textToBlob(sanitizeTxtHtmlOutput(html), 'text/html')
   const mimeType = 'text/html;charset=utf-8'
   return [
     {
@@ -946,10 +1093,164 @@ export const convertHtmlToTxt = async (request: ConversionRequest): Promise<Conv
   const mimeType = 'text/plain'
   return [
     {
-      buffer: await blobToArrayBuffer(textToBlob(pageTexts.join('\n').trim(), mimeType)),
+      buffer: await blobToArrayBuffer(
+        textToBlob(formatPageTextsAsReadableText(pageTexts), mimeType)
+      ),
       filename: replaceExtension(request.filename, 'txt'),
       mimeType,
       targetFormat: 'txt'
+    }
+  ]
+}
+
+const encodeMarkdownIntermediate = async (buffer: ArrayBuffer): Promise<IntermediateDocument> => {
+  const { MarkdownParser } = (await import('@hamster-note/markdown-parser')) as MarkdownParserModule
+  return MarkdownParser.encode(buffer)
+}
+
+const renderHtmlStringToCanvas = async (
+  html: string,
+  width: number
+): Promise<HTMLCanvasElement> => {
+  const { default: html2canvas } = (await import('html2canvas')) as Html2CanvasModule
+  const container = document.createElement('div')
+  container.style.position = 'fixed'
+  container.style.top = '-10000px'
+  container.style.left = '-10000px'
+  container.style.width = `${width}px`
+  container.style.padding = '24px'
+  container.style.boxSizing = 'border-box'
+  container.style.backgroundColor = '#ffffff'
+  container.style.color = '#000000'
+  container.style.fontFamily = 'sans-serif'
+  container.style.fontSize = '14px'
+  container.style.lineHeight = '1.6'
+  container.innerHTML = html
+  document.body.appendChild(container)
+
+  try {
+    return await html2canvas(container, {
+      backgroundColor: '#ffffff',
+      width,
+      windowWidth: width,
+      scale: 1,
+      useCORS: true,
+      logging: false
+    })
+  } finally {
+    container.remove()
+  }
+}
+
+const MARKDOWN_RENDER_WIDTH_PX = 800
+
+export const convertMarkdownToHtml = async (
+  request: ConversionRequest
+): Promise<ConversionResult[]> => {
+  const intermediate = await encodeMarkdownIntermediate(request.buffer)
+  return intermediateToHtmlResult(request, intermediate)
+}
+
+export const convertMarkdownToTxt = async (
+  request: ConversionRequest
+): Promise<ConversionResult[]> => {
+  const txtMode = request.options?.markdown?.txtMode ?? 'plain'
+
+  if (txtMode === 'raw') {
+    const text = bufferToText(request.buffer)
+    const mimeType = 'text/plain;charset=utf-8'
+    return [
+      {
+        buffer: await blobToArrayBuffer(textToBlob(text, mimeType)),
+        filename: replaceExtension(request.filename, 'txt'),
+        mimeType,
+        targetFormat: 'txt'
+      }
+    ]
+  }
+
+  const intermediate = await encodeMarkdownIntermediate(request.buffer)
+  return intermediateToTxtResult(request, intermediate)
+}
+
+const renderMarkdownToImage = async (request: ConversionRequest): Promise<HTMLCanvasElement> => {
+  const intermediate = await encodeMarkdownIntermediate(request.buffer)
+  const { HtmlParser } = (await import('@hamster-note/html-parser')) as HtmlParserModule
+  const html = await HtmlParser.decodeToHtml(
+    intermediate,
+    request.options?.decode as HtmlParserDecodeOptions
+  )
+  return renderHtmlStringToCanvas(html, MARKDOWN_RENDER_WIDTH_PX)
+}
+
+export const convertMarkdownToImage = async (
+  request: ConversionRequest
+): Promise<ConversionResult[]> => {
+  const targetFormat = request.targetFormat
+  if (!['png', 'jpg', 'webp'].includes(targetFormat)) {
+    throw new Error(`Unsupported markdown image target: ${targetFormat}`)
+  }
+  const concreteTarget = targetFormat as ConcreteImageTarget
+  const canvas = await renderMarkdownToImage(request)
+  const { blob, extension, mimeType } = await encodeCanvasToImage(canvas, concreteTarget)
+  return [
+    {
+      buffer: await blobToArrayBuffer(blob),
+      filename: replaceExtension(request.filename, extension.replace(/^\./, '')),
+      mimeType,
+      targetFormat
+    }
+  ]
+}
+
+export const convertMarkdownToPdf = async (
+  request: ConversionRequest
+): Promise<ConversionResult[]> => {
+  const canvas = await renderMarkdownToImage(request)
+  const { blob: pngBlob } = await encodeCanvasToImage(canvas, 'png')
+  const objectUrl = URL.createObjectURL(pngBlob)
+
+  try {
+    const { jsPDF } = (await import('jspdf')) as JsPdfModule
+    const doc = new jsPDF({
+      unit: 'pt',
+      format: [canvas.width * 0.75, canvas.height * 0.75]
+    })
+    doc.addImage(objectUrl, 0, 0, canvas.width * 0.75, canvas.height * 0.75)
+    const pdfBlob = doc.output('blob')
+    return [
+      {
+        buffer: await blobToArrayBuffer(pdfBlob),
+        filename: replaceExtension(request.filename, 'pdf'),
+        mimeType: 'application/pdf',
+        targetFormat: 'pdf'
+      }
+    ]
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
+export const convertHtmlToMd = async (request: ConversionRequest): Promise<ConversionResult[]> => {
+  const [{ HtmlParser }, { MarkdownParser }] = await Promise.all([
+    import('@hamster-note/html-parser') as Promise<HtmlParserModule>,
+    import('@hamster-note/markdown-parser') as Promise<MarkdownParserModule>
+  ])
+
+  const htmlDocument = await HtmlParser.encode(
+    request.buffer,
+    request.options?.encode as HtmlParserEncodeOptions
+  )
+  const intermediate = htmlDocument.getIntermediateDocument()
+  const markdownText = await MarkdownParser.decodeToMarkdown(intermediate)
+
+  const mimeType = 'text/markdown;charset=utf-8'
+  return [
+    {
+      buffer: await blobToArrayBuffer(textToBlob(markdownText, mimeType)),
+      filename: replaceExtension(request.filename, 'md'),
+      mimeType,
+      targetFormat: 'md'
     }
   ]
 }

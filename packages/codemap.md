@@ -10,6 +10,7 @@
 - **`parser-runtime/`** — iframe 运行时，实际执行 PDF/HTML/TXT/Image 之间的格式转换，内含转换引擎、任务队列、pdf.js 适配层
 
 核心职责：
+
 1. 将文档转换逻辑隔离在同源 iframe 内，避免阻塞 host 主线程
 2. 提供统一的请求-响应-进度协议，host 无需了解具体解析器细节
 3. 支持 13 种源→目标格式转换组合（PDF/TXT/Image/HTML → HTML/TXT/PNG/JPG/WebP/PDF）
@@ -47,36 +48,36 @@
 
 ### 关键设计模式
 
-| 模式 | 应用位置 | 说明 |
-|------|----------|------|
-| **策略模式** | `conversion/adapters.ts` | 每个源→目标格式对对应一个 `RuntimeConversionAdapter` 函数 |
-| **路由表模式** | `conversion/index.ts` | `adapters` 二维映射 `Record<SourceFormat, Partial<Record<TargetFormat, Adapter>>>` |
-| **请求-响应 + 进度推送** | `server.ts` | 通过 MessagePort 实现异步转换，支持多次进度报告 |
-| **中间文档抽象** | 各适配器 | `encode()` → `IntermediateDocument` → `decode()` 流水线 |
-| **动态导入** | `adapters.ts` | 所有外部依赖使用 `await import()` 懒加载，减少首屏体积 |
-| **包装器模式** | `lib/pdfjs-wrapper.ts` | 包装 pdfjs-dist，自动注入 CMap 配置解决 CJK 乱码 |
-| **类型推断链** | `parser-protocol/src/` | `.d.ts` → `typeof import(...)` → 类型别名 → 下游消费 |
-| **容错降级链** | `conversion/adapters.ts` | PDF→TXT 先尝试 pdf-parser，失败降级到 pdfjs-dist |
+| 模式                     | 应用位置                 | 说明                                                                               |
+| ------------------------ | ------------------------ | ---------------------------------------------------------------------------------- |
+| **策略模式**             | `conversion/adapters.ts` | 每个源→目标格式对对应一个 `RuntimeConversionAdapter` 函数                          |
+| **路由表模式**           | `conversion/index.ts`    | `adapters` 二维映射 `Record<SourceFormat, Partial<Record<TargetFormat, Adapter>>>` |
+| **请求-响应 + 进度推送** | `server.ts`              | 通过 MessagePort 实现异步转换，支持多次进度报告                                    |
+| **中间文档抽象**         | 各适配器                 | `encode()` → `IntermediateDocument` → `decode()` 流水线                            |
+| **动态导入**             | `adapters.ts`            | 所有外部依赖使用 `await import()` 懒加载，减少首屏体积                             |
+| **包装器模式**           | `lib/pdfjs-wrapper.ts`   | 包装 pdfjs-dist，自动注入 CMap 配置解决 CJK 乱码                                   |
+| **类型推断链**           | `parser-protocol/src/`   | `.d.ts` → `typeof import(...)` → 类型别名 → 下游消费                               |
+| **容错降级链**           | `conversion/adapters.ts` | PDF→TXT 先尝试 pdf-parser，失败降级到 pdfjs-dist                                   |
 
 ### 桥接通信协议
 
 所有消息通过 `MessagePort.postMessage()` 传递（非直接 `window.postMessage`）：
 
-| 方向 | 消息类型 | 载荷 |
-|------|----------|------|
-| iframe → host | `ready` | `{ source: 'hamster-parser-runtime', parserNames: string[] }` |
-| host → iframe | `convert` | `{ requestId, filename, sourceFormat, targetFormat, buffer, options? }` |
-| iframe → host | `progress` | `{ requestId, phase, percent, queueLength, message? }` |
-| iframe → host | `convert:result` | `{ requestId, payload: { filename, mimeType, targetFormat, buffer } }` |
-| iframe → host | `convert:error` | `{ requestId, error: { code, message, details? } }` |
-| host → iframe | `cancel` | `{ requestId }` |
+| 方向          | 消息类型         | 载荷                                                                    |
+| ------------- | ---------------- | ----------------------------------------------------------------------- |
+| iframe → host | `ready`          | `{ source: 'hamster-parser-runtime', parserNames: string[] }`           |
+| host → iframe | `convert`        | `{ requestId, filename, sourceFormat, targetFormat, buffer, options? }` |
+| iframe → host | `progress`       | `{ requestId, phase, percent, queueLength, message? }`                  |
+| iframe → host | `convert:result` | `{ requestId, payload: { filename, mimeType, targetFormat, buffer } }`  |
+| iframe → host | `convert:error`  | `{ requestId, error: { code, message, details? } }`                     |
+| host → iframe | `cancel`         | `{ requestId }`                                                         |
 
 ### 转换矩阵
 
 | 源 \ 目标 | html | txt | png | jpg | webp | pdf |
-|:---------:|:----:|:---:|:---:|:---:|:----:|:---:|
-| **pdf**   |  ✓   |  ✓  |  ✓  |  ✓  |  ✓   |  ✓  |
-| **txt**   |  ✓   |  —  |  ✓  |  ✓  |  ✓   |  —  |
+| :-------: | :--: | :-: | :-: | :-: | :--: | :-: |
+|  **pdf**  |  ✓   |  ✓  |  ✓  |  ✓  |  ✓   |  ✓  |
+|  **txt**  |  ✓   |  —  |  ✓  |  ✓  |  ✓   |  —  |
 | **image** |  ✓   |  ✓  |  ✓  |  ✓  |  ✓   |  ✓  |
 | **html**  |  —   |  ✓  |  —  |  —  |  —   |  —  |
 
@@ -180,30 +181,30 @@ cancel(requestId):
 
 ### 上游依赖（被 packages/ 消费）
 
-| 依赖 | 类型 | 用途 |
-|------|------|------|
-| `@hamster-note/pdf-parser` | 运行时（动态导入） | PDF 编解码，中间文档生成 |
-| `@hamster-note/html-parser` | 运行时（动态导入） | HTML 编解码 |
-| `@hamster-note/image-parser` | 运行时（动态导入） | 图片 OCR、格式转换 |
-| `@hamster-note/txt-parser` | 运行时（动态导入） | 纯文本编解码 |
-| `@hamster-note/document-parser` | 运行时（动态导入） | 通用文档解析 |
-| `@hamster-note/types` | 编译期类型 | `IntermediateDocument` 等共享类型 |
-| `pdfjs-dist` | 运行时（动态导入） | PDF 文本提取、页面渲染 |
-| `pdf-lib` | 运行时（动态导入） | PDF 页面裁剪/合并 |
-| `jspdf` | 运行时（动态导入） | PDF 输出生成 |
-| `piexifjs` | 运行时（静态导入） | JPEG EXIF 元数据读写 |
+| 依赖                            | 类型               | 用途                              |
+| ------------------------------- | ------------------ | --------------------------------- |
+| `@hamster-note/pdf-parser`      | 运行时（动态导入） | PDF 编解码，中间文档生成          |
+| `@hamster-note/html-parser`     | 运行时（动态导入） | HTML 编解码                       |
+| `@hamster-note/image-parser`    | 运行时（动态导入） | 图片 OCR、格式转换                |
+| `@hamster-note/txt-parser`      | 运行时（动态导入） | 纯文本编解码                      |
+| `@hamster-note/document-parser` | 运行时（动态导入） | 通用文档解析                      |
+| `@hamster-note/types`           | 编译期类型         | `IntermediateDocument` 等共享类型 |
+| `pdfjs-dist`                    | 运行时（动态导入） | PDF 文本提取、页面渲染            |
+| `pdf-lib`                       | 运行时（动态导入） | PDF 页面裁剪/合并                 |
+| `jspdf`                         | 运行时（动态导入） | PDF 输出生成                      |
+| `piexifjs`                      | 运行时（静态导入） | JPEG EXIF 元数据读写              |
 
 ### 下游消费者（消费 packages/ 的代码）
 
-| 消费者 | 导入内容 | 用途 |
-|--------|----------|------|
-| `src/components/ParserIframeBridge.tsx` | 协议消息类型 + 守卫函数 | React 组件中管理 iframe 生命周期、处理消息 |
-| `src/lib/parser-bridge/proxy.ts` | `ParserBridgeRequest` 类型 | 向 iframe 发送转换请求 |
-| `src/lib/parser-bridge/client.ts` | 协议消息类型 + 守卫函数 | iframe 端消息验证 |
-| `src/App.tsx` | 间接依赖 | 通过 ParserIframeBridge 触发转换 |
-| `src/__tests__/*.test.tsx` | 协议类型 | 构造测试用的模拟数据 |
-| 根 `vite.config.ts` | `parser-runtime` 构建产物 | 将 `/parser-runtime/` 路径代理到 iframe 运行时 |
-| 根 `tsconfig.json` | `parser-protocol` 源码路径 | TypeScript 项目引用，路径别名 `@hamster-note/parser-protocol` |
+| 消费者                                  | 导入内容                   | 用途                                                          |
+| --------------------------------------- | -------------------------- | ------------------------------------------------------------- |
+| `src/components/ParserIframeBridge.tsx` | 协议消息类型 + 守卫函数    | React 组件中管理 iframe 生命周期、处理消息                    |
+| `src/lib/parser-bridge/proxy.ts`        | `ParserBridgeRequest` 类型 | 向 iframe 发送转换请求                                        |
+| `src/lib/parser-bridge/client.ts`       | 协议消息类型 + 守卫函数    | iframe 端消息验证                                             |
+| `src/App.tsx`                           | 间接依赖                   | 通过 ParserIframeBridge 触发转换                              |
+| `src/__tests__/*.test.tsx`              | 协议类型                   | 构造测试用的模拟数据                                          |
+| 根 `vite.config.ts`                     | `parser-runtime` 构建产物  | 将 `/parser-runtime/` 路径代理到 iframe 运行时                |
+| 根 `tsconfig.json`                      | `parser-protocol` 源码路径 | TypeScript 项目引用，路径别名 `@hamster-note/parser-protocol` |
 
 ### 构建集成
 
@@ -221,10 +222,10 @@ dist/parser-runtime/         # 包含 index.html + 所有 JS/CSS 资源
 
 ### Vite 插件（parser-runtime 构建时）
 
-| 插件 | 作用 |
-|------|------|
-| `interceptPdfjsImportPlugin` | 将 `@hamster-note/pdf-parser` 中的 `import("pdfjs-dist")` 重写为 `/src/lib/pdfjs-wrapper.ts`，解决 CJK 文本乱码 |
-| `ensurePdfParserStandardFontUrlPlugin` | 确保 pdf-parser 的标准字体 URL 格式正确，并在构建时复制字体文件 |
+| 插件                                   | 作用                                                                                                            |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `interceptPdfjsImportPlugin`           | 将 `@hamster-note/pdf-parser` 中的 `import("pdfjs-dist")` 重写为 `/src/lib/pdfjs-wrapper.ts`，解决 CJK 文本乱码 |
+| `ensurePdfParserStandardFontUrlPlugin` | 确保 pdf-parser 的标准字体 URL 格式正确，并在构建时复制字体文件                                                 |
 
 ### 文件结构
 

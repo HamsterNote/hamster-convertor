@@ -23,16 +23,17 @@ src/ 是 Hamster Document Converter 的主应用源码目录。包含 React 应�
 
 **核心抽象**：
 
-| 抽象 | 位置 | 职责 |
-|------|------|------|
-| `FileItem` | `App.tsx` | 单个待转换文件的完整状态（源文件、目标格式、选项、进度、结果） |
-| `ConversionResult` | `lib/converter.ts` | 转换输出（Blob、文件名、MIME 类型、警告） |
-| `ParserIframeBridgeRef` | `components/ParserIframeBridge.tsx` | iframe bridge 的 ref 接口，用于发送转换请求 |
-| `SourceFormat` / `TargetFormat` | `lib/converter.ts` | 格式类型联合类型，定义支持的转换路径 |
+| 抽象                            | 位置                                | 职责                                                           |
+| ------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
+| `FileItem`                      | `App.tsx`                           | 单个待转换文件的完整状态（源文件、目标格式、选项、进度、结果） |
+| `ConversionResult`              | `lib/converter.ts`                  | 转换输出（Blob、文件名、MIME 类型、警告）                      |
+| `ParserIframeBridgeRef`         | `components/ParserIframeBridge.tsx` | iframe bridge 的 ref 接口，用于发送转换请求                    |
+| `SourceFormat` / `TargetFormat` | `lib/converter.ts`                  | 格式类型联合类型，定义支持的转换路径                           |
 
 ## Flow
 
 **启动流程**：
+
 ```
 main.tsx
   ├── 导入 styles/theme.css, styles/global.css（全局样式）
@@ -41,6 +42,7 @@ main.tsx
 ```
 
 **文件转换数据流**：
+
 ```
 用户拖拽/选择文件
   → FileDropzone.onFiles()
@@ -66,6 +68,7 @@ main.tsx
 ```
 
 **渲染结构**：
+
 ```
 <div className="app">
   <FullscreenLoading />          // 全屏加载遮罩
@@ -89,22 +92,22 @@ main.tsx
 
 **内部依赖**：
 
-| 子模块 | 用途 |
-|--------|------|
-| `components/` | UI 组件：Header、FileDropzone、Footer、各种 Modal、ParserIframeBridge |
-| `hooks/` | React Hook：`usePdfPageList` 等 |
-| `i18n/` | 国际化配置与文案（zh-CN/zh-TW/en） |
-| `lib/` | 工具库：converter 类型定义、download、filename、parser-bridge 代理、pdf-utils、preview |
-| `types/` | TypeScript 类型声明（全局类型、第三方库类型） |
-| `styles/` | CSS 主题变量与全局样式 |
+| 子模块        | 用途                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `components/` | UI 组件：Header、FileDropzone、Footer、各种 Modal、ParserIframeBridge                  |
+| `hooks/`      | React Hook：`usePdfPageList` 等                                                        |
+| `i18n/`       | 国际化配置与文案（zh-CN/zh-TW/en）                                                     |
+| `lib/`        | 工具库：converter 类型定义、download、filename、parser-bridge 代理、pdf-utils、preview |
+| `types/`      | TypeScript 类型声明（全局类型、第三方库类型）                                          |
+| `styles/`     | CSS 主题变量与全局样式                                                                 |
 
 **外部依赖**：
 
-| 依赖 | 用途 |
-|------|------|
-| `react` / `react-dom` | UI 框架 |
-| `react-i18next` / `i18next` | 国际化 |
-| `loglevel` | 日志 |
+| 依赖                             | 用途                               |
+| -------------------------------- | ---------------------------------- |
+| `react` / `react-dom`            | UI 框架                            |
+| `react-i18next` / `i18next`      | 国际化                             |
+| `loglevel`                       | 日志                               |
 | `@system-ui-js/development-base` | 共享 ESLint/Prettier/TSConfig 配置 |
 
 **消费者**：
@@ -115,9 +118,9 @@ main.tsx
 
 **支持的转换路径**（定义于 `lib/converter.ts`）：
 
-| 源格式 | 可转换为 |
-|--------|----------|
-| pdf | txt, png, jpg, webp, pdf, html |
-| txt | png, html |
-| image | pdf, txt, png, jpg, webp, html |
-| html | txt |
+| 源格式 | 可转换为                       |
+| ------ | ------------------------------ |
+| pdf    | txt, png, jpg, webp, pdf, html |
+| txt    | png, html                      |
+| image  | pdf, txt, png, jpg, webp, html |
+| html   | txt                            |

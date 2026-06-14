@@ -5,6 +5,7 @@
 此目录是 **parser-runtime iframe 沙箱的运行时核心**，负责在浏览器 iframe 内接收 Host 发起的文档转换请求，调度转换任务队列，并通过 MessageChannel 协议将结果返回给 Host。
 
 核心职责：
+
 1. **入口引导**（`main.ts`）— 初始化所有解析器模块，监听 Host 的连接握手，建立 MessagePort 通信通道
 2. **协议服务器**（`server.ts`）— 实现请求/响应协议，管理任务队列、并发控制、取消语义和进度上报
 3. **格式转换引擎**（`conversion/`）— 执行实际的文件格式转换（PDF/TXT/Image/HTML 互转）
@@ -50,26 +51,26 @@
 
 ### 文件结构
 
-| 文件 | 职责 | 行数 |
-|---|---|---|
-| `main.ts` | 入口：注册解析器模块，监听连接握手，创建 ProtocolServer | 66 |
-| `server.ts` | 协议服务器：任务队列、进度上报、取消语义、调用转换引擎 | 624 |
-| `conversion/` | 格式转换引擎：13 个适配器 + 路由表 + 工具函数 | 子目录 |
-| `lib/` | pdfjs-dist 适配层：Worker 配置 + CMap 注入 | 子目录 |
-| `types/` | 第三方解析器包的 TypeScript 类型声明 | 子目录 |
-| `__tests__/` | 单元测试 + 集成测试 | 子目录 |
+| 文件          | 职责                                                    | 行数   |
+| ------------- | ------------------------------------------------------- | ------ |
+| `main.ts`     | 入口：注册解析器模块，监听连接握手，创建 ProtocolServer | 66     |
+| `server.ts`   | 协议服务器：任务队列、进度上报、取消语义、调用转换引擎  | 624    |
+| `conversion/` | 格式转换引擎：13 个适配器 + 路由表 + 工具函数           | 子目录 |
+| `lib/`        | pdfjs-dist 适配层：Worker 配置 + CMap 注入              | 子目录 |
+| `types/`      | 第三方解析器包的 TypeScript 类型声明                    | 子目录 |
+| `__tests__/`  | 单元测试 + 集成测试                                     | 子目录 |
 
 ### 核心类型
 
-| 类型 | 定义位置 | 用途 |
-|---|---|---|
-| `ParserRuntimeReadyMessage` | `main.ts` | 向 Host 发送就绪通知，携带支持的解析器名称列表 |
-| `ParserBridgeRequest` | `server.ts` | 转换请求体（requestId、filename、sourceFormat、targetFormat、buffer） |
-| `ParserBridgeCancelRequest` | `server.ts` | 取消请求体（requestId + type: 'cancel'） |
-| `ParserBridgeProgress` | `server.ts` | 进度上报体（phase、percent、queueLength、message） |
-| `ParserBridgeResponse` | `server.ts` | 响应联合类型（convert:result / convert:error / progress） |
-| `ConversionTask` | `server.ts` | 内部任务对象，跟踪任务状态和结果 |
-| `ProtocolServer` | `server.ts` | 服务器接口（enqueue、cancel、getQueueLength、dispose 等） |
+| 类型                        | 定义位置    | 用途                                                                  |
+| --------------------------- | ----------- | --------------------------------------------------------------------- |
+| `ParserRuntimeReadyMessage` | `main.ts`   | 向 Host 发送就绪通知，携带支持的解析器名称列表                        |
+| `ParserBridgeRequest`       | `server.ts` | 转换请求体（requestId、filename、sourceFormat、targetFormat、buffer） |
+| `ParserBridgeCancelRequest` | `server.ts` | 取消请求体（requestId + type: 'cancel'）                              |
+| `ParserBridgeProgress`      | `server.ts` | 进度上报体（phase、percent、queueLength、message）                    |
+| `ParserBridgeResponse`      | `server.ts` | 响应联合类型（convert:result / convert:error / progress）             |
+| `ConversionTask`            | `server.ts` | 内部任务对象，跟踪任务状态和结果                                      |
+| `ProtocolServer`            | `server.ts` | 服务器接口（enqueue、cancel、getQueueLength、dispose 等）             |
 
 ## Flow
 
@@ -172,46 +173,46 @@ server.ts cancel(requestId)
 
 ### 上游依赖（被此模块消费）
 
-| 依赖 | 用途 | 加载方式 |
-|---|---|---|
-| `@hamster-note/document-parser` | 文档解析器 | 静态 import（main.ts） |
-| `@hamster-note/html-parser` | HTML 解析器 | 静态 import（main.ts） |
-| `@hamster-note/image-parser` | 图片解析器 | 静态 import（main.ts） |
-| `@hamster-note/pdf-parser` | PDF 解析器 | 静态 import（main.ts） |
-| `@hamster-note/txt-parser` | TXT 解析器 | 静态 import（main.ts） |
-| `@hamster-note/types` | `IntermediateDocument` 共享类型 | 静态 import（仅类型） |
-| `pdfjs-dist` | PDF 文本提取 & 页面渲染 | 动态 import（conversion/） |
-| `pdf-lib` | PDF 页面裁剪/合并 | 动态 import（conversion/） |
-| `jspdf` | 生成 PDF 输出 | 动态 import（conversion/） |
-| `piexifjs` | JPEG EXIF 元数据读写 | 静态 import（conversion/） |
+| 依赖                            | 用途                            | 加载方式                   |
+| ------------------------------- | ------------------------------- | -------------------------- |
+| `@hamster-note/document-parser` | 文档解析器                      | 静态 import（main.ts）     |
+| `@hamster-note/html-parser`     | HTML 解析器                     | 静态 import（main.ts）     |
+| `@hamster-note/image-parser`    | 图片解析器                      | 静态 import（main.ts）     |
+| `@hamster-note/pdf-parser`      | PDF 解析器                      | 静态 import（main.ts）     |
+| `@hamster-note/txt-parser`      | TXT 解析器                      | 静态 import（main.ts）     |
+| `@hamster-note/types`           | `IntermediateDocument` 共享类型 | 静态 import（仅类型）      |
+| `pdfjs-dist`                    | PDF 文本提取 & 页面渲染         | 动态 import（conversion/） |
+| `pdf-lib`                       | PDF 页面裁剪/合并               | 动态 import（conversion/） |
+| `jspdf`                         | 生成 PDF 输出                   | 动态 import（conversion/） |
+| `piexifjs`                      | JPEG EXIF 元数据读写            | 静态 import（conversion/） |
 
 ### 下游消费者（消费此模块的代码）
 
-| 消费者 | 用途 | 通信方式 |
-|---|---|---|
-| Host `App.tsx` / `ParserIframeBridge` | 发起转换请求，接收结果 | MessageChannel (postMessage) |
-| `src/__tests__/conversion-runtime.test.ts` | 转换引擎单元测试 | 直接调用 `convertRuntime()` |
-| `src/__tests__/server-integration.test.ts` | 协议服务器集成测试 | Mock MessagePort |
-| `src/__tests__/queue.test.ts` | 队列并发/取消语义测试 | Mock MessagePort |
-| `src/__tests__/exif.test.ts` | EXIF 剥离单元测试 | 直接调用 EXIF 工具函数 |
+| 消费者                                     | 用途                   | 通信方式                     |
+| ------------------------------------------ | ---------------------- | ---------------------------- |
+| Host `App.tsx` / `ParserIframeBridge`      | 发起转换请求，接收结果 | MessageChannel (postMessage) |
+| `src/__tests__/conversion-runtime.test.ts` | 转换引擎单元测试       | 直接调用 `convertRuntime()`  |
+| `src/__tests__/server-integration.test.ts` | 协议服务器集成测试     | Mock MessagePort             |
+| `src/__tests__/queue.test.ts`              | 队列并发/取消语义测试  | Mock MessagePort             |
+| `src/__tests__/exif.test.ts`               | EXIF 剥离单元测试      | 直接调用 EXIF 工具函数       |
 
 ### 子目录索引
 
-| 子目录 | Codemap | 职责 |
-|---|---|---|
+| 子目录        | Codemap                                        | 职责                                              |
+| ------------- | ---------------------------------------------- | ------------------------------------------------- |
 | `conversion/` | [conversion/codemap.md](conversion/codemap.md) | 文档格式转换引擎：13 个适配器 + 路由表 + 工具函数 |
-| `lib/` | [lib/codemap.md](lib/codemap.md) | pdfjs-dist 适配层：Worker 配置 + CMap 注入 |
-| `types/` | [types/codemap.md](types/codemap.md) | 第三方解析器包的 TypeScript 类型声明 |
-| `__tests__/` | — | 单元测试 + 集成测试（4 个测试文件 + fixtures） |
+| `lib/`        | [lib/codemap.md](lib/codemap.md)               | pdfjs-dist 适配层：Worker 配置 + CMap 注入        |
+| `types/`      | [types/codemap.md](types/codemap.md)           | 第三方解析器包的 TypeScript 类型声明              |
+| `__tests__/`  | —                                              | 单元测试 + 集成测试（4 个测试文件 + fixtures）    |
 
 ### 协议消息清单
 
-| 方向 | type | 用途 |
-|---|---|---|
-| iframe → Host | `ready` | 声明运行时就绪，携带 parserNames 列表 |
-| Host → iframe | `parser-bridge:connect` | 握手，携带 MessagePort |
-| Host → iframe | `convert` | 转换请求 |
-| Host → iframe | `cancel` | 取消请求 |
-| iframe → Host | `progress` | 进度上报 |
-| iframe → Host | `convert:result` | 转换成功结果 |
-| iframe → Host | `convert:error` | 转换失败错误 |
+| 方向          | type                    | 用途                                  |
+| ------------- | ----------------------- | ------------------------------------- |
+| iframe → Host | `ready`                 | 声明运行时就绪，携带 parserNames 列表 |
+| Host → iframe | `parser-bridge:connect` | 握手，携带 MessagePort                |
+| Host → iframe | `convert`               | 转换请求                              |
+| Host → iframe | `cancel`                | 取消请求                              |
+| iframe → Host | `progress`              | 进度上报                              |
+| iframe → Host | `convert:result`        | 转换成功结果                          |
+| iframe → Host | `convert:error`         | 转换失败错误                          |

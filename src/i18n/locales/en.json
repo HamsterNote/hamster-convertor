@@ -20,7 +20,8 @@
       "jpg": "JPG",
       "webp": "WEBP",
       "pdf": "PDF",
-      "html": "HTML"
+      "html": "HTML",
+      "md": "Markdown"
     }
   },
   "actions": {
@@ -79,8 +80,6 @@
     "htmlBackground": "HTML Background Options",
     "includeBackground": "Include Background",
     "backgroundQuality": "Background Quality",
-    "excludeTextFromBackground": "Exclude Text from Background",
-    "excludeImagesFromBackground": "Exclude Images from Background",
     "textControls": "Text Controls",
     "htmlTextControls": "HTML Text Controls",
     "textControlsDefault": "Default text",
@@ -149,7 +148,15 @@
     "htmlOptionsTitle": "HTML Options",
     "htmlEncodeOptionsTitle": "HTML Input Options",
     "imageOptionsTitle": "Image Options",
+    "txtImageOptionsTitle": "TXT Image Options",
     "imageToPdfTitle": "Image to PDF Options",
+    "txtImageTextColor": "Text color",
+    "txtImageBackgroundColor": "Background color",
+    "txtImageFontSize": "Font size (px)",
+    "txtImageWidth": "Image width (px)",
+    "txtImagePadding": "Padding (px)",
+    "txtImageLineHeight": "Line height (px)",
+    "txtImageHelp": "Applies only to TXT converted into PNG, JPG, or WebP. These values are saved separately from general image options.",
     "maxWidth": "Max width",
     "maxHeight": "Max height",
     "keepAspectRatio": "Keep aspect ratio",
@@ -180,6 +187,11 @@
     "rotationDegrees": "{{degrees}}°",
     "scale": "Scale (%)",
     "imageToPdfTransformHelp": "Rotation is limited to right angles; scale accepts 10% to 300%.",
+    "markdownTitle": "Markdown Options",
+    "markdownTxtMode": "TXT output mode",
+    "markdownTxtModeRaw": "Keep raw Markdown",
+    "markdownTxtModePlain": "Extract plain text",
+    "markdownTxtModeHelp": "Raw mode keeps Markdown syntax (headings, lists). Plain mode parses the document and extracts text only.",
     "excludeSelectors": "Exclude selectors",
     "excludeSelectorsHelp": "Separate CSS selectors with commas or new lines. Matching elements are skipped while encoding HTML input.",
     "snapshotWidth": "Snapshot width",
@@ -197,5 +209,25 @@
     "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
     "feedback": "Feedback",
     "feedbackUrl": "https://github.com/HamsterNote/hamster-convertor/issues"
+  },
+  "multiSelect": {
+    "toggle": "Multi-select",
+    "cancel": "Cancel selection",
+    "selectedCount": "{{count}} selected",
+    "bulkDelete": "Delete selected",
+    "bulkTarget": "Set target format",
+    "noCommonTarget": "No common target format for selected files",
+    "selectionUnavailable": "Cannot select converted or converting files"
+  },
+  "group": {
+    "create": "Create Group",
+    "title": "Group {{index}} · {{count}} files",
+    "expand": "Expand group",
+    "collapse": "Collapse group",
+    "settings": "Group settings",
+    "convert": "Convert Group",
+    "selectAll": "Select all in group",
+    "noSettingsForTarget": "No settings available for this target format",
+    "alreadyInGroup": "Cannot create a Group from files that are already in a Group"
   }
 }

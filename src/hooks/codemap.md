@@ -13,14 +13,14 @@
 
 ### 内部辅助函数（模块私有）
 
-| 函数 | 职责 |
-|------|------|
-| `configurePdfJsWorker` | 配置 pdfjs-dist 的 Worker 路径（Vite `?url` 导入） |
-| `loadPdfDocument` | 动态导入 pdfjs-dist，将 ArrayBuffer 转为 PdfDocument |
-| `readFileAsArrayBuffer` | 优先使用 `File.arrayBuffer()`，回退到 FileReader |
-| `renderPageThumbnail` | 将单页渲染到离屏 canvas，导出为 PNG blob URL |
-| `isE2E` | 检测 `window.__E2E__` 标志，E2E 模式跳过真实 PDF 加载 |
-| `createFakeE2EThumbnails` | E2E 模式下生成占位色块缩略图 |
+| 函数                      | 职责                                                  |
+| ------------------------- | ----------------------------------------------------- |
+| `configurePdfJsWorker`    | 配置 pdfjs-dist 的 Worker 路径（Vite `?url` 导入）    |
+| `loadPdfDocument`         | 动态导入 pdfjs-dist，将 ArrayBuffer 转为 PdfDocument  |
+| `readFileAsArrayBuffer`   | 优先使用 `File.arrayBuffer()`，回退到 FileReader      |
+| `renderPageThumbnail`     | 将单页渲染到离屏 canvas，导出为 PNG blob URL          |
+| `isE2E`                   | 检测 `window.__E2E__` 标志，E2E 模式跳过真实 PDF 加载 |
+| `createFakeE2EThumbnails` | E2E 模式下生成占位色块缩略图                          |
 
 ### 设计模式
 
@@ -65,20 +65,20 @@
 
 ### 外部依赖
 
-| 依赖 | 用途 |
-|------|------|
-| `react` | useState, useEffect, useCallback, useRef |
-| `pdfjs-dist` | PDF 解析与页面渲染（动态导入） |
-| `pdfjs-dist/build/pdf.worker.mjs?url` | Vite 专用 Worker URL 导入 |
+| 依赖                                  | 用途                                     |
+| ------------------------------------- | ---------------------------------------- |
+| `react`                               | useState, useEffect, useCallback, useRef |
+| `pdfjs-dist`                          | PDF 解析与页面渲染（动态导入）           |
+| `pdfjs-dist/build/pdf.worker.mjs?url` | Vite 专用 Worker URL 导入                |
 
 ### 消费模块
 
-| 文件 | 用法 |
-|------|------|
+| 文件                                       | 用法                                           |
+| ------------------------------------------ | ---------------------------------------------- |
 | `src/components/PdfPageSelectorInline.tsx` | 内联 PDF 页面选择器，绑定 `gridRef` 到网格容器 |
-| `src/components/PdfPageSelectorModal.tsx` | 模态框 PDF 页面选择器，同上模式 |
-| `src/__tests__/app.upload.test.tsx` | 单元测试中 mock 该 Hook |
-| `src/components/SettingsModal.test.tsx` | 单元测试中 mock 该 Hook |
+| `src/components/PdfPageSelectorModal.tsx`  | 模态框 PDF 页面选择器，同上模式                |
+| `src/__tests__/app.upload.test.tsx`        | 单元测试中 mock 该 Hook                        |
+| `src/components/SettingsModal.test.tsx`    | 单元测试中 mock 该 Hook                        |
 
 ### 接口契约
 

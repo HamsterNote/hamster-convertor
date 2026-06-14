@@ -84,10 +84,7 @@ export const HtmlParser = {
     return new MockHtmlDocument(pageTexts)
   },
 
-  async decode(
-    _intermediateDocument: IntermediateDocument,
-    _options?: unknown
-  ): Promise<File> {
+  async decode(_intermediateDocument: IntermediateDocument, _options?: unknown): Promise<File> {
     const file = new File([html], 'converted.html', { type: 'text/html' })
     return file
   },
@@ -97,5 +94,5 @@ export const HtmlParser = {
     _options?: unknown
   ): Promise<string> {
     return html
-  },
+  }
 }

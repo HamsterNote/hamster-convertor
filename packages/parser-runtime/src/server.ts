@@ -6,7 +6,8 @@ import {
   type ImageOptions,
   type ImageToPdfOptions,
   type SourceFormat,
-  type TargetFormat
+  type TargetFormat,
+  type TxtImageOptions
 } from './conversion'
 
 type ParserBridgeRequest = {
@@ -137,11 +138,20 @@ const ROTATION_DEGREES = [
   0, 90, 180, 270
 ] as const satisfies readonly ImageToPdfOptions['rotationDeg'][]
 
+const DEFAULT_TXT_IMAGE_OPTIONS: TxtImageOptions = {
+  textColor: '#000000',
+  backgroundColor: '#ffffff',
+  fontSizePx: 16,
+  imageWidthPx: 800,
+  paddingPx: 20,
+  lineHeightPx: 24
+}
+
 const isSourceFormat = (value: string): value is SourceFormat =>
-  ['pdf', 'txt', 'image', 'html', 'docx'].includes(value)
+  ['pdf', 'txt', 'image', 'html', 'docx', 'markdown'].includes(value)
 
 const isTargetFormat = (value: string): value is TargetFormat =>
-  ['html', 'txt', 'png', 'jpg', 'webp', 'pdf'].includes(value)
+  ['html', 'txt', 'png', 'jpg', 'webp', 'pdf', 'md'].includes(value)
 
 const isParserBridgeRequest = (value: unknown): value is ParserBridgeRequest => {
   if (!isRecord(value)) {
@@ -206,6 +216,19 @@ const clampNumber = (value: unknown, fallback: number, min: number, max: number)
   return Math.min(Math.max(value, min), max)
 }
 
+const normalizeRoundedNumber = (
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.min(Math.max(Math.round(value), min), max)
+}
+
 const normalizeImageDimension = (value: unknown): number | undefined => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) {
     return undefined
@@ -229,6 +252,39 @@ const normalizeExifCategories = (value: unknown): ExifCategory[] => {
   )
   const uniqueCategories = [...new Set(categories)]
   return uniqueCategories.includes('all') ? ['all'] : uniqueCategories
+}
+
+const normalizeDecodeOptions = (
+  value?: Record<string, unknown>
+): ConversionOptions['decode'] | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  const textControl = readNestedRecord(value, 'textControl')
+  const background = readNestedRecord(value, 'background')
+  const normalized: NonNullable<ConversionOptions['decode']> = {}
+
+  if (textControl) {
+    normalized.textControl = { ...textControl } as NonNullable<
+      ConversionOptions['decode']
+    >['textControl']
+  }
+
+  if (background) {
+    const normalizedBackground: NonNullable<
+      NonNullable<ConversionOptions['decode']>['background']
+    > = {}
+    if (typeof background.includeBackground === 'boolean') {
+      normalizedBackground.includeBackground = background.includeBackground
+    }
+    if (typeof background.backgroundQuality === 'number') {
+      normalizedBackground.backgroundQuality = background.backgroundQuality
+    }
+    normalized.background = normalizedBackground
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
 const normalizeImageOptions = (value?: Record<string, unknown>): ImageOptions | undefined => {
@@ -278,6 +334,52 @@ const normalizeImageToPdfOptions = (
   }
 }
 
+const normalizeTxtImageOptions = (value?: Record<string, unknown>): TxtImageOptions | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  const fontSizePx = normalizeRoundedNumber(
+    value.fontSizePx,
+    DEFAULT_TXT_IMAGE_OPTIONS.fontSizePx,
+    8,
+    96
+  )
+  const imageWidthPx = normalizeRoundedNumber(
+    value.imageWidthPx,
+    DEFAULT_TXT_IMAGE_OPTIONS.imageWidthPx,
+    320,
+    4096
+  )
+  let paddingPx = normalizeRoundedNumber(
+    value.paddingPx,
+    DEFAULT_TXT_IMAGE_OPTIONS.paddingPx,
+    0,
+    256
+  )
+  const lineHeightPx = Math.max(
+    normalizeRoundedNumber(value.lineHeightPx, DEFAULT_TXT_IMAGE_OPTIONS.lineHeightPx, 8, 160),
+    fontSizePx
+  )
+
+  if (imageWidthPx - paddingPx * 2 < 40) {
+    paddingPx = Math.max(0, Math.floor((imageWidthPx - 40) / 2))
+  }
+
+  return {
+    textColor:
+      typeof value.textColor === 'string' ? value.textColor : DEFAULT_TXT_IMAGE_OPTIONS.textColor,
+    backgroundColor:
+      typeof value.backgroundColor === 'string'
+        ? value.backgroundColor
+        : DEFAULT_TXT_IMAGE_OPTIONS.backgroundColor,
+    fontSizePx,
+    imageWidthPx,
+    paddingPx,
+    lineHeightPx
+  }
+}
+
 const normalizeConversionOptions = (
   options?: Record<string, unknown>
 ): ConversionOptions | undefined => {
@@ -290,6 +392,7 @@ const normalizeConversionOptions = (
   const layout = readNestedRecord(options, 'layout')
   const image = readNestedRecord(options, 'image')
   const imageToPdf = readNestedRecord(options, 'imageToPdf')
+  const txtImage = readNestedRecord(options, 'txtImage')
   const normalized: ConversionOptions = {}
 
   if (pdf) {
@@ -300,8 +403,9 @@ const normalizeConversionOptions = (
     }
   }
 
-  if (decode) {
-    normalized.decode = decode as ConversionOptions['decode']
+  const normalizedDecode = normalizeDecodeOptions(decode)
+  if (normalizedDecode) {
+    normalized.decode = normalizedDecode
   }
 
   if (layout) {
@@ -316,6 +420,11 @@ const normalizeConversionOptions = (
   const normalizedImageToPdf = normalizeImageToPdfOptions(imageToPdf)
   if (normalizedImageToPdf) {
     normalized.imageToPdf = normalizedImageToPdf
+  }
+
+  const normalizedTxtImage = normalizeTxtImageOptions(txtImage)
+  if (normalizedTxtImage) {
+    normalized.txtImage = normalizedTxtImage
   }
 
   return normalized

@@ -32,14 +32,14 @@
 
 ### 关键类型
 
-| 类型 | 方向 | 用途 |
-|------|------|------|
-| `ParserBridgeRequest` | host → iframe | 转换请求，携带文件 buffer、源/目标格式 |
-| `ParserBridgeCancelRequest` | host → iframe | 取消进行中的请求 |
-| `ParserBridgeProgress` | iframe → host | 进度报告（阶段、百分比、队列长度） |
-| `ParserBridgeResponse` | iframe → host | 转换结果或错误 |
-| `ParserBridgeReadyMessage` | iframe → host | iframe 加载完成信号 |
-| `ParserBridgeConversionOptions` | 内嵌于 Request | 透传给具体解析器的选项 |
+| 类型                            | 方向           | 用途                                   |
+| ------------------------------- | -------------- | -------------------------------------- |
+| `ParserBridgeRequest`           | host → iframe  | 转换请求，携带文件 buffer、源/目标格式 |
+| `ParserBridgeCancelRequest`     | host → iframe  | 取消进行中的请求                       |
+| `ParserBridgeProgress`          | iframe → host  | 进度报告（阶段、百分比、队列长度）     |
+| `ParserBridgeResponse`          | iframe → host  | 转换结果或错误                         |
+| `ParserBridgeReadyMessage`      | iframe → host  | iframe 加载完成信号                    |
+| `ParserBridgeConversionOptions` | 内嵌于 Request | 透传给具体解析器的选项                 |
 
 ### 进度阶段（ParserBridgeProgressPhase）
 
@@ -52,6 +52,7 @@ queued → reading → encoding → decoding → rendering → packaging → com
 ### 类型守卫模式
 
 所有消息类型都有对应的 `is*()` 验证函数（如 `isParserBridgeRequest()`），用于运行时类型检查。这些守卫：
+
 - 拒绝非对象输入
 - 逐字段验证类型和必要性
 - 对 `type` 字段做字面量匹配
@@ -118,24 +119,24 @@ proxy.ts → client.sendCancel(requestId)
 
 ### 上游依赖
 
-| 依赖 | 类型 | 用途 |
-|------|------|------|
-| `@hamster-note/types` | devDep | 共享类型定义 |
-| `@hamster-note/html-parser` | devDep | 提供 HTML 解析器类型推断源 |
-| `@hamster-note/pdf-parser` | devDep | 提供 PDF 解析器类型推断源 |
-| `@hamster-note/txt-parser` | devDep | 提供 TXT 解析器类型推断源 |
-| `@hamster-note/image-parser` | devDep | 提供图片解析器类型推断源 |
+| 依赖                            | 类型   | 用途                         |
+| ------------------------------- | ------ | ---------------------------- |
+| `@hamster-note/types`           | devDep | 共享类型定义                 |
+| `@hamster-note/html-parser`     | devDep | 提供 HTML 解析器类型推断源   |
+| `@hamster-note/pdf-parser`      | devDep | 提供 PDF 解析器类型推断源    |
+| `@hamster-note/txt-parser`      | devDep | 提供 TXT 解析器类型推断源    |
+| `@hamster-note/image-parser`    | devDep | 提供图片解析器类型推断源     |
 | `@hamster-note/document-parser` | devDep | 提供通用文档解析器类型推断源 |
 
 **注意**：所有依赖均为 `devDependencies`，仅用于类型推断，不产生运行时依赖。
 
 ### 下游消费者
 
-| 消费者 | 导入内容 | 用途 |
-|--------|----------|------|
-| `src/lib/parser-bridge/client.ts` | `ParserBridgeRequest`, `ParserBridgeCancelRequest`, `ParserBridgeProgress`, `ParserBridgeConversionResultPayload` | 实现 BridgeClient，管理请求/响应/超时 |
-| `src/lib/parser-bridge/proxy.ts` | `ParserBridgeRequest` | 构造请求并调用 bridge，转换结果为 `ConversionResult` |
-| `packages/parser-runtime/` | 类型守卫函数、协议类型 | iframe 端验证和处理消息 |
+| 消费者                            | 导入内容                                                                                                          | 用途                                                 |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `src/lib/parser-bridge/client.ts` | `ParserBridgeRequest`, `ParserBridgeCancelRequest`, `ParserBridgeProgress`, `ParserBridgeConversionResultPayload` | 实现 BridgeClient，管理请求/响应/超时                |
+| `src/lib/parser-bridge/proxy.ts`  | `ParserBridgeRequest`                                                                                             | 构造请求并调用 bridge，转换结果为 `ConversionResult` |
+| `packages/parser-runtime/`        | 类型守卫函数、协议类型                                                                                            | iframe 端验证和处理消息                              |
 
 ### 包导出
 

@@ -101,6 +101,15 @@ export type ExifCategory =
   | 'software'
   | 'authorCopyright'
 
+export type TxtImageOptions = {
+  textColor: string
+  backgroundColor: string
+  fontSizePx: number
+  imageWidthPx: number
+  paddingPx: number
+  lineHeightPx: number
+}
+
 /**
  * 转换选项 - 透传给具体解析器
  */
@@ -127,8 +136,6 @@ export type ParserBridgeConversionOptions = {
     background?: {
       includeBackground?: boolean
       backgroundQuality?: number
-      excludeTextFromBackground?: boolean
-      excludeImagesFromBackground?: boolean
     }
   }
   layout?: {
@@ -151,6 +158,16 @@ export type ParserBridgeConversionOptions = {
     pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: number
+  }
+  txtImage?: TxtImageOptions
+  /** Markdown 转换选项 */
+  markdown?: {
+    /**
+     * Markdown 转 TXT 模式
+     * - raw: 直接以原始 Markdown 文本作为 TXT 输出（保留语法标记）
+     * - plain: 先解析为中间文档再提取纯文本（去除标题/列表等语法）
+     */
+    txtMode?: 'raw' | 'plain'
   }
   /** 渲染选项 */
   render?: {

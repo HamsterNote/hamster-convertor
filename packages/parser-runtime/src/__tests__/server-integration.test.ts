@@ -339,6 +339,39 @@ describe('ProtocolServer integration', () => {
     expect(percents).toEqual([0, 15, 35, 55, 75, 90, 100])
   })
 
+  it('drops stale HTML background exclusion options before runtime conversion', async () => {
+    port.dispatch({
+      ...createConvertRequest('stale-html-background'),
+      options: {
+        decode: {
+          textControl: { fontSize: 18 },
+          background: {
+            includeBackground: true,
+            backgroundQuality: 0.6,
+            excludeTextFromBackground: false,
+            excludeImagesFromBackground: true
+          }
+        }
+      }
+    })
+
+    await waitFor(() => getResultIds(port).includes('stale-html-background'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          decode: {
+            textControl: { fontSize: 18 },
+            background: {
+              includeBackground: true,
+              backgroundQuality: 0.6
+            }
+          }
+        })
+      })
+    )
+  })
+
   it('normalizes image max dimensions before runtime conversion', async () => {
     port.dispatch(createImageConvertRequest('image-options'))
 

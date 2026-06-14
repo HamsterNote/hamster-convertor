@@ -71,23 +71,23 @@ src/types/
 
 ### 上游依赖
 
-| 依赖包 | 用途 | 类型来源 |
-|--------|------|----------|
-| `@hamster-note/pdf-parser` | PDF 文档解析 | 本目录提供（`parser-packages.d.ts`） |
-| `@hamster-note/document-parser` | 文档解析 | 包自带类型 |
-| `@hamster-note/html-parser` | HTML 解析 | 包自带类型 |
-| `@hamster-note/image-parser` | 图片解析 | 包自带类型 |
-| `@hamster-note/txt-parser` | 文本解析 | 包自带类型 |
-| `@hamster-note/types` | 共享类型定义 | 包自带类型 |
+| 依赖包                          | 用途         | 类型来源                             |
+| ------------------------------- | ------------ | ------------------------------------ |
+| `@hamster-note/pdf-parser`      | PDF 文档解析 | 本目录提供（`parser-packages.d.ts`） |
+| `@hamster-note/document-parser` | 文档解析     | 包自带类型                           |
+| `@hamster-note/html-parser`     | HTML 解析    | 包自带类型                           |
+| `@hamster-note/image-parser`    | 图片解析     | 包自带类型                           |
+| `@hamster-note/txt-parser`      | 文本解析     | 包自带类型                           |
+| `@hamster-note/types`           | 共享类型定义 | 包自带类型                           |
 
 ### 下游消费者
 
-| 消费模块 | 使用方式 | 依赖类型 |
-|----------|----------|----------|
-| `src/main.ts` | 导入所有解析器包，创建解析器运行时 | `PdfParser` 及其他解析器类型 |
-| `src/conversion/adapters.ts` | 动态导入解析器，执行格式转换 | `PdfParserModule`、`ImageParserModule` 等 |
-| `src/conversion/utils.ts` | 使用共享类型 | `IntermediateDocument` |
-| `src/server.ts` | 协议服务器，调用转换功能 | 间接依赖解析器类型 |
+| 消费模块                     | 使用方式                           | 依赖类型                                  |
+| ---------------------------- | ---------------------------------- | ----------------------------------------- |
+| `src/main.ts`                | 导入所有解析器包，创建解析器运行时 | `PdfParser` 及其他解析器类型              |
+| `src/conversion/adapters.ts` | 动态导入解析器，执行格式转换       | `PdfParserModule`、`ImageParserModule` 等 |
+| `src/conversion/utils.ts`    | 使用共享类型                       | `IntermediateDocument`                    |
+| `src/server.ts`              | 协议服务器，调用转换功能           | 间接依赖解析器类型                        |
 
 ### 配置集成
 

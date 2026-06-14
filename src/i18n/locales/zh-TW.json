@@ -20,7 +20,8 @@
       "jpg": "JPG",
       "webp": "WEBP",
       "pdf": "PDF",
-      "html": "HTML"
+      "html": "HTML",
+      "md": "Markdown"
     }
   },
   "actions": {
@@ -79,8 +80,6 @@
     "htmlBackground": "HTML 背景選項",
     "includeBackground": "包含背景",
     "backgroundQuality": "背景品質",
-    "excludeTextFromBackground": "從背景中排除文字",
-    "excludeImagesFromBackground": "從背景中排除圖片",
     "textControls": "文字控制",
     "htmlTextControls": "HTML 文字控制",
     "textControlsDefault": "預設文字",
@@ -149,7 +148,15 @@
     "htmlOptionsTitle": "HTML 選項",
     "htmlEncodeOptionsTitle": "HTML 輸入選項",
     "imageOptionsTitle": "圖片選項",
+    "txtImageOptionsTitle": "TXT 圖片選項",
     "imageToPdfTitle": "圖片轉 PDF 選項",
+    "txtImageTextColor": "文字顏色",
+    "txtImageBackgroundColor": "背景顏色",
+    "txtImageFontSize": "字型大小 (px)",
+    "txtImageWidth": "圖片寬度 (px)",
+    "txtImagePadding": "內邊距 (px)",
+    "txtImageLineHeight": "行高 (px)",
+    "txtImageHelp": "僅用於 TXT 轉 PNG、JPG 或 WebP；這些值會獨立儲存，不會寫入通用圖片選項。",
     "maxWidth": "最大寬度",
     "maxHeight": "最大高度",
     "keepAspectRatio": "保持寬高比",
@@ -180,6 +187,11 @@
     "rotationDegrees": "{{degrees}}°",
     "scale": "縮放 (%)",
     "imageToPdfTransformHelp": "旋轉僅支援直角；縮放範圍為 10% 到 300%。",
+    "markdownTitle": "Markdown 選項",
+    "markdownTxtMode": "TXT 輸出模式",
+    "markdownTxtModeRaw": "保留原始 Markdown",
+    "markdownTxtModePlain": "擷取純文字",
+    "markdownTxtModeHelp": "「保留原始」直接輸出 Markdown 語法（標題、列表等）；「擷取純文字」會先解析文件再擷取純文字內容。",
     "excludeSelectors": "排除選擇器",
     "excludeSelectorsHelp": "多個 CSS 選擇器可用逗號或換行分隔，編碼 HTML 輸入時會跳過符合元素。",
     "snapshotWidth": "快照寬度",
@@ -197,5 +209,25 @@
     "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
     "feedback": " 問題反饋",
     "feedbackUrl": "https://github.com/HamsterNote/hamster-convertor/issues"
+  },
+  "multiSelect": {
+    "toggle": "多選",
+    "cancel": "取消選擇",
+    "selectedCount": "已選擇 {{count}} 個",
+    "bulkDelete": "刪除所選",
+    "bulkTarget": "設定目標格式",
+    "noCommonTarget": "所選檔案沒有共同的目標格式",
+    "selectionUnavailable": "無法選擇已轉換或轉換中的檔案"
+  },
+  "group": {
+    "create": "建立群組",
+    "title": "群組 {{index}} · {{count}} 個檔案",
+    "expand": "展開群組",
+    "collapse": "收起群組",
+    "settings": "群組設定",
+    "convert": "轉換群組",
+    "selectAll": "全選群組內檔案",
+    "noSettingsForTarget": "該目標格式沒有可用設定",
+    "alreadyInGroup": "無法將已在群組中的檔案建立新群組"
   }
 }

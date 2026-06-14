@@ -137,37 +137,37 @@ truncateMiddle("very-long-filename.pdf")
 
 ### 上游依赖
 
-| 依赖 | 用途 | 文件 |
-|------|------|------|
-| `pdfjs-dist` | PDF 解析引擎 | `pdf-utils.ts`, `pdfjs-wrapper.ts` |
-| `pdfjs-dist/build/pdf.worker.mjs?url` | PDF.js Worker（Vite URL 导入） | `pdf-utils.ts` |
-| `jszip` | ZIP 打包（动态导入） | `download.ts` |
-| `@hamster-note/parser-protocol` | iframe 桥接协议类型 | `parser-bridge/client.ts`, `parser-bridge/proxy.ts` |
-| `loglevel` | 日志（通过 App.tsx 间接使用） | — |
+| 依赖                                  | 用途                           | 文件                                                |
+| ------------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `pdfjs-dist`                          | PDF 解析引擎                   | `pdf-utils.ts`, `pdfjs-wrapper.ts`                  |
+| `pdfjs-dist/build/pdf.worker.mjs?url` | PDF.js Worker（Vite URL 导入） | `pdf-utils.ts`                                      |
+| `jszip`                               | ZIP 打包（动态导入）           | `download.ts`                                       |
+| `@hamster-note/parser-protocol`       | iframe 桥接协议类型            | `parser-bridge/client.ts`, `parser-bridge/proxy.ts` |
+| `loglevel`                            | 日志（通过 App.tsx 间接使用）  | —                                                   |
 
 ### 下游消费者
 
-| 消费者 | 使用的导出 | 用途 |
-|--------|-----------|------|
-| `src/App.tsx` | `ConversionResult`, `ConversionWarning`, `SourceFormat`, `TargetFormat`, `getSupportedTargets`, `HtmlDecodeOptions`, `ExifCategory` | 类型定义与转换路径查询 |
-| `src/App.tsx` | `downloadBlobFile`, `downloadResultArchive` | 单文件/批量下载 |
-| `src/App.tsx` | `truncateMiddle` | 文件表格中文件名显示 |
-| `src/App.tsx` | `getPdfPageCount` | 大 PDF 转换前确认 |
-| `src/App.tsx` | `getPreviewableOutputs` | 预览按钮可用性判断 |
-| `src/App.tsx` | `convertViaBridge` (parser-bridge) | 实际转换调用 |
-| `src/components/ParserIframeBridge.tsx` | `createBridgeClient`, `BridgeError`, `BridgeErrorCode` (parser-bridge) | iframe 生命周期管理 |
+| 消费者                                  | 使用的导出                                                                                                                          | 用途                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `src/App.tsx`                           | `ConversionResult`, `ConversionWarning`, `SourceFormat`, `TargetFormat`, `getSupportedTargets`, `HtmlDecodeOptions`, `ExifCategory` | 类型定义与转换路径查询 |
+| `src/App.tsx`                           | `downloadBlobFile`, `downloadResultArchive`                                                                                         | 单文件/批量下载        |
+| `src/App.tsx`                           | `truncateMiddle`                                                                                                                    | 文件表格中文件名显示   |
+| `src/App.tsx`                           | `getPdfPageCount`                                                                                                                   | 大 PDF 转换前确认      |
+| `src/App.tsx`                           | `getPreviewableOutputs`                                                                                                             | 预览按钮可用性判断     |
+| `src/App.tsx`                           | `convertViaBridge` (parser-bridge)                                                                                                  | 实际转换调用           |
+| `src/components/ParserIframeBridge.tsx` | `createBridgeClient`, `BridgeError`, `BridgeErrorCode` (parser-bridge)                                                              | iframe 生命周期管理    |
 
 ### 文件职责映射
 
-| 文件 | 行数 | 职责 |
-|------|------|------|
-| `converter.ts` | 318 | 类型定义、转换路径矩阵、HTML 后处理（`applyHtmlLayout`）、弃用守卫 |
-| `pdf-utils.ts` | 63 | pdfjs-dist 封装：Worker 配置、ArrayBuffer 读取、文档加载、页数查询 |
-| `pdfjs-wrapper.ts` | 48 | `getDocument` 包装器：自动注入 CMap 参数解决中文乱码 |
-| `download.ts` | 36 | Blob 下载（单文件 + ZIP 打包），动态导入 jszip |
-| `filename.ts` | 98 | Canvas 测量 + 二分查找文件名截断，含 SSR 回退方案 |
-| `preview.ts` | 18 | 可预览格式列表定义与筛选函数 |
-| `parser-bridge/` | — | iframe 桥接通信层（详见 `parser-bridge/codemap.md`） |
-| `converter/` | 0 | 空目录（预留） |
-| `filename.test.ts` | — | filename.ts 单元测试 |
-| `pdf-utils.test.ts` | — | pdf-utils.ts 单元测试 |
+| 文件                | 行数 | 职责                                                               |
+| ------------------- | ---- | ------------------------------------------------------------------ |
+| `converter.ts`      | 318  | 类型定义、转换路径矩阵、HTML 后处理（`applyHtmlLayout`）、弃用守卫 |
+| `pdf-utils.ts`      | 63   | pdfjs-dist 封装：Worker 配置、ArrayBuffer 读取、文档加载、页数查询 |
+| `pdfjs-wrapper.ts`  | 48   | `getDocument` 包装器：自动注入 CMap 参数解决中文乱码               |
+| `download.ts`       | 36   | Blob 下载（单文件 + ZIP 打包），动态导入 jszip                     |
+| `filename.ts`       | 98   | Canvas 测量 + 二分查找文件名截断，含 SSR 回退方案                  |
+| `preview.ts`        | 18   | 可预览格式列表定义与筛选函数                                       |
+| `parser-bridge/`    | —    | iframe 桥接通信层（详见 `parser-bridge/codemap.md`）               |
+| `converter/`        | 0    | 空目录（预留）                                                     |
+| `filename.test.ts`  | —    | filename.ts 单元测试                                               |
+| `pdf-utils.test.ts` | —    | pdf-utils.ts 单元测试                                              |

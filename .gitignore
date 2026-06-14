@@ -47,7 +47,11 @@ test-results/
 .omo/
 
 # Yalc 本地包管理
-.yalc/
+# 注意：.yalc/ 与 yalc.lock 需要进入 git，
+# 因为部分依赖（如 @hamster-note/markdown-parser）通过 yalc 链接到本地，
+# 如果忽略 .yalc/，CI 上 `yarn install --frozen-lockfile` 会因找不到
+# `file:.yalc/...` 路径而失败。
+# 因此这里仅忽略 .yalc 临时缓存，不忽略目录本身。
 
 # ts 增量编译
 *.tsbuildinfo

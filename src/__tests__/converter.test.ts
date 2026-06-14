@@ -7,7 +7,7 @@ describe('getSupportedTargets', () => {
   })
 
   it('returns exact ordered list for txt source', () => {
-    expect(getSupportedTargets('txt')).toEqual(['png', 'html'])
+    expect(getSupportedTargets('txt')).toEqual(['png', 'jpg', 'webp', 'html'])
   })
 
   it('returns exact ordered list for image source', () => {
@@ -15,10 +15,14 @@ describe('getSupportedTargets', () => {
   })
 
   it('returns exact ordered list for html source', () => {
-    expect(getSupportedTargets('html')).toEqual(['txt'])
+    expect(getSupportedTargets('html')).toEqual(['txt', 'md'])
   })
 
   it('returns exact ordered list for docx source', () => {
     expect(getSupportedTargets('docx')).toEqual(['txt', 'html'])
+  })
+
+  it('returns exact ordered list for markdown source', () => {
+    expect(getSupportedTargets('markdown')).toEqual(['html', 'txt', 'png', 'jpg', 'webp', 'pdf'])
   })
 })

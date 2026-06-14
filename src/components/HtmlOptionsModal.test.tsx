@@ -10,8 +10,7 @@ describe('HtmlOptionsModal', () => {
   const defaultOptions = {
     background: {
       includeBackground: true,
-      backgroundQuality: 0.85,
-      excludeTextFromBackground: true
+      backgroundQuality: 0.85
     },
     htmlLayout: {
       mode: 'paginated' as const,
@@ -50,13 +49,21 @@ describe('HtmlOptionsModal', () => {
     expect(screen.getByText('HTML conversion options')).toBeInTheDocument()
   })
 
-  it('renders all three sections', () => {
+  it('renders supported sections without obsolete background exclusions', () => {
     render(
       <HtmlOptionsModal open options={defaultOptions} onCancel={onCancel} onConfirm={onConfirm} />
     )
     expect(screen.getByText('Background options')).toBeInTheDocument()
     expect(screen.getByText('Text controls')).toBeInTheDocument()
     expect(screen.getByText('Layout options')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Include Background' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Background Quality' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: 'Exclude Text from Background' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: 'Exclude Images from Background' })
+    ).not.toBeInTheDocument()
   })
 
   it('when readOnly=true, all inputs are disabled and no Cancel button visible', () => {

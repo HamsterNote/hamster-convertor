@@ -25,7 +25,7 @@
 iframe 解析器运行时：
 
 - 详细架构、协议消息、队列/取消语义、构建/测试命令见 `docs/parser-iframe-runtime.md`。
-- 所有 PDF/HTML/TXT/image 解析在 `/parser-runtime/index.html` 同源 iframe 内执行，host 通过 `<ParserIframeBridge />` 转发请求。
+- 所有 PDF/HTML/TXT/image/markdown 解析在 `/parser-runtime/index.html` 同源 iframe 内执行，host 通过 `<ParserIframeBridge />` 转发请求。
 
 目录结构：
 

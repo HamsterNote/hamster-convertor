@@ -27,11 +27,11 @@ class XxxParser {
 
 ### 差异化设计
 
-| 解析器     | 特殊能力                                                                 |
-| ---------- | ------------------------------------------------------------------------ |
+| 解析器     | 特殊能力                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------- |
 | PdfParser  | `EncodeOptions`（maxPages、pageLoadTimeoutMs）、`DecodeOptions`（fonts）、`onProgress` 回调 |
-| HtmlParser | `DecodeOptions`（textControl 文本样式、background 背景选项）             |
-| 其他       | 标准 encode/decode，无额外选项                                           |
+| HtmlParser | `DecodeOptions`（textControl 文本样式、background 背景选项）                                |
+| 其他       | 标准 encode/decode，无额外选项                                                              |
 
 ### 中间文档抽象
 
@@ -70,6 +70,7 @@ class XxxParser {
 ### 上游依赖
 
 无运行时依赖。这些 `.d.ts` 文件通过 `declare module` 语法为外部 npm 包提供类型声明：
+
 - `@hamster-note/document-parser`
 - `@hamster-note/html-parser`
 - `@hamster-note/image-parser`
@@ -78,15 +79,16 @@ class XxxParser {
 
 ### 下游消费者
 
-| 消费者                                      | 用途                                                 |
-| ------------------------------------------- | ---------------------------------------------------- |
-| `parser-protocol/src/index.ts`              | 通过 `typeof import(...)` 派生类型别名               |
-| `parser-runtime/src/main.ts`                | 导入实际解析器模块，注册到 parserModules 映射        |
-| `parser-runtime/src/conversion/adapters.ts` | 使用类型声明进行类型转换，调用各解析器的 encode/decode |
-| `parser-runtime/src/types/parser-packages.d.ts` | 为运行时环境提供补充声明                         |
+| 消费者                                          | 用途                                                   |
+| ----------------------------------------------- | ------------------------------------------------------ |
+| `parser-protocol/src/index.ts`                  | 通过 `typeof import(...)` 派生类型别名                 |
+| `parser-runtime/src/main.ts`                    | 导入实际解析器模块，注册到 parserModules 映射          |
+| `parser-runtime/src/conversion/adapters.ts`     | 使用类型声明进行类型转换，调用各解析器的 encode/decode |
+| `parser-runtime/src/types/parser-packages.d.ts` | 为运行时环境提供补充声明                               |
 
 ### 类型导出
 
 类型通过两种方式对外暴露：
+
 1. **直接导出**：各 `.d.ts` 文件通过 `declare module` 全局可用
 2. **派生别名**：`index.ts` 中的 `HtmlParserEncodeInput`、`PdfParserEncodeInput`、`HtmlParserDecodeResult`、`PdfParserDecodeResult`

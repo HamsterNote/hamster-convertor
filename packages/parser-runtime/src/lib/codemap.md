@@ -71,16 +71,16 @@
 
 ### 上游依赖
 
-| 依赖 | 用途 |
-|------|------|
-| `pdfjs-dist` | Mozilla 的 PDF 解析库，本模块是它的薄包装 |
+| 依赖                                         | 用途                                                                                           |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pdfjs-dist`                                 | Mozilla 的 PDF 解析库，本模块是它的薄包装                                                      |
 | Vite 构建插件 (`interceptPdfjsImportPlugin`) | 在 `vite.config.ts` 中将 `@hamster-note/pdf-parser` 的 `import("pdfjs-dist")` 重写为指向本模块 |
 
 ### 下游消费者
 
-| 消费者 | 使用方式 |
-|--------|----------|
-| `@hamster-note/pdf-parser` | 通过 Vite 插件重写后的 import 路径间接使用本模块的 `getDocument` |
+| 消费者                       | 使用方式                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| `@hamster-note/pdf-parser`   | 通过 Vite 插件重写后的 import 路径间接使用本模块的 `getDocument`                                   |
 | `src/conversion/adapters.ts` | 直接 import `pdfjs-dist`（走 worker 配置路径），以及通过 `@hamster-note/pdf-parser` 间接使用本模块 |
 
 ### 构建时集成

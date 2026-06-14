@@ -1,11 +1,16 @@
 import {
   convertDocxToHtml,
   convertDocxToTxt,
+  convertHtmlToMd,
   convertHtmlToTxt,
   convertImageToHtml,
   convertImageToImage,
   convertImageToPdf,
   convertImageToTxt,
+  convertMarkdownToHtml,
+  convertMarkdownToImage,
+  convertMarkdownToPdf,
+  convertMarkdownToTxt,
   convertPdfToHtml,
   convertPdfToImage,
   convertPdfToPdf,
@@ -21,9 +26,9 @@ import type {
   HtmlLayoutOptions
 } from './utils'
 
-export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html' | 'docx'
+export type SourceFormat = 'pdf' | 'txt' | 'image' | 'html' | 'docx' | 'markdown'
 
-export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf'
+export type TargetFormat = 'html' | 'txt' | 'png' | 'jpg' | 'webp' | 'pdf' | 'md'
 
 export type ExifCategory =
   | 'all'
@@ -52,6 +57,15 @@ export type ImageToPdfOptions = {
   scalePercent: number
 }
 
+export type TxtImageOptions = {
+  textColor: string
+  backgroundColor: string
+  fontSizePx: number
+  imageWidthPx: number
+  paddingPx: number
+  lineHeightPx: number
+}
+
 export type ConversionOptions = {
   pdf?: {
     ocr?: boolean
@@ -63,6 +77,10 @@ export type ConversionOptions = {
   layout?: HtmlLayoutOptions
   image?: ImageOptions
   imageToPdf?: ImageToPdfOptions
+  txtImage?: TxtImageOptions
+  markdown?: {
+    txtMode?: 'raw' | 'plain'
+  }
 }
 
 export type ConversionRequest = {
@@ -98,8 +116,10 @@ const supportedTargets = {
   pdf: ['txt', 'png', 'jpg', 'webp', 'pdf', 'html'],
   txt: ['png', 'jpg', 'webp', 'html'],
   image: ['pdf', 'txt', 'png', 'jpg', 'webp', 'html'],
-  html: ['txt'],
-  docx: ['txt', 'html']
+  html: ['txt', 'md'],
+  docx: ['txt', 'html'],
+  // markdown 源：可以输出 html/txt/三种图片/pdf。md→md 不开放
+  markdown: ['html', 'txt', 'png', 'jpg', 'webp', 'pdf']
 } as const satisfies Record<SourceFormat, readonly TargetFormat[]>
 
 type ConversionAdapterMap = Record<
@@ -131,11 +151,20 @@ const adapters: ConversionAdapterMap = {
     webp: convertImageToImage
   },
   html: {
-    txt: convertHtmlToTxt
+    txt: convertHtmlToTxt,
+    md: convertHtmlToMd
   },
   docx: {
     txt: convertDocxToTxt,
     html: convertDocxToHtml
+  },
+  markdown: {
+    html: convertMarkdownToHtml,
+    txt: convertMarkdownToTxt,
+    png: convertMarkdownToImage,
+    jpg: convertMarkdownToImage,
+    webp: convertMarkdownToImage,
+    pdf: convertMarkdownToPdf
   }
 }
 
@@ -146,7 +175,7 @@ export const getSupportedTargets = (source: SourceFormat): TargetFormat[] => [
 const isSourceFormat = (value: string): value is SourceFormat => value in supportedTargets
 
 const isTargetFormat = (value: string): value is TargetFormat =>
-  ['html', 'txt', 'png', 'jpg', 'webp', 'pdf'].includes(value)
+  ['html', 'txt', 'png', 'jpg', 'webp', 'pdf', 'md'].includes(value)
 
 export const convertRuntime = async (request: ConversionRequest): Promise<ConversionResult[]> => {
   if (!isSourceFormat(request.sourceFormat) || !isTargetFormat(request.targetFormat)) {

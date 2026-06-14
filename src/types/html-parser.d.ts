@@ -17,7 +17,6 @@ declare module '@hamster-note/html-parser' {
     background?: {
       includeBackground?: boolean
       backgroundQuality?: number
-      excludeTextFromBackground?: boolean
     }
   }
 

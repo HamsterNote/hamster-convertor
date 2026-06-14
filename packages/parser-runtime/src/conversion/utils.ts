@@ -16,8 +16,6 @@ export type HtmlDecodeOptions = {
   background?: {
     includeBackground?: boolean
     backgroundQuality?: number
-    excludeTextFromBackground?: boolean
-    excludeImagesFromBackground?: boolean
   }
 }
 
@@ -113,6 +111,7 @@ export const bufferToText = (buffer: ArrayBuffer): string => new TextDecoder().d
 export const textToBlob = (text: string, type: string): Blob => new Blob([text], { type })
 
 type TextNode = {
+  pages?: unknown
   text?: unknown
   children?: TextNode[]
 }
@@ -128,8 +127,87 @@ const collectText = (value: unknown): string[] => {
   return [...ownText, ...childText]
 }
 
+const collectIntermediateTextBlocks = (value: unknown): string[] => {
+  if (!value || typeof value !== 'object') {
+    return []
+  }
+
+  const node = value as TextNode
+  if (Array.isArray(node.pages)) {
+    return node.pages
+      .map(page => collectText(page).join('\n').trim())
+      .filter(pageText => pageText.length > 0)
+  }
+
+  const text = collectText(value).join('\n').trim()
+  return text ? [text] : []
+}
+
 export const extractIntermediateText = (intermediateDocument: IntermediateDocument): string =>
-  collectText(intermediateDocument).join('\n').trim()
+  collectIntermediateTextBlocks(intermediateDocument).join('\n\n').trim()
+
+const compactTextLines = (text: string): string[] =>
+  text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+
+const normalizeExistingTextBreaks = (text: string): string =>
+  text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+export const formatTextAsReadableParagraphs = (text: string): string =>
+  compactTextLines(text).join('\n\n')
+
+export const formatPageTextsAsReadableText = (pageTexts: string[]): string => {
+  const normalizedPages = pageTexts.map(normalizeExistingTextBreaks).filter(text => text.length > 0)
+
+  if (normalizedPages.length === 0) {
+    return ''
+  }
+
+  if (normalizedPages.some(text => text.includes('\n\n'))) {
+    return normalizedPages.join('\n\n').trim()
+  }
+
+  const pages = normalizedPages.map(compactTextLines)
+
+  if (pages.every(lines => lines.length === 1)) {
+    return pages
+      .map(([line]) => line)
+      .join('\n')
+      .trim()
+  }
+
+  return pages
+    .map(lines => lines.join('\n\n'))
+    .join('\n\n')
+    .trim()
+}
+
+const removeEmptyStyleAttribute = (element: HTMLElement): void => {
+  if (!element.getAttribute('style')?.trim()) {
+    element.removeAttribute('style')
+  }
+}
+
+export const sanitizeTxtHtmlOutput = (html: string): string => {
+  const document = new DOMParser().parseFromString(html, 'text/html')
+
+  document.querySelectorAll<HTMLElement>('[style]').forEach(element => {
+    element.style.removeProperty('transform')
+    removeEmptyStyleAttribute(element)
+  })
+
+  document.body.dataset.hamsterTxtHtmlWrapper = 'true'
+  document.body.setAttribute('style', 'font-size:16px;line-height:1.5;transform:none')
+
+  return `<!doctype html>${document.documentElement.outerHTML}`
+}
 
 export const extractOcrText = (intermediateDocument: IntermediateDocument | undefined): string => {
   const text =

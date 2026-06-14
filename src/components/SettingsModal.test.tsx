@@ -90,13 +90,21 @@ describe('SettingsModal', () => {
     expect(screen.queryByText('PDF OCR')).not.toBeInTheDocument()
   })
 
-  it('renders HTML options section when target is html', () => {
+  it('renders supported HTML options without obsolete background exclusions', () => {
     render(<SettingsModal {...defaultProps} target="html" />)
     // Use getAllByText since navigation and section title both contain 'HTML Options'
     const htmlOptionsElements = screen.getAllByText('HTML Options')
     expect(htmlOptionsElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Background options')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Exclude Images from Background' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Include Background' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Background Quality' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Font Size' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: 'Exclude Text from Background' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: 'Exclude Images from Background' })
+    ).not.toBeInTheDocument()
   })
 
   it('renders HTML input options when source is html', () => {
@@ -136,6 +144,84 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('spinbutton', { name: 'Max width' })).toBeInTheDocument()
     expect(screen.getByRole('spinbutton', { name: 'Max height' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Keep aspect ratio' })).toBeInTheDocument()
+  })
+
+  it('renders TXT image options with defaults for TXT image targets', () => {
+    render(<SettingsModal {...defaultProps} source="txt" target="png" fileName="notes.txt" />)
+
+    expect(screen.getAllByText('TXT Image Options').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByLabelText('Text color')).toHaveValue('#000000')
+    expect(screen.getByLabelText('Background color')).toHaveValue('#ffffff')
+    expect(screen.getByRole('spinbutton', { name: 'Font size (px)' })).toHaveValue(16)
+    expect(screen.getByRole('spinbutton', { name: 'Image width (px)' })).toHaveValue(800)
+    expect(screen.getByRole('spinbutton', { name: 'Padding (px)' })).toHaveValue(20)
+    expect(screen.getByRole('spinbutton', { name: 'Line height (px)' })).toHaveValue(24)
+    expect(screen.queryByRole('spinbutton', { name: 'Max width' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Remove EXIF metadata' })).not.toBeInTheDocument()
+  })
+
+  it('renders TXT image options for JPG and WebP but not TXT to HTML', () => {
+    const { rerender } = render(
+      <SettingsModal {...defaultProps} source="txt" target="jpg" fileName="notes.txt" />
+    )
+    expect(screen.getByLabelText('Text color')).toBeInTheDocument()
+
+    rerender(<SettingsModal {...defaultProps} source="txt" target="webp" fileName="notes.txt" />)
+    expect(screen.getByLabelText('Text color')).toBeInTheDocument()
+
+    rerender(<SettingsModal {...defaultProps} source="txt" target="html" fileName="notes.txt" />)
+    expect(screen.queryByText('TXT Image Options')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Text color')).not.toBeInTheDocument()
+  })
+
+  it('does not render TXT image options for PDF or image sources targeting PNG', () => {
+    const { rerender } = render(
+      <SettingsModal {...defaultProps} source="pdf" target="png" fileName="scan.pdf" />
+    )
+    expect(screen.queryByText('TXT Image Options')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Text color')).not.toBeInTheDocument()
+
+    rerender(<SettingsModal {...defaultProps} source="image" target="png" fileName="photo.png" />)
+    expect(screen.queryByText('TXT Image Options')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Text color')).not.toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Max width' })).toBeInTheDocument()
+  })
+
+  it('returns edited TXT image options as dedicated txtImage settings', () => {
+    render(<SettingsModal {...defaultProps} source="txt" target="png" fileName="notes.txt" />)
+
+    fireEvent.change(screen.getByLabelText('Text color'), { target: { value: '#123456' } })
+    fireEvent.change(screen.getByLabelText('Background color'), { target: { value: '#abcdef' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Font size (px)' }), {
+      target: { value: '22' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Image width (px)' }), {
+      target: { value: '900' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Padding (px)' }), {
+      target: { value: '32' }
+    })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Line height (px)' }), {
+      target: { value: '40' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        txtImage: {
+          textColor: '#123456',
+          backgroundColor: '#abcdef',
+          fontSizePx: 22,
+          imageWidthPx: 900,
+          paddingPx: 32,
+          lineHeightPx: 40
+        },
+        image: expect.not.objectContaining({
+          textColor: '#123456',
+          backgroundColor: '#abcdef'
+        })
+      })
+    )
   })
 
   it('does not show quality for PNG target', () => {
@@ -366,6 +452,34 @@ describe('SettingsModal', () => {
     expect(onCancel).not.toHaveBeenCalled()
   })
 
+  it('ignores stale HTML background exclusion options when confirmed', () => {
+    const staleOptions = {
+      html: {
+        background: {
+          includeBackground: false,
+          backgroundQuality: 0.6,
+          excludeTextFromBackground: false,
+          excludeImagesFromBackground: true
+        },
+        htmlLayout: { mode: 'paginated' as const, widthMode: 'actual' as const }
+      }
+    }
+
+    render(<SettingsModal {...defaultProps} source="pdf" target="html" options={staleOptions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.objectContaining({
+          background: {
+            includeBackground: false,
+            backgroundQuality: 0.6
+          }
+        })
+      })
+    )
+  })
+
   it('returns image max dimensions as positive integer options', () => {
     render(<SettingsModal {...defaultProps} source="image" target="png" />)
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Max width' }), {
@@ -446,6 +560,103 @@ describe('SettingsModal', () => {
   })
 })
 
+describe('SettingsModal group-target mode', () => {
+  const onCancel = vi.fn()
+  const onConfirm = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders nothing when visibleSectionsOverride is empty', () => {
+    const { queryByRole } = render(
+      <SettingsModal
+        open
+        settingsScope="group-target"
+        visibleSectionsOverride={[]}
+        target="html"
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    )
+    expect(queryByRole('dialog')).toBeNull()
+  })
+
+  it('renders exactly visibleSectionsOverride and ignores inferred sections', () => {
+    render(
+      <SettingsModal
+        open
+        settingsScope="group-target"
+        visibleSectionsOverride={['htmlOptions']}
+        target="png"
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    )
+    expect(screen.getByText('HTML Options')).toBeInTheDocument()
+    expect(screen.queryByText('Image Options')).not.toBeInTheDocument()
+  })
+
+  it('omits side navigation when only one section is visible', () => {
+    render(
+      <SettingsModal
+        open
+        settingsScope="group-target"
+        visibleSectionsOverride={['htmlOptions']}
+        target="html"
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    )
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(screen.getByText('HTML Options')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+  })
+
+  it('keeps Done and Cancel accessible names in group-target mode', () => {
+    render(
+      <SettingsModal
+        open
+        settingsScope="group-target"
+        visibleSectionsOverride={['htmlOptions']}
+        target="html"
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+  })
+
+  it('returns settings options when confirmed in group-target mode', () => {
+    render(
+      <SettingsModal
+        open
+        settingsScope="group-target"
+        visibleSectionsOverride={['htmlOptions']}
+        target="html"
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />
+    )
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Include Background' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.objectContaining({
+          background: expect.objectContaining({ includeBackground: false })
+        })
+      })
+    )
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+})
+
 describe('getSettingsSections', () => {
   it('returns empty array when no sections apply', () => {
     const sections = getSettingsSections('txt', 'pdf', 'test.txt', 'ready')
@@ -470,6 +681,12 @@ describe('getSettingsSections', () => {
     const sections = getSettingsSections('pdf', 'pdf', 'test.pdf', 'ready')
     expect(sections).toContain('pdfOcr')
     expect(sections).toContain('pdfPages')
+  })
+
+  it('returns txtImage for TXT image targets', () => {
+    expect(getSettingsSections('txt', 'png', 'test.txt', 'ready')).toEqual(['txtImage'])
+    expect(getSettingsSections('txt', 'jpg', 'test.txt', 'ready')).toEqual(['txtImage'])
+    expect(getSettingsSections('txt', 'webp', 'test.txt', 'ready')).toEqual(['txtImage'])
   })
 
   it('returns imageTarget for png target', () => {
