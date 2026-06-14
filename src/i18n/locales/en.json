@@ -30,6 +30,7 @@
     "clearAll": "Clear all",
     "download": "Download",
     "downloadAll": "Download all",
+    "preview": "Preview",
     "remove": "Remove",
     "selectPages": "Select pages",
     "selectAll": "Select all",
@@ -41,7 +42,6 @@
     "continue": "Continue",
     "settings": "Settings",
     "copy": "Copy",
-    "preview": "Preview",
     "previewUnsupported": "Preview not available for this format"
   },
   "table": {

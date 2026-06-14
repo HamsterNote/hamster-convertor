@@ -30,6 +30,7 @@
     "clearAll": "清空",
     "download": "下载",
     "downloadAll": "下载全部",
+    "preview": "预览",
     "remove": "删除",
     "selectPages": "选择页数",
     "selectAll": "全选",
@@ -41,7 +42,6 @@
     "continue": "继续",
     "settings": "设置",
     "copy": "复制",
-    "preview": "预览",
     "previewUnsupported": "该格式不支持预览"
   },
   "table": {

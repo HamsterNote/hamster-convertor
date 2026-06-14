@@ -30,6 +30,7 @@
     "clearAll": "清空",
     "download": "下載",
     "downloadAll": "下載全部",
+    "preview": "預覽",
     "remove": "刪除",
     "selectPages": "選擇頁數",
     "selectAll": "全選",
@@ -41,7 +42,6 @@
     "continue": "繼續",
     "settings": "設定",
     "copy": "複製",
-    "preview": "預覽",
     "previewUnsupported": "該格式不支援預覽"
   },
   "table": {
