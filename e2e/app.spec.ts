@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 
 const dropzoneFileInput = '.dropzone + input[type="file"]'
 
@@ -43,10 +44,10 @@ type ManualRuntimeTranscript = {
 }
 
 const targetSelectForRow = (page: Page, fileName: string): Locator =>
-  page.locator('tbody tr').filter({ hasText: fileName }).locator('select')
+  rowForFile(page, fileName).locator('select')
 
 const rowForFile = (page: Page, fileName: string): Locator =>
-  page.locator('tbody tr').filter({ hasText: fileName })
+  page.locator('tbody tr').filter({ has: page.getByText(fileName, { exact: true }) })
 
 const filePayload = (name: string, mimeType: string, content: string) => ({
   name,
@@ -71,6 +72,22 @@ const samplePdf = () => ({
   buffer: readFileSync(fixturePath('sample.pdf'))
 })
 
+const twoPagePdf = async () => {
+  const document = await PDFDocument.create()
+  const font = await document.embedFont(StandardFonts.Helvetica)
+  for (const [index, text] of ['First page', 'Second page'].entries()) {
+    const page = document.addPage([300, 200])
+    page.drawText(text, { x: 40, y: 100, size: 18, font })
+    page.drawText(String(index + 1), { x: 145, y: 40, size: 12, font })
+  }
+
+  return {
+    name: 'sample.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from(await document.save())
+  }
+}
+
 const sampleTextFixture = () => fixturePath('bridge-sample.txt')
 
 const optionValues = (select: Locator): Promise<string[]> =>
@@ -89,25 +106,6 @@ const loadingOverlay = (page: Page): Locator => page.locator('.fullscreen-loadin
 const waitForBridgeReady = async (page: Page): Promise<void> => {
   await expect.poll(async () => parserReadyMessages(page)).not.toHaveLength(0)
   await page.waitForTimeout(500)
-}
-
-const routeMultiOutputProxy = async (page: Page): Promise<void> => {
-  await page.route('**/src/lib/parser-bridge/proxy.ts*', async route => {
-    await route.fulfill({
-      contentType: 'application/javascript',
-      body: [
-        'export async function convertViaBridge(_bridge, file, _sourceFormat, targetFormat) {',
-        "  const baseName = file.name.replace(/\\.[^/.]+$/, '') || file.name",
-        '  return [1, 2].map(pageNumber => ({',
-        "    filename: baseName + '-page-' + String(pageNumber).padStart(3, '0') + '.' + targetFormat,",
-        "    mimeType: 'image/' + targetFormat,",
-        '    targetFormat,',
-        "    blob: new Blob(['preview-page-' + pageNumber], { type: 'image/' + targetFormat })",
-        '  }))',
-        '}'
-      ].join('\n')
-    })
-  })
 }
 
 const routeDelayedProxy = async (page: Page): Promise<void> => {
@@ -322,12 +320,14 @@ test.describe('converter app', () => {
           })
         }
       })
+      const createObjectURL = URL.createObjectURL.bind(URL)
+      const revokeObjectURL = URL.revokeObjectURL.bind(URL)
       URL.createObjectURL = (blob: Blob) => {
         e2eWindow.__downloadTypes?.push(blob.type)
         e2eWindow.__downloadBlobs?.push(blob)
-        return `blob:e2e-${e2eWindow.__downloadTypes?.length ?? 0}`
+        return createObjectURL(blob)
       }
-      URL.revokeObjectURL = () => undefined
+      URL.revokeObjectURL = objectUrl => revokeObjectURL(objectUrl)
       HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement) {
         e2eWindow.__downloadNames?.push(this.download)
       }
@@ -483,7 +483,8 @@ test.describe('converter app', () => {
     expect(values).toContain('webp')
   })
 
-  test('converts PDF to PDF with OCR and keeps completed target locked', async ({ page }) => {
+  test('reports empty OCR and locks the target after retrying without OCR', async ({ page }) => {
+    test.setTimeout(90000)
     await page.locator('.nav__select').selectOption('zh-CN')
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
 
@@ -510,6 +511,18 @@ test.describe('converter app', () => {
     await page.getByRole('button', { name: '全部转换' }).click()
 
     const pdfRow = rowForFile(page, 'sample.pdf')
+    await expect(pdfRow.locator('.status')).toHaveClass(/status--failed/, {
+      timeout: 60000
+    })
+    await expect(pdfRow.locator('.status')).toContainText('图片中未检测到文字')
+    await expect(targetSelect).toBeEnabled()
+
+    await row.getByRole('button', { name: '设置' }).click()
+    await expect(dialog).toBeVisible()
+    await ocrCheckbox.uncheck()
+    await dialog.getByRole('button', { name: '完成' }).click()
+    await page.getByRole('button', { name: '全部转换' }).click()
+
     await expect(pdfRow.locator('.status')).toHaveClass(/status--done/, {
       timeout: 15000
     })
@@ -719,7 +732,9 @@ test.describe('converter app', () => {
     })
     await imageRow.getByRole('button', { name: 'Preview' }).click()
     await expect(page.locator('.preview-modal')).toBeVisible()
-    await expect(page.locator('.preview-modal__iframe')).toBeVisible()
+    await expect(page.locator('.preview-modal__pdf-viewer canvas').first()).toBeVisible({
+      timeout: 15000
+    })
   })
 
   test('preserves image PDF page orientation when settings are reopened', async ({ page }) => {
@@ -739,16 +754,18 @@ test.describe('converter app', () => {
   })
 
   test('opens PDF to PNG preview tabs for multi-output conversion', async ({ page }) => {
-    await routeMultiOutputProxy(page)
-    await page.reload()
-    await waitForBridgeReady(page)
-
-    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+    await page.locator(dropzoneFileInput).setInputFiles(await twoPagePdf())
     await targetSelectForRow(page, 'sample.pdf').selectOption('png')
+
+    const pdfRow = rowForFile(page, 'sample.pdf')
+    await pdfRow.getByRole('button', { name: 'Settings' }).click()
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+    await settingsDialog.getByRole('button', { name: 'Select all', exact: true }).click()
+    await expect(settingsDialog).toContainText('2 pages selected')
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
 
     await page.getByRole('button', { name: 'Convert all' }).click()
 
-    const pdfRow = rowForFile(page, 'sample.pdf')
     await expect(pdfRow.locator('.status')).toContainText('Done', {
       timeout: 15000
     })
@@ -766,14 +783,21 @@ test.describe('converter app', () => {
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true')
   })
 
-  test('keeps Settings unavailable for HTML to TXT fallback', async ({ page }) => {
+  test('opens HTML encode settings for HTML to TXT conversion', async ({ page }) => {
     await page
       .locator(dropzoneFileInput)
       .setInputFiles(filePayload('sample.html', 'text/html', '<h1>Test</h1>'))
 
     const htmlRow = rowForFile(page, 'sample.html')
     await expect(targetSelectForRow(page, 'sample.html')).toHaveValue('txt')
-    await expect(htmlRow.getByRole('button', { name: 'Settings' })).toBeDisabled()
+    await htmlRow.getByRole('button', { name: 'Settings' }).click()
+
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+    await expect(settingsDialog).toContainText('HTML Input Options')
+    await expect(settingsDialog.getByLabel('Exclude selectors')).toBeVisible()
+    await expect(settingsDialog.getByLabel('Snapshot width')).toBeVisible()
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
     await expect(htmlRow.getByRole('button', { name: 'Remove' })).toBeEnabled()
   })
 
@@ -962,7 +986,7 @@ test.describe('converter app', () => {
       .locator(dropzoneFileInput)
       .setInputFiles([
         filePayload('notes.txt', 'text/plain', 'hello text'),
-        filePayload('fail-notes.txt', 'text/plain', 'bad text')
+        filePayload('fail-photo.png', 'image/png', 'not an image')
       ])
 
     await page.getByRole('button', { name: 'Convert all' }).click()
@@ -970,8 +994,8 @@ test.describe('converter app', () => {
     await expect(rowForFile(page, 'notes.txt').locator('.status')).toContainText('Done', {
       timeout: 15000
     })
-    await expect(rowForFile(page, 'fail-notes.txt').locator('.status')).toContainText('Failed')
-    await expect(rowForFile(page, 'fail-notes.txt').locator('.status')).toContainText(
+    await expect(rowForFile(page, 'fail-photo.png').locator('.status')).toContainText('Failed')
+    await expect(rowForFile(page, 'fail-photo.png').locator('.status')).toContainText(
       'Conversion failed, please retry'
     )
   })
@@ -994,9 +1018,7 @@ test.describe('converter app', () => {
   })
 
   test('converts image to WEBP and downloads', async ({ page }) => {
-    await page
-      .locator(dropzoneFileInput)
-      .setInputFiles(filePayload('photo.png', 'image/png', 'fake image'))
+    await page.locator(dropzoneFileInput).setInputFiles(validPngPayload())
     await targetSelectForRow(page, 'photo.png').selectOption('webp')
 
     await page.getByRole('button', { name: 'Convert all' }).click()
@@ -1013,7 +1035,7 @@ test.describe('converter app', () => {
   test('selects PDF pages inline from Settings and converts to exact output count', async ({
     page
   }) => {
-    await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
+    await page.locator(dropzoneFileInput).setInputFiles(await twoPagePdf())
 
     await targetSelectForRow(page, 'sample.pdf').selectOption('png')
 
@@ -1025,30 +1047,21 @@ test.describe('converter app', () => {
       'PDF Pages'
     )
 
-    await settingsDialog.getByRole('button', { name: 'Select all' }).click()
+    await settingsDialog.getByRole('button', { name: 'Select all', exact: true }).click()
     await expect(settingsDialog).toContainText('2 pages selected')
 
     const pageCards = settingsDialog.locator('.pdf-modal__card')
     await expect(pageCards).toHaveCount(2)
     await settingsDialog.getByRole('button', { name: 'Page 2' }).click()
-    await expect(settingsDialog).toContainText('1 page selected')
+    await expect(settingsDialog).toContainText(/1 pages? selected/)
 
-    await settingsDialog.getByRole('button', { name: 'Collapse' }).click()
+    await settingsDialog.locator('.pdf-page-selector-inline__header').click()
     await expect(settingsDialog.getByRole('button', { name: 'Page 1' })).toBeHidden()
-    await settingsDialog.getByRole('button', { name: 'Expand' }).click()
+    await settingsDialog.locator('.pdf-page-selector-inline__header').click()
     await expect(settingsDialog.getByRole('button', { name: 'Page 1' })).toBeVisible()
 
     await settingsDialog.getByRole('button', { name: 'Done' }).click()
     await expect(settingsDialog).toBeHidden()
-
-    await groupHeader.getByRole('button', { name: 'Convert Group' }).click()
-    await expect(rowA.locator('.status')).toContainText('Done', { timeout: 15000 })
-    await expect(rowB.locator('.status')).toContainText('Done')
-
-    await groupTargetSelect.selectOption('png')
-    await expect(rowA.locator('.status')).toContainText('Ready')
-    await expect(rowB.locator('.status')).toContainText('Ready')
-    await expect(groupHeader.getByRole('button', { name: 'Convert Group' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'Convert all' }).click()
 
@@ -1135,20 +1148,15 @@ test.describe('converter app', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.locator(dropzoneFileInput).setInputFiles(samplePdf())
 
-    const cardList = page.locator('.file-card-list')
-    await expect(cardList).toBeVisible()
-
-    const card = cardList.locator('.file-card').filter({ hasText: 'sample.pdf' })
-    await expect(card).toBeVisible()
-
-    await expect(card.locator('.file-card__filename')).toContainText('sample.pdf')
-    await expect(card.locator('.file-card__meta')).toContainText('pdf')
-
-    const actions = card.locator('.file-card__actions')
-    await expect(actions.getByRole('button', { name: 'Settings' })).toBeVisible()
-    await expect(actions.getByRole('button', { name: 'Remove' })).toBeVisible()
-
-    await expect(page.locator('table.file-table')).toBeHidden()
+    const table = page.locator('table.file-table')
+    const row = rowForFile(page, 'sample.pdf')
+    await expect(table).toBeVisible()
+    await expect(table.locator('thead')).toHaveCSS('display', 'none')
+    await expect(row).toHaveCSS('display', 'grid')
+    await expect(row.locator('.file-table__cell--source')).toBeHidden()
+    await expect(row.locator('.file-table__filename')).toContainText('sample.pdf')
+    await expect(row.getByRole('button', { name: 'Settings' })).toBeVisible()
+    await expect(row.getByRole('button', { name: 'Remove' })).toBeVisible()
   })
 
   test('multi-select creates a group, changes target, and collapses members', async ({ page }) => {
@@ -1211,6 +1219,15 @@ test.describe('converter app', () => {
     await expect(settingsDialog).toContainText('HTML Options')
     await settingsDialog.getByRole('button', { name: 'Done' }).click()
     await expect(settingsDialog).toBeHidden()
+
+    await groupHeader.getByRole('button', { name: 'Convert Group' }).click()
+    await expect(rowA.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(rowB.locator('.status')).toContainText('Done')
+
+    await groupTargetSelect.selectOption('png')
+    await expect(rowA.locator('.status')).toContainText('Ready')
+    await expect(rowB.locator('.status')).toContainText('Ready')
+    await expect(groupHeader.getByRole('button', { name: 'Convert Group' })).toBeEnabled()
   })
 
   test('uploads markdown file and converts to HTML via parser iframe', async ({ page }) => {
