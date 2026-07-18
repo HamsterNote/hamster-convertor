@@ -58,8 +58,15 @@ jobs:
       - name: Run unit tests
         run: yarn test:run
 
-      # 关键：BASE_PATH=/beta/ 让 vite 构建产物使用 /beta/ 前缀
-      # 同时影响 host (vite.config.ts) 与 parser-runtime (packages/parser-runtime/vite.config.ts)
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      # E2E 会为本地预览执行默认 base / 构建，因此必须先于最终 beta 构建运行。
+      - name: Run E2E tests
+        run: yarn test:e2e
+
+      # 最后生成部署产物，避免 E2E 的默认构建覆盖 /beta/ 资源路径。
+      # BASE_PATH 同时影响 host 与 parser-runtime。
       - name: Build host and parser runtime with /beta/ base
         env:
           BASE_PATH: /beta/
@@ -67,14 +74,6 @@ jobs:
 
       - name: Verify parser runtime artifact
         run: test -f dist/parser-runtime/index.html
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      # E2E 在默认 base / 下运行，与构建产物的 /beta/ base 无关
-      # （test:e2e 会单独以 vite preview 启动，不读 BASE_PATH）
-      - name: Run E2E tests
-        run: yarn test:e2e
 
       # 部署到 gh-pages 分支的 beta/ 子目录
       # destination_dir: beta -> 推送到 gh-pages 分支的 beta/ 路径
