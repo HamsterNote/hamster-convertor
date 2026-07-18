@@ -412,6 +412,56 @@ describe('ProtocolServer integration', () => {
     )
   })
 
+  it('propagates HTML encode options through server normalization', async () => {
+    port.dispatch({
+      ...createConvertRequest('html-encode-options'),
+      filename: 'document.html',
+      sourceFormat: 'html',
+      targetFormat: 'txt',
+      options: {
+        encode: {
+          excludeSelectors: ['.skip-from-output'],
+          snapshotWidth: 1024
+        }
+      }
+    })
+
+    await waitFor(() => getResultIds(port).includes('html-encode-options'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          encode: {
+            excludeSelectors: ['.skip-from-output'],
+            snapshotWidth: 1024
+          }
+        })
+      })
+    )
+  })
+
+  it('propagates Markdown TXT mode through server normalization', async () => {
+    port.dispatch({
+      ...createConvertRequest('markdown-options'),
+      filename: 'document.md',
+      sourceFormat: 'markdown',
+      targetFormat: 'txt',
+      options: {
+        markdown: { txtMode: 'raw' }
+      }
+    })
+
+    await waitFor(() => getResultIds(port).includes('markdown-options'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          markdown: { txtMode: 'raw' }
+        })
+      })
+    )
+  })
+
   it('propagates PDF page setup orientation for image-to-PDF', async () => {
     port.dispatch({
       ...createImageToPdfRequest('img2pdf-page-setup'),

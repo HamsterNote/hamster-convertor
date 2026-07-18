@@ -100,6 +100,22 @@ describe('applyHtmlLayout charset and document structure', () => {
     })
   })
 
+  describe('continuous actual-width mode', () => {
+    it('preserves page dimensions and text coordinates in pixels', () => {
+      const result = applyHtmlLayout(chineseFragment, {
+        mode: 'continuous',
+        widthMode: 'actual'
+      })
+
+      expect(result).toContain('width:612px')
+      expect(result).toContain('height:792px')
+      expect(result).toContain('font-size:14px')
+      expect(result).toContain('left:72px')
+      expect(result).toContain('top:60px')
+      expect(result).not.toContain('vw')
+    })
+  })
+
   describe('paginated mode layout CSS', () => {
     it('adds centered page shadow and edge spacing styles', () => {
       const result = applyHtmlLayout(chineseFragment, { mode: 'paginated' })

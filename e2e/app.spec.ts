@@ -682,6 +682,10 @@ test.describe('converter app', () => {
     ])
   })
 
+  test('includes DOCX in the native file chooser filter', async ({ page }) => {
+    await expect(page.locator(dropzoneFileInput)).toHaveAttribute('accept', /\.docx(?:,|$)/)
+  })
+
   test('opens image to PDF settings, edits transform settings, converts, and previews result', async ({
     page
   }) => {
@@ -716,6 +720,22 @@ test.describe('converter app', () => {
     await imageRow.getByRole('button', { name: 'Preview' }).click()
     await expect(page.locator('.preview-modal')).toBeVisible()
     await expect(page.locator('.preview-modal__iframe')).toBeVisible()
+  })
+
+  test('preserves image PDF page orientation when settings are reopened', async ({ page }) => {
+    await page.locator(dropzoneFileInput).setInputFiles(validPngPayload())
+
+    const imageRow = rowForFile(page, 'photo.png')
+    const settingsButton = imageRow.getByRole('button', { name: 'Settings' })
+    const settingsDialog = page.getByRole('dialog', { name: 'Settings' })
+
+    await settingsButton.click()
+    await settingsDialog.getByLabel('Orientation').selectOption('landscape')
+    await settingsDialog.getByRole('button', { name: 'Done' }).click()
+    await expect(settingsDialog).toBeHidden()
+
+    await settingsButton.click()
+    await expect(settingsDialog.getByLabel('Orientation')).toHaveValue('landscape')
   })
 
   test('opens PDF to PNG preview tabs for multi-output conversion', async ({ page }) => {
@@ -1021,6 +1041,15 @@ test.describe('converter app', () => {
     await settingsDialog.getByRole('button', { name: 'Done' }).click()
     await expect(settingsDialog).toBeHidden()
 
+    await groupHeader.getByRole('button', { name: 'Convert Group' }).click()
+    await expect(rowA.locator('.status')).toContainText('Done', { timeout: 15000 })
+    await expect(rowB.locator('.status')).toContainText('Done')
+
+    await groupTargetSelect.selectOption('png')
+    await expect(rowA.locator('.status')).toContainText('Ready')
+    await expect(rowB.locator('.status')).toContainText('Ready')
+    await expect(groupHeader.getByRole('button', { name: 'Convert Group' })).toBeEnabled()
+
     await page.getByRole('button', { name: 'Convert all' }).click()
 
     await expect(pdfRow.locator('.status')).toContainText('Done', {
@@ -1223,10 +1252,22 @@ test.describe('converter app', () => {
     await dialog.getByRole('button', { name: 'Done' }).click()
     await expect(dialog).toBeHidden()
 
+    await row.getByRole('button', { name: 'Settings' }).click()
+    await expect(dialog.getByLabel('Keep raw Markdown')).toBeChecked()
+    await dialog.getByRole('button', { name: 'Done' }).click()
+
     await page.getByRole('button', { name: 'Convert all' }).click()
     await expect(row.locator('.status')).toContainText('Done', { timeout: 30000 })
 
     await row.getByRole('button', { name: 'Download' }).click()
     await expect.poll(async () => downloadNames(page)).toEqual(['raw.txt'])
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const [blob] = (window as E2EWindow).__downloadBlobs ?? []
+          return blob ? blob.text() : ''
+        })
+      )
+      .toBe('# Title\n\n- item one')
   })
 })

@@ -304,6 +304,46 @@ const normalizeDecodeOptions = (
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
+const normalizePdfOptions = (
+  value?: Record<string, unknown>
+): ConversionOptions['pdf'] | undefined =>
+  value
+    ? {
+        ocr: typeof value.ocr === 'boolean' ? value.ocr : undefined,
+        selectedPages: isNumberArray(value.selectedPages) ? value.selectedPages : undefined,
+        selectedImagePages: isNumberArray(value.selectedImagePages)
+          ? value.selectedImagePages
+          : undefined
+      }
+    : undefined
+
+const normalizeEncodeOptions = (
+  value?: Record<string, unknown>
+): ConversionOptions['encode'] | undefined =>
+  value
+    ? {
+        excludeSelectors:
+          Array.isArray(value.excludeSelectors) &&
+          value.excludeSelectors.every(selector => typeof selector === 'string')
+            ? value.excludeSelectors
+            : undefined,
+        snapshotWidth:
+          typeof value.snapshotWidth === 'number' && Number.isFinite(value.snapshotWidth)
+            ? value.snapshotWidth
+            : undefined
+      }
+    : undefined
+
+const normalizeMarkdownOptions = (
+  value?: Record<string, unknown>
+): ConversionOptions['markdown'] | undefined => {
+  if (!value || (value.txtMode !== 'raw' && value.txtMode !== 'plain')) {
+    return undefined
+  }
+
+  return { txtMode: value.txtMode }
+}
+
 const normalizeImageOptions = (value?: Record<string, unknown>): ImageOptions | undefined => {
   if (!value) {
     return undefined
@@ -423,20 +463,24 @@ const normalizeConversionOptions = (
   }
 
   const pdf = readNestedRecord(options, 'pdf')
+  const encode = readNestedRecord(options, 'encode')
   const decode = readNestedRecord(options, 'decode')
   const layout = readNestedRecord(options, 'layout')
   const image = readNestedRecord(options, 'image')
   const imageToPdf = readNestedRecord(options, 'imageToPdf')
   const pdfPageSetup = readNestedRecord(options, 'pdfPageSetup')
   const txtImage = readNestedRecord(options, 'txtImage')
+  const markdown = readNestedRecord(options, 'markdown')
   const normalized: ConversionOptions = {}
 
-  if (pdf) {
-    normalized.pdf = {
-      ocr: typeof pdf.ocr === 'boolean' ? pdf.ocr : undefined,
-      selectedPages: isNumberArray(pdf.selectedPages) ? pdf.selectedPages : undefined,
-      selectedImagePages: isNumberArray(pdf.selectedImagePages) ? pdf.selectedImagePages : undefined
-    }
+  const normalizedPdf = normalizePdfOptions(pdf)
+  if (normalizedPdf) {
+    normalized.pdf = normalizedPdf
+  }
+
+  const normalizedEncode = normalizeEncodeOptions(encode)
+  if (normalizedEncode) {
+    normalized.encode = normalizedEncode
   }
 
   const normalizedDecode = normalizeDecodeOptions(decode)
@@ -466,6 +510,11 @@ const normalizeConversionOptions = (
   const normalizedTxtImage = normalizeTxtImageOptions(txtImage)
   if (normalizedTxtImage) {
     normalized.txtImage = normalizedTxtImage
+  }
+
+  const normalizedMarkdown = normalizeMarkdownOptions(markdown)
+  if (normalizedMarkdown) {
+    normalized.markdown = normalizedMarkdown
   }
 
   return normalized

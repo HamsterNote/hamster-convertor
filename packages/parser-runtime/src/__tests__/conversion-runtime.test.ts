@@ -1,6 +1,7 @@
 import type { IntermediateContent, IntermediateDocument } from '@hamster-note/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { convertRuntime } from '../conversion'
+import { applyHtmlLayout } from '../conversion/utils'
 
 const parserMocks = vi.hoisted(() => ({
   pdfEncode: vi.fn(),
@@ -1366,6 +1367,27 @@ describe('Image-to-PDF A4 sizing', () => {
     expectDrawBox({ drawWidth: usableWidth, drawHeight: usableWidth / 4 })
   })
 
+  it('scales show-all images down to page height when image is taller', async () => {
+    mockImageWidth = 1000
+    mockImageHeight = 4000
+
+    await convertImageToPdf({
+      marginPt,
+      fit: 'showAll',
+      pageMode: 'auto',
+      rotationDeg: 0,
+      scalePercent: 100
+    })
+
+    const usableHeight = a4Portrait.height - marginPt * 2
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: [a4Portrait.width, a4Portrait.height]
+    })
+    expectDrawBox({ drawWidth: usableHeight / 4, drawHeight: usableHeight })
+  })
+
   it('applies scale on top of the show-all base width', async () => {
     mockImageWidth = 4000
     mockImageHeight = 1000
@@ -1703,6 +1725,22 @@ describe('Image-to-PDF A4 sizing', () => {
       unit: 'pt',
       format: [2000, 1000]
     })
+  })
+})
+
+describe('HTML layout options', () => {
+  it('preserves pixel coordinates in continuous actual-width mode', () => {
+    const html =
+      '<div class="hamster-note-page" style="width:612px;height:792px"><span class="hamster-note-text" style="font-size:14px;left:72px;top:60px">text</span></div>'
+
+    const result = applyHtmlLayout(html, { mode: 'continuous', widthMode: 'actual' })
+
+    expect(result).toContain('width:612px')
+    expect(result).toContain('height:792px')
+    expect(result).toContain('font-size:14px')
+    expect(result).toContain('left:72px')
+    expect(result).toContain('top:60px')
+    expect(result).not.toContain('vw')
   })
 })
 

@@ -1,7 +1,7 @@
+import type { TFunction } from 'i18next'
 import log from 'loglevel'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
 import { ConfirmModal } from './components/ConfirmModal'
 import FileDropzone from './components/FileDropzone'
 import Footer from './components/Footer'
@@ -26,17 +26,17 @@ import {
   type TxtImageOptions
 } from './lib/converter'
 import { downloadBlobFile, downloadResultArchive } from './lib/download'
+import { truncateMiddle } from './lib/filename'
 import {
   applyGroupSectionOptionsToApplicableMembers,
+  type GroupItem,
+  type GroupMember,
   getCommonGroupTargets,
   getGroupSettingsSections,
   isSelectableForBatch,
   pickTargetRelatedOptions,
-  removeEmptyGroups,
-  type GroupItem,
-  type GroupMember
+  removeEmptyGroups
 } from './lib/group-helpers'
-import { truncateMiddle } from './lib/filename'
 import { convertViaBridge } from './lib/parser-bridge/proxy'
 import { getPdfPageCount } from './lib/pdf-utils'
 import { getPreviewableOutputs } from './lib/preview'
@@ -79,6 +79,9 @@ type ConversionOptions = {
     orientation: 'portrait' | 'landscape' | 'auto'
   }
   txtImage?: TxtImageOptions
+  markdown?: {
+    txtMode?: 'raw' | 'plain'
+  }
 }
 
 const DEFAULT_HTML_BACKGROUND_OPTIONS: Required<BackgroundDecodeOptions> = {
@@ -652,6 +655,7 @@ function App() {
           }
         }
         conversionOptions.txtImage = next.txtImage ? { ...next.txtImage } : undefined
+        conversionOptions.markdown = next.markdown ? { ...next.markdown } : undefined
         if (next.pdfPageSetup) {
           conversionOptions.pdfPageSetup = {
             paperSize: next.pdfPageSetup.paperSize ?? DEFAULT_PDF_PAGE_SETUP.paperSize,
@@ -768,7 +772,8 @@ function App() {
         image: bridgeImageOptions,
         imageToPdf: imageToPdfOptions,
         pdfPageSetup: current.conversionOptions.pdfPageSetup,
-        txtImage: txtImageOptions
+        txtImage: txtImageOptions,
+        markdown: current.conversionOptions.markdown
       })
       const results = Array.isArray(result) ? result : [result]
       markDone(id, results)
@@ -808,7 +813,7 @@ function App() {
   }
 
   const acceptAttr = useMemo(
-    () => '.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.html,.htm,.md,.markdown',
+    () => '.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.html,.htm,.docx,.md,.markdown',
     []
   )
 
@@ -932,9 +937,20 @@ function App() {
     if (!group) return
 
     const memberIds = new Set(group.fileIds)
-    const nextItems = items.map(it =>
-      memberIds.has(it.id) ? updateItemTargetKeepStatus(it, target) : it
-    )
+    const nextItems = items.map(it => {
+      if (!memberIds.has(it.id)) return it
+
+      const nextItem = updateItemTargetKeepStatus(it, target)
+      if (it.target === target || it.status !== 'done') return nextItem
+
+      return {
+        ...nextItem,
+        status: 'ready' as const,
+        outputs: undefined,
+        warnings: undefined,
+        errorMessage: undefined
+      }
+    })
 
     const nextMembers = group.fileIds
       .map(id => nextItems.find(it => it.id === id))
@@ -1597,6 +1613,8 @@ function App() {
             htmlEncode: activeSettingsItem.conversionOptions.htmlEncode,
             image: activeSettingsItem.conversionOptions.image,
             txtImage: activeSettingsItem.conversionOptions.txtImage,
+            pdfPageSetup: activeSettingsItem.conversionOptions.pdfPageSetup,
+            markdown: activeSettingsItem.conversionOptions.markdown,
             imageToPdf: activeSettingsItem.conversionOptions.imageToPdf
               ? {
                   margin: activeSettingsItem.conversionOptions.imageToPdf.marginPt,

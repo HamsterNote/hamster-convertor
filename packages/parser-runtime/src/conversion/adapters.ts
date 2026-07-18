@@ -349,9 +349,10 @@ const getImageToPdfDrawBox = (
 ): { drawHeight: number; drawWidth: number; x: number; y: number } => {
   const marginPt = clampNumber(options.marginPt, 0, Math.min(pageBox.width, pageBox.height) / 2)
   const usableWidth = pageBox.width - marginPt * 2
+  const usableHeight = pageBox.height - marginPt * 2
 
-  const showAllWidthScale = Math.min(usableWidth / dimensions.width, 1)
-  const baseScale = options.fit === 'showAll' ? showAllWidthScale : 1
+  const showAllScale = Math.min(usableWidth / dimensions.width, usableHeight / dimensions.height, 1)
+  const baseScale = options.fit === 'showAll' ? showAllScale : 1
   const scaleMultiplier = clampNumber(options.scalePercent, 10, 300) / 100
   const drawWidth = dimensions.width * baseScale * scaleMultiplier
   const drawHeight = dimensions.height * baseScale * scaleMultiplier

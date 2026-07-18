@@ -112,6 +112,9 @@ export type ConversionRequest = {
     }
     pdfPageSetup?: PdfPageSetupOptions
     txtImage?: TxtImageOptions
+    markdown?: {
+      txtMode?: 'raw' | 'plain'
+    }
   }
 }
 
@@ -295,9 +298,6 @@ export const applyHtmlLayout = (html: string, layoutOptions?: HtmlLayoutOptions)
     }
   `.trim()
 
-  // 连续模式 - 撑满宽度：将 px 转换为 vw 实现响应式缩放
-  const processedHtml = convertPxToVw(withCharset)
-
   const fitWidthCss = `
     html, body {
       overflow-x: hidden !important;
@@ -321,10 +321,12 @@ export const applyHtmlLayout = (html: string, layoutOptions?: HtmlLayoutOptions)
     }
   `.trim()
 
-  return injectStyleIntoHead(
-    processedHtml,
-    layoutOptions.widthMode === 'fit' ? fitWidthCss : actualWidthCss
-  )
+  if (layoutOptions.widthMode !== 'fit') {
+    return injectStyleIntoHead(withCharset, actualWidthCss)
+  }
+
+  // 连续模式 - 撑满宽度：将 px 转换为 vw 实现响应式缩放
+  return injectStyleIntoHead(convertPxToVw(withCharset), fitWidthCss)
 }
 
 const createHostParserRuntimeError = (source: SourceFormat, target: TargetFormat): Error =>

@@ -244,6 +244,14 @@ describe('app upload feedback', () => {
     expect(within(targetSelect).getByRole('option', { name: 'HTML' })).toBeInTheDocument()
   })
 
+  it('includes DOCX in the native file chooser filter', () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    expect(input).toBeInstanceOf(HTMLInputElement)
+    expect(input).toHaveAttribute('accept', expect.stringContaining('.docx'))
+  })
+
   it('shows unsupported file feedback when no selectable row is added', async () => {
     const { container } = render(<App />)
     const input = container.querySelector('.dropzone + input[type="file"]')
@@ -1730,6 +1738,54 @@ describe('app upload feedback', () => {
     })
   })
 
+  it('preserves single-file PDF page setup when settings are reopened', async () => {
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['png'], 'photo.png', { type: 'image/png' })] }
+    })
+    await screen.findByRole('row', { name: /photo\.png/ })
+
+    changeNativeSelectValue(getFileTargetSelects()[0], 'pdf')
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    changeNativeSelectValue(screen.getByRole('combobox', { name: /orientation/i }), 'landscape')
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    expect(screen.getByRole('combobox', { name: /orientation/i })).toHaveValue('landscape')
+  })
+
+  it('passes the selected Markdown TXT mode to the bridge', async () => {
+    bridgeMocks.convert.mockResolvedValue(createBridgeResult({ filename: 'notes.txt' }))
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['# Heading'], 'notes.md', { type: 'text/markdown' })] }
+    })
+    await screen.findByRole('row', { name: /notes\.md/ })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.click(screen.getByDisplayValue('raw'))
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'markdown',
+          targetFormat: 'txt',
+          options: expect.objectContaining({ markdown: { txtMode: 'raw' } })
+        })
+      )
+    })
+  })
+
   it('TDD-image-2: bridge receives imageToPdf options when converting image to pdf', async () => {
     bridgeMocks.convert.mockResolvedValue(
       createBridgeResult({
@@ -2502,6 +2558,43 @@ describe('app upload feedback', () => {
       })
       expect(getFileTargetSelects()[2]).toHaveValue('png')
       expect(screen.getAllByText('Failed')).toHaveLength(3)
+    })
+
+    it('resets completed members and clears stale outputs when group target changes', async () => {
+      bridgeMocks.convert.mockResolvedValue(
+        createBridgeResult({ filename: 'old.png', targetFormat: 'png' })
+      )
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.txt', { type: 'text/plain' }),
+            new File(['b'], 'b.txt', { type: 'text/plain' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.txt/ })
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => expect(getGroupHeaders()).toHaveLength(1))
+
+      fireEvent.click(within(getGroupHeaders()[0]).getByRole('button', { name: 'Convert Group' }))
+      await waitFor(() => expect(screen.getAllByText('Done')).toHaveLength(2))
+
+      const groupTargetSelect = within(getGroupHeaders()[0]).getByRole('combobox', {
+        name: 'Target'
+      }) as HTMLSelectElement
+      changeNativeSelectValue(groupTargetSelect, 'html')
+
+      await waitFor(() => expect(screen.getAllByText('Ready')).toHaveLength(2))
+      expect(screen.queryByText('Done')).not.toBeInTheDocument()
+      expect(
+        within(getGroupHeaders()[0]).getByRole('button', { name: 'Convert Group' })
+      ).toBeEnabled()
     })
 
     it('group settings apply target-related options only to applicable members', async () => {

@@ -337,10 +337,11 @@ export const applyHtmlLayout = (html: string, layoutOptions?: HtmlLayoutOptions)
     .hamster-note-page { width: 100% !important; height: 0 !important; overflow: hidden !important; position: relative !important; }
   `.trim()
 
-  return injectStyleIntoHead(
-    convertPxToVw(withCharset),
-    layoutOptions.widthMode === 'fit' ? fitWidthCss : actualWidthCss
-  )
+  if (layoutOptions.widthMode !== 'fit') {
+    return injectStyleIntoHead(withCharset, actualWidthCss)
+  }
+
+  return injectStyleIntoHead(convertPxToVw(withCharset), fitWidthCss)
 }
 
 const imageConfigs: Record<
