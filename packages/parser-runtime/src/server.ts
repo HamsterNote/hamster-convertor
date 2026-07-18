@@ -5,6 +5,7 @@ import {
   type ExifCategory,
   type ImageOptions,
   type ImageToPdfOptions,
+  type PdfPageSetupOptions,
   type SourceFormat,
   type TargetFormat,
   type TxtImageOptions
@@ -137,6 +138,22 @@ const EXIF_CATEGORIES = [
 const ROTATION_DEGREES = [
   0, 90, 180, 270
 ] as const satisfies readonly ImageToPdfOptions['rotationDeg'][]
+
+const PDF_PAPER_SIZES = [
+  'A4',
+  'A3',
+  'A5',
+  'Letter',
+  'Legal',
+  'B5',
+  'auto'
+] as const satisfies readonly PdfPageSetupOptions['paperSize'][]
+
+const PDF_PAGE_ORIENTATIONS = [
+  'portrait',
+  'landscape',
+  'auto'
+] as const satisfies readonly PdfPageSetupOptions['orientation'][]
 
 const DEFAULT_TXT_IMAGE_OPTIONS: TxtImageOptions = {
   textColor: '#000000',
@@ -313,11 +330,10 @@ const normalizeImageToPdfOptions = (
     return undefined
   }
 
-  // 验证 fit：只允许 'cover' 或 'contain'，默认 'cover'
-  const validFits: ImageToPdfOptions['fit'][] = ['cover', 'contain']
+  const validFits: ImageToPdfOptions['fit'][] = ['original', 'showAll']
   const fit = validFits.includes(value.fit as ImageToPdfOptions['fit'])
     ? (value.fit as ImageToPdfOptions['fit'])
-    : 'cover'
+    : 'original'
 
   // 验证 pageMode：只允许 'auto'、'single'、'multi'，默认 'auto'
   const validPageModes: ImageToPdfOptions['pageMode'][] = ['auto', 'single', 'multi']
@@ -332,6 +348,25 @@ const normalizeImageToPdfOptions = (
     rotationDeg: normalizeRotationDeg(value.rotationDeg),
     scalePercent: clampNumber(value.scalePercent, 100, 10, 300)
   }
+}
+
+const normalizePdfPageSetupOptions = (
+  value?: Record<string, unknown>
+): PdfPageSetupOptions | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  const paperSize = PDF_PAPER_SIZES.includes(value.paperSize as PdfPageSetupOptions['paperSize'])
+    ? (value.paperSize as PdfPageSetupOptions['paperSize'])
+    : 'A4'
+  const orientation = PDF_PAGE_ORIENTATIONS.includes(
+    value.orientation as PdfPageSetupOptions['orientation']
+  )
+    ? (value.orientation as PdfPageSetupOptions['orientation'])
+    : 'auto'
+
+  return { paperSize, orientation }
 }
 
 const normalizeTxtImageOptions = (value?: Record<string, unknown>): TxtImageOptions | undefined => {
@@ -392,6 +427,7 @@ const normalizeConversionOptions = (
   const layout = readNestedRecord(options, 'layout')
   const image = readNestedRecord(options, 'image')
   const imageToPdf = readNestedRecord(options, 'imageToPdf')
+  const pdfPageSetup = readNestedRecord(options, 'pdfPageSetup')
   const txtImage = readNestedRecord(options, 'txtImage')
   const normalized: ConversionOptions = {}
 
@@ -420,6 +456,11 @@ const normalizeConversionOptions = (
   const normalizedImageToPdf = normalizeImageToPdfOptions(imageToPdf)
   if (normalizedImageToPdf) {
     normalized.imageToPdf = normalizedImageToPdf
+  }
+
+  const normalizedPdfPageSetup = normalizePdfPageSetupOptions(pdfPageSetup)
+  if (normalizedPdfPageSetup) {
+    normalized.pdfPageSetup = normalizedPdfPageSetup
   }
 
   const normalizedTxtImage = normalizeTxtImageOptions(txtImage)

@@ -21,6 +21,7 @@ type SettingsSection =
   | 'imageTarget'
   | 'txtImage'
   | 'imageToPdf'
+  | 'pdfPageSetup'
   | 'markdown'
 
 type ImageTargetOptions = {
@@ -36,10 +37,15 @@ type ImageTargetOptions = {
 
 type ImageToPdfOptions = {
   margin?: number
-  fit?: 'cover' | 'contain'
+  fit?: 'original' | 'showAll'
   pageMode?: 'auto' | 'single' | 'multi'
   rotationDeg?: 0 | 90 | 180 | 270
   scalePercent?: number
+}
+
+type PdfPageSetupOptions = {
+  paperSize?: 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'B5' | 'auto'
+  orientation?: 'portrait' | 'landscape' | 'auto'
 }
 
 type SettingsOptions = {
@@ -56,6 +62,7 @@ type SettingsOptions = {
   image?: ImageTargetOptions
   txtImage?: TxtImageOptions
   imageToPdf?: ImageToPdfOptions
+  pdfPageSetup?: PdfPageSetupOptions
   markdown?: {
     txtMode?: 'raw' | 'plain'
   }
@@ -141,10 +148,14 @@ type Draft = {
   }
   imageToPdf: {
     margin: string
-    fit: 'cover' | 'contain'
+    fit: 'original' | 'showAll'
     pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: string
+  }
+  pdfPageSetup: {
+    paperSize: 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'B5' | 'auto'
+    orientation: 'portrait' | 'landscape' | 'auto'
   }
   markdown: {
     txtMode: 'raw' | 'plain'
@@ -195,10 +206,15 @@ const DEFAULT_IMAGE_OPTIONS = {
 
 const DEFAULT_IMAGE_TO_PDF_OPTIONS = {
   margin: '',
-  fit: 'cover' as const,
+  fit: 'original' as const,
   pageMode: 'auto' as const,
   rotationDeg: 0 as const,
   scalePercent: '100'
+}
+
+const DEFAULT_PDF_PAGE_SETUP = {
+  paperSize: 'A4' as const,
+  orientation: 'auto' as const
 }
 
 const DEFAULT_TXT_IMAGE_OPTIONS: TxtImageOptions = {
@@ -298,6 +314,10 @@ const createDraft = (options?: SettingsModalProps['options']): Draft => ({
     rotationDeg: options?.imageToPdf?.rotationDeg ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.rotationDeg,
     scalePercent:
       options?.imageToPdf?.scalePercent?.toString() ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.scalePercent
+  },
+  pdfPageSetup: {
+    paperSize: options?.pdfPageSetup?.paperSize ?? DEFAULT_PDF_PAGE_SETUP.paperSize,
+    orientation: options?.pdfPageSetup?.orientation ?? DEFAULT_PDF_PAGE_SETUP.orientation
   },
   markdown: {
     txtMode: options?.markdown?.txtMode ?? 'plain'
@@ -418,6 +438,11 @@ const cleanOutput = (draft: Draft): SettingsOptions => {
   if (margin !== undefined) imageToPdfOutput.margin = margin
   output.imageToPdf = imageToPdfOutput
 
+  output.pdfPageSetup = {
+    paperSize: draft.pdfPageSetup.paperSize,
+    orientation: draft.pdfPageSetup.orientation
+  }
+
   output.markdown = {
     txtMode: draft.markdown.txtMode
   }
@@ -458,6 +483,10 @@ function getSettingsSections(
     sections.push('imageToPdf')
   }
 
+  if (target === 'pdf') {
+    sections.push('pdfPageSetup')
+  }
+
   if (source === 'markdown' && target === 'txt') {
     sections.push('markdown')
   }
@@ -468,6 +497,7 @@ function getSettingsSections(
 const SECTION_ID_MAP: Record<SettingsSection, string> = {
   pdfPages: 'settings-section-pdf-pages',
   pdfOcr: 'settings-section-pdf-ocr',
+  pdfPageSetup: 'settings-section-pdf-page-setup',
   htmlOptions: 'settings-section-html-options',
   htmlEncodeOptions: 'settings-section-html-encode-options',
   imageTarget: 'settings-section-image-target',
@@ -479,6 +509,7 @@ const SECTION_ID_MAP: Record<SettingsSection, string> = {
 const SECTION_TITLE_KEY_MAP: Record<SettingsSection, string> = {
   pdfPages: 'settingsModal.pdfPagesTitle',
   pdfOcr: 'settingsModal.pdfOcrTitle',
+  pdfPageSetup: 'settingsModal.pdfPageSetupTitle',
   htmlOptions: 'settingsModal.htmlOptionsTitle',
   htmlEncodeOptions: 'settingsModal.htmlEncodeOptionsTitle',
   imageTarget: 'settingsModal.imageOptionsTitle',
@@ -532,6 +563,7 @@ const resolveSections = (props: SettingsModalProps): SettingsSection[] =>
 const createInitialCollapsedSections = (): Record<SettingsSection, boolean> => ({
   pdfPages: false,
   pdfOcr: false,
+  pdfPageSetup: false,
   htmlOptions: false,
   htmlEncodeOptions: false,
   imageTarget: false,
@@ -603,6 +635,81 @@ const MarkdownSection = ({
         <div className="settings-modal__estimate settings-modal__field--wide">
           {t('settingsModal.markdownTxtModeHelp')}
         </div>
+      </div>
+    )}
+  </div>
+)
+
+// PDF 页面设置 section（纸张尺寸 + 方向）— 提取为独立组件以降低主函数复杂度
+type PdfPageSetupSectionProps = {
+  t: (key: string) => string
+  collapsed: boolean
+  onToggle: () => void
+  paperSize: Draft['pdfPageSetup']['paperSize']
+  orientation: Draft['pdfPageSetup']['orientation']
+  onPaperSizeChange: (value: Draft['pdfPageSetup']['paperSize']) => void
+  onOrientationChange: (value: Draft['pdfPageSetup']['orientation']) => void
+  readOnly: boolean
+}
+
+const PdfPageSetupSection = ({
+  t,
+  collapsed,
+  onToggle,
+  paperSize,
+  orientation,
+  onPaperSizeChange,
+  onOrientationChange,
+  readOnly
+}: PdfPageSetupSectionProps) => (
+  <div id={SECTION_ID_MAP.pdfPageSetup} className="settings-modal__section">
+    <button
+      type="button"
+      className="settings-modal__section-header"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? 'Expand' : 'Collapse'}
+    >
+      <span className="settings-modal__collapse-btn" aria-hidden="true">
+        {collapsed ? '▶' : '▼'}
+      </span>
+      <span className="settings-modal__section-title">{t('settingsModal.pdfPageSetupTitle')}</span>
+    </button>
+    {!collapsed && (
+      <div className="settings-modal__section-content">
+        <label className="settings-modal__field">
+          <span>{t('settingsModal.paperSize')}</span>
+          <select
+            value={paperSize}
+            onChange={event =>
+              onPaperSizeChange(event.target.value as Draft['pdfPageSetup']['paperSize'])
+            }
+            disabled={readOnly}
+          >
+            <option value="A4">{t('settingsModal.paperSizeA4')}</option>
+            <option value="A3">{t('settingsModal.paperSizeA3')}</option>
+            <option value="A5">{t('settingsModal.paperSizeA5')}</option>
+            <option value="Letter">{t('settingsModal.paperSizeLetter')}</option>
+            <option value="Legal">{t('settingsModal.paperSizeLegal')}</option>
+            <option value="B5">{t('settingsModal.paperSizeB5')}</option>
+            <option value="auto">{t('settingsModal.paperSizeAuto')}</option>
+          </select>
+        </label>
+
+        <label className="settings-modal__field">
+          <span>{t('settingsModal.orientation')}</span>
+          <select
+            value={orientation}
+            onChange={event =>
+              onOrientationChange(event.target.value as Draft['pdfPageSetup']['orientation'])
+            }
+            disabled={readOnly}
+          >
+            <option value="portrait">{t('settingsModal.orientationPortrait')}</option>
+            <option value="landscape">{t('settingsModal.orientationLandscape')}</option>
+            <option value="auto">{t('settingsModal.orientationAuto')}</option>
+          </select>
+        </label>
       </div>
     )}
   </div>
@@ -713,6 +820,14 @@ export default function SettingsModal(props: SettingsModalProps) {
     value: Draft['imageToPdf'][Key]
   ) => {
     setDraft(prev => ({ ...prev, imageToPdf: { ...prev.imageToPdf, [key]: value } }))
+  }
+
+  // 更新 PDF 页面设置（纸张尺寸、方向）
+  const updatePdfPageSetup = <Key extends keyof Draft['pdfPageSetup']>(
+    key: Key,
+    value: Draft['pdfPageSetup'][Key]
+  ) => {
+    setDraft(prev => ({ ...prev, pdfPageSetup: { ...prev.pdfPageSetup, [key]: value } }))
   }
 
   // 更新 Markdown 设置（如 txt 输出模式）
@@ -1333,12 +1448,12 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <select
                         value={draft.imageToPdf.fit}
                         onChange={event =>
-                          updateImageToPdf('fit', event.target.value as 'cover' | 'contain')
+                          updateImageToPdf('fit', event.target.value as 'original' | 'showAll')
                         }
                         disabled={readOnly}
                       >
-                        <option value="cover">{t('settingsModal.fitCover')}</option>
-                        <option value="contain">{t('settingsModal.fitContain')}</option>
+                        <option value="original">{t('settingsModal.fitOriginal')}</option>
+                        <option value="showAll">{t('settingsModal.fitShowAll')}</option>
                       </select>
                     </label>
 
@@ -1401,6 +1516,20 @@ export default function SettingsModal(props: SettingsModalProps) {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* PDF Page Setup Section */}
+            {sections.includes('pdfPageSetup') && (
+              <PdfPageSetupSection
+                t={t}
+                collapsed={collapsedSections.pdfPageSetup}
+                onToggle={() => toggleSection('pdfPageSetup')}
+                paperSize={draft.pdfPageSetup.paperSize}
+                orientation={draft.pdfPageSetup.orientation}
+                onPaperSizeChange={value => updatePdfPageSetup('paperSize', value)}
+                onOrientationChange={value => updatePdfPageSetup('orientation', value)}
+                readOnly={readOnly}
+              />
             )}
 
             {sections.includes('markdown') && (

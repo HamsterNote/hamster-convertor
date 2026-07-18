@@ -56,5 +56,8 @@ test-results/
 # ts 增量编译
 *.tsbuildinfo
 
+# CodeGraph 索引缓存（工具内部状态）
+.codegraph/
+
 # Codemap 状态文件（工具内部状态）
 .slim/

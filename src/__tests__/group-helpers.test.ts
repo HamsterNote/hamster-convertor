@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { SourceFormat, TargetFormat } from '../lib/converter'
+import type { ConversionOptions, GroupItem } from '../lib/group-helpers'
 import {
-  type GroupItem,
-  type ConversionOptions,
-  isSelectableForBatch,
-  getCommonGroupTargets,
-  hasTargetRelatedSettings,
-  pickTargetRelatedOptions,
-  getGroupSettingsSections,
   applyGroupSectionOptionsToApplicableMembers,
+  getCommonGroupTargets,
+  getGroupSettingsSections,
+  hasTargetRelatedSettings,
+  isSelectableForBatch,
+  pickTargetRelatedOptions,
   removeEmptyGroups
 } from '../lib/group-helpers'
 
@@ -43,6 +42,16 @@ const mkGroupItem = (id: string, fileIds: string[], target: TargetFormat): Group
   conversionOptions: { pdf: { ocr: false } },
   collapsed: false
 })
+
+const findMember = (members: MemberLike[], id: string): MemberLike => {
+  const found = members.find((m: MemberLike) => m.id === id)
+
+  if (!found) {
+    throw new Error(`Missing test member: ${id}`)
+  }
+
+  return found
+}
 
 // ─── isSelectableForBatch ────────────────────────────────────────────────────
 
@@ -158,7 +167,13 @@ describe('pickTargetRelatedOptions', () => {
     html: { textControl: { fontSize: 16 } },
     htmlEncode: { excludeSelectors: ['.nav'] },
     image: { quality: 0.9, keepAspectRatio: true },
-    imageToPdf: { marginPt: 12, fit: 'cover', pageMode: 'auto', rotationDeg: 0, scalePercent: 100 },
+    imageToPdf: {
+      marginPt: 12,
+      fit: 'original',
+      pageMode: 'auto',
+      rotationDeg: 0,
+      scalePercent: 100
+    },
     txtImage: {
       textColor: '#000',
       backgroundColor: '#fff',
@@ -295,7 +310,7 @@ describe('applyGroupSectionOptionsToApplicableMembers', () => {
     ]
     const imageToPdfOpts = {
       marginPt: 48,
-      fit: 'contain' as const,
+      fit: 'showAll' as const,
       pageMode: 'single' as const,
       rotationDeg: 90 as const,
       scalePercent: 80
@@ -305,9 +320,9 @@ describe('applyGroupSectionOptionsToApplicableMembers', () => {
       members,
       'imageToPdf'
     )
-    const imgPdf = result.find((m: MemberLike) => m.id === 'img-pdf')!
-    const pdfPdf = result.find((m: MemberLike) => m.id === 'pdf-pdf')!
-    const imgTxt = result.find((m: MemberLike) => m.id === 'img-txt')!
+    const imgPdf = findMember(result, 'img-pdf')
+    const pdfPdf = findMember(result, 'pdf-pdf')
+    const imgTxt = findMember(result, 'img-txt')
     expect(imgPdf.conversionOptions.imageToPdf).toEqual(imageToPdfOpts)
     expect(pdfPdf.conversionOptions.imageToPdf).toBeUndefined()
     expect(imgTxt.conversionOptions.imageToPdf).toBeUndefined()
@@ -325,9 +340,9 @@ describe('applyGroupSectionOptionsToApplicableMembers', () => {
       members,
       'htmlOptions'
     )
-    expect(result.find((m: MemberLike) => m.id === 'a')!.conversionOptions.html).toEqual(htmlOpts)
-    expect(result.find((m: MemberLike) => m.id === 'b')!.conversionOptions.html).toBeUndefined()
-    expect(result.find((m: MemberLike) => m.id === 'c')!.conversionOptions.html).toEqual(htmlOpts)
+    expect(findMember(result, 'a').conversionOptions.html).toEqual(htmlOpts)
+    expect(findMember(result, 'b').conversionOptions.html).toBeUndefined()
+    expect(findMember(result, 'c').conversionOptions.html).toEqual(htmlOpts)
   })
 
   it('writes imageTarget options only to non-txt-source image-target members', () => {
@@ -342,9 +357,9 @@ describe('applyGroupSectionOptionsToApplicableMembers', () => {
       members,
       'imageTarget'
     )
-    expect(result.find((m: MemberLike) => m.id === 'a')!.conversionOptions.image).toEqual(imgOpts)
-    expect(result.find((m: MemberLike) => m.id === 'b')!.conversionOptions.image).toBeUndefined()
-    expect(result.find((m: MemberLike) => m.id === 'c')!.conversionOptions.image).toEqual(imgOpts)
+    expect(findMember(result, 'a').conversionOptions.image).toEqual(imgOpts)
+    expect(findMember(result, 'b').conversionOptions.image).toBeUndefined()
+    expect(findMember(result, 'c').conversionOptions.image).toEqual(imgOpts)
   })
 
   it('does not mutate original members', () => {
@@ -353,7 +368,7 @@ describe('applyGroupSectionOptionsToApplicableMembers', () => {
       {
         imageToPdf: {
           marginPt: 10,
-          fit: 'cover',
+          fit: 'original',
           pageMode: 'auto',
           rotationDeg: 0,
           scalePercent: 100

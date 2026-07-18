@@ -1690,6 +1690,46 @@ describe('app upload feedback', () => {
     })
   })
 
+  it('passes single-file PDF portrait orientation setting to the bridge', async () => {
+    bridgeMocks.convert.mockResolvedValue(
+      createBridgeResult({
+        contents: 'pdf-bytes',
+        filename: 'photo.pdf',
+        mimeType: 'application/pdf',
+        targetFormat: 'pdf'
+      })
+    )
+
+    const { container } = render(<App />)
+    const input = container.querySelector('.dropzone + input[type="file"]')
+
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['png'], 'photo.png', { type: 'image/png' })] }
+    })
+
+    await screen.findByRole('row', { name: /photo\.png/ })
+
+    fireEvent.change(getFileTargetSelects()[0], { target: { value: 'pdf' } })
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.change(screen.getByLabelText('Orientation'), { target: { value: 'portrait' } })
+    fireEvent.click(screen.getByRole('button', { name: /done/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+
+    await waitFor(() => {
+      expect(bridgeMocks.convert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFormat: 'image',
+          targetFormat: 'pdf',
+          options: expect.objectContaining({
+            pdfPageSetup: expect.objectContaining({
+              orientation: 'portrait'
+            })
+          })
+        })
+      )
+    })
+  })
+
   it('TDD-image-2: bridge receives imageToPdf options when converting image to pdf', async () => {
     bridgeMocks.convert.mockResolvedValue(
       createBridgeResult({
@@ -1720,7 +1760,7 @@ describe('app upload feedback', () => {
           options: expect.objectContaining({
             imageToPdf: expect.objectContaining({
               marginPt: 24,
-              fit: 'cover',
+              fit: 'original',
               pageMode: 'auto'
             })
           })
@@ -2581,6 +2621,72 @@ describe('app upload feedback', () => {
       )
       // (source=txt, groupTarget=png) is not applicable for imageTarget
       expect((txtCall?.[0].options as { image?: { maxWidth?: number } }).image).toBeUndefined()
+    })
+
+    it('group settings apply pdfPageSetup orientation to image-to-pdf members', async () => {
+      bridgeMocks.convert.mockResolvedValue(
+        createBridgeResult({
+          contents: 'pdf-bytes',
+          filename: 'photo.pdf',
+          mimeType: 'application/pdf',
+          targetFormat: 'pdf'
+        })
+      )
+
+      const { container } = render(<App />)
+      const input = container.querySelector('.dropzone + input[type="file"]')
+
+      fireEvent.change(input as HTMLInputElement, {
+        target: {
+          files: [
+            new File(['a'], 'a.jpg', { type: 'image/jpeg' }),
+            new File(['b'], 'b.jpg', { type: 'image/jpeg' })
+          ]
+        }
+      })
+      await screen.findByRole('row', { name: /a\.jpg/ })
+
+      const targetSelects = getFileTargetSelects()
+      changeNativeSelectValue(targetSelects[0], 'pdf')
+      changeNativeSelectValue(targetSelects[1], 'pdf')
+      await waitFor(() => {
+        expect(targetSelects[0]).toHaveValue('pdf')
+        expect(targetSelects[1]).toHaveValue('pdf')
+      })
+
+      await enterMultiSelectMode()
+      fireEvent.click(getFileRows()[0])
+      fireEvent.click(getFileRows()[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }))
+      await waitFor(() => {
+        expect(getGroupHeaders()).toHaveLength(1)
+      })
+
+      const groupHeader = getGroupHeaders()[0]
+      fireEvent.click(within(groupHeader).getByRole('button', { name: 'Group settings' }))
+      const dialog = screen.getByRole('dialog', { name: /settings/i })
+
+      changeNativeSelectValue(
+        within(dialog).getByRole('combobox', { name: /orientation/i }),
+        'portrait'
+      )
+      fireEvent.click(screen.getByRole('button', { name: /done/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /settings/i })).not.toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Convert all' }))
+      await waitFor(() => {
+        expect(bridgeMocks.convert).toHaveBeenCalledTimes(2)
+      })
+
+      const calls = bridgeMocks.convert.mock.calls
+      for (const call of calls) {
+        const pdfPageSetup = (call[0].options as { pdfPageSetup?: { orientation?: string } })
+          .pdfPageSetup
+        expect(pdfPageSetup?.orientation).toBe('portrait')
+      }
     })
   })
 

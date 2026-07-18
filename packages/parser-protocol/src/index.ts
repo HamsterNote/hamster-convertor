@@ -154,7 +154,7 @@ export type ParserBridgeConversionOptions = {
   }
   imageToPdf?: {
     marginPt: number
-    fit: 'cover' | 'contain'
+    fit: 'original' | 'showAll'
     pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: number

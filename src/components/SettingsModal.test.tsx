@@ -49,7 +49,8 @@ describe('SettingsModal', () => {
   })
 
   it('renders nothing when no sections apply', () => {
-    render(<SettingsModal {...defaultProps} source="txt" target="pdf" />)
+    // 注意：target='txt' 不会触发任何 section（pdfPageSetup 仅对 pdf 目标生效）
+    render(<SettingsModal {...defaultProps} source="txt" target="txt" />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -248,6 +249,8 @@ describe('SettingsModal', () => {
     const imageToPdfElements = screen.getAllByText('Image to PDF Options')
     expect(imageToPdfElements.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('spinbutton', { name: 'Margin (pt)' })).toBeInTheDocument()
+    expect(screen.getByText('Original size')).toBeInTheDocument()
+    expect(screen.getByText('Show as much as possible')).toBeInTheDocument()
   })
 
   it('toggles PDF page selection via inline selector', () => {
@@ -659,7 +662,8 @@ describe('SettingsModal group-target mode', () => {
 
 describe('getSettingsSections', () => {
   it('returns empty array when no sections apply', () => {
-    const sections = getSettingsSections('txt', 'pdf', 'test.txt', 'ready')
+    // 注意：txt→txt 不会触发任何 section（pdfPageSetup 仅对 pdf 目标生效）
+    const sections = getSettingsSections('txt', 'txt', 'test.txt', 'ready')
     expect(sections).toEqual([])
   })
 
@@ -705,8 +709,9 @@ describe('getSettingsSections', () => {
   })
 
   it('returns imageToPdf when source is image and target is pdf', () => {
+    // 注意：target='pdf' 会同时触发 imageToPdf 和 pdfPageSetup 两个 section
     const sections = getSettingsSections('image', 'pdf', 'test.png', 'ready')
-    expect(sections).toEqual(['imageToPdf'])
+    expect(sections).toEqual(['imageToPdf', 'pdfPageSetup'])
   })
 
   it('returns multiple sections for complex conversion', () => {

@@ -71,15 +71,28 @@ type ImageOptions = NonNullable<NonNullable<ConversionRequest['options']>['image
 type ImageToPdfOptions = NonNullable<NonNullable<ConversionRequest['options']>['imageToPdf']>
 type TxtImageOptions = NonNullable<NonNullable<ConversionRequest['options']>['txtImage']>
 type PdfPageBox = { height: number; width: number }
+type PdfPageOrientation = 'landscape' | 'portrait'
+type PdfPageSetupOptions = NonNullable<NonNullable<ConversionRequest['options']>['pdfPageSetup']>
 type ThumbnailPage = IntermediatePage & {
   getThumbnail: (scale?: number) => Promise<IntermediateImage | undefined>
 }
 
-const A4_PORTRAIT_PT: PdfPageBox = { width: 595.28, height: 841.89 }
-const A4_LANDSCAPE_PT: PdfPageBox = { width: 841.89, height: 595.28 }
+const PAPER_SIZE_MAP: Record<string, PdfPageBox> = {
+  A4: { width: 595.28, height: 841.89 },
+  A3: { width: 841.89, height: 1190.55 },
+  A5: { width: 419.53, height: 595.28 },
+  Letter: { width: 612, height: 792 },
+  Legal: { width: 612, height: 1008 },
+  B5: { width: 498.9, height: 708.66 }
+}
+
+const DEFAULT_PDF_PAGE_SETUP: PdfPageSetupOptions = {
+  paperSize: 'A4',
+  orientation: 'auto'
+}
 const DEFAULT_IMAGE_TO_PDF_OPTIONS: ImageToPdfOptions = {
   marginPt: 0,
-  fit: 'cover',
+  fit: 'original',
   pageMode: 'auto',
   rotationDeg: 0,
   scalePercent: 100
@@ -289,14 +302,45 @@ const getRotatedImageDimensions = (
 
 const getImageToPdfPageBox = (
   dimensions: ImageDimensions,
-  pageMode: ImageToPdfOptions['pageMode']
+  pageMode: ImageToPdfOptions['pageMode'],
+  pageSetup: PdfPageSetupOptions
 ): PdfPageBox => {
-  if (pageMode === 'single') {
-    return A4_PORTRAIT_PT
+  // auto 模式下根据图片尺寸选择方向；single 模式强制 portrait
+  const getOrientationBox = (box: PdfPageBox): PdfPageBox => {
+    if (pageMode === 'single') return box
+    return dimensions.width > dimensions.height ? { width: box.height, height: box.width } : box
   }
 
-  return dimensions.width > dimensions.height ? A4_LANDSCAPE_PT : A4_PORTRAIT_PT
+  if (pageSetup.paperSize === 'auto') {
+    // auto 纸张尺寸 = 以图片尺寸作为页面尺寸，
+    // 但仍需尊重 orientation 设置：
+    //   portrait  → 确保 width <= height（横图则交换宽高）
+    //   landscape → 确保 width >= height（竖图则交换宽高）
+    //   auto      → 保持原图宽高比
+    const rawBox = { width: dimensions.width, height: dimensions.height }
+    if (pageSetup.orientation === 'portrait' && rawBox.width > rawBox.height) {
+      return { width: rawBox.height, height: rawBox.width }
+    }
+    if (pageSetup.orientation === 'landscape' && rawBox.height > rawBox.width) {
+      return { width: rawBox.height, height: rawBox.width }
+    }
+    return rawBox
+  }
+
+  const baseBox = PAPER_SIZE_MAP[pageSetup.paperSize] ?? PAPER_SIZE_MAP.A4
+
+  if (pageSetup.orientation === 'landscape') {
+    return { width: baseBox.height, height: baseBox.width }
+  }
+  if (pageSetup.orientation === 'portrait') {
+    return baseBox
+  }
+  // orientation === 'auto' → 根据 pageMode 和图片尺寸决定
+  return getOrientationBox(baseBox)
 }
+
+const getPdfPageOrientation = (pageBox: PdfPageBox): PdfPageOrientation =>
+  pageBox.width > pageBox.height ? 'landscape' : 'portrait'
 
 const getImageToPdfDrawBox = (
   dimensions: ImageDimensions,
@@ -305,31 +349,18 @@ const getImageToPdfDrawBox = (
 ): { drawHeight: number; drawWidth: number; x: number; y: number } => {
   const marginPt = clampNumber(options.marginPt, 0, Math.min(pageBox.width, pageBox.height) / 2)
   const usableWidth = pageBox.width - marginPt * 2
-  const usableHeight = pageBox.height - marginPt * 2
-  const fitScale =
-    options.fit === 'contain'
-      ? Math.min(usableWidth / dimensions.width, usableHeight / dimensions.height)
-      : Math.max(usableWidth / dimensions.width, usableHeight / dimensions.height)
-  const coverClampedWidth = Math.min(dimensions.width * fitScale, usableWidth)
-  const coverClampedHeight = Math.min(dimensions.height * fitScale, usableHeight)
-  const scaleMultiplier = clampNumber(options.scalePercent, 10, 300) / 100
-  const drawWidth = Math.min(coverClampedWidth * scaleMultiplier, usableWidth)
-  const drawHeight = Math.min(coverClampedHeight * scaleMultiplier, usableHeight)
 
-  if (options.fit === 'contain') {
-    return {
-      drawHeight,
-      drawWidth,
-      x: marginPt,
-      y: marginPt
-    }
-  }
+  const showAllWidthScale = Math.min(usableWidth / dimensions.width, 1)
+  const baseScale = options.fit === 'showAll' ? showAllWidthScale : 1
+  const scaleMultiplier = clampNumber(options.scalePercent, 10, 300) / 100
+  const drawWidth = dimensions.width * baseScale * scaleMultiplier
+  const drawHeight = dimensions.height * baseScale * scaleMultiplier
 
   return {
     drawHeight,
     drawWidth,
-    x: marginPt + (usableWidth - drawWidth) / 2,
-    y: marginPt + (usableHeight - drawHeight) / 2
+    x: marginPt,
+    y: marginPt
   }
 }
 
@@ -713,8 +744,9 @@ export const convertImageToPdf = async (
     const dimensions = await loadImageDimensions(objectUrl)
     const { jsPDF } = (await import('jspdf')) as JsPdfModule
     const imageToPdfOptions = request.options?.imageToPdf ?? DEFAULT_IMAGE_TO_PDF_OPTIONS
+    const pageSetup = request.options?.pdfPageSetup ?? DEFAULT_PDF_PAGE_SETUP
     const effectiveDimensions = getRotatedImageDimensions(dimensions, imageToPdfOptions.rotationDeg)
-    const pageBox = getImageToPdfPageBox(effectiveDimensions, imageToPdfOptions.pageMode)
+    const pageBox = getImageToPdfPageBox(effectiveDimensions, imageToPdfOptions.pageMode, pageSetup)
     const { drawHeight, drawWidth, x, y } = getImageToPdfDrawBox(
       effectiveDimensions,
       pageBox,
@@ -722,6 +754,7 @@ export const convertImageToPdf = async (
     )
 
     const doc = new jsPDF({
+      orientation: getPdfPageOrientation(pageBox),
       unit: 'pt',
       format: [pageBox.width, pageBox.height]
     })
@@ -1212,11 +1245,37 @@ export const convertMarkdownToPdf = async (
 
   try {
     const { jsPDF } = (await import('jspdf')) as JsPdfModule
-    const doc = new jsPDF({
-      unit: 'pt',
-      format: [canvas.width * 0.75, canvas.height * 0.75]
-    })
-    doc.addImage(objectUrl, 0, 0, canvas.width * 0.75, canvas.height * 0.75)
+    const pageSetup = request.options?.pdfPageSetup ?? DEFAULT_PDF_PAGE_SETUP
+    const canvasPtW = canvas.width * 0.75
+    const canvasPtH = canvas.height * 0.75
+
+    let pageW: number
+    let pageH: number
+
+    if (pageSetup.paperSize === 'auto') {
+      pageW = canvasPtW
+      pageH = canvasPtH
+    } else {
+      const baseBox = PAPER_SIZE_MAP[pageSetup.paperSize] ?? PAPER_SIZE_MAP.A4
+      if (pageSetup.orientation === 'landscape') {
+        pageW = baseBox.height
+        pageH = baseBox.width
+      } else if (pageSetup.orientation === 'portrait') {
+        pageW = baseBox.width
+        pageH = baseBox.height
+      } else {
+        // orientation === 'auto' → 根据 canvas 宽高比选择
+        pageW = canvasPtW > canvasPtH ? baseBox.height : baseBox.width
+        pageH = canvasPtW > canvasPtH ? baseBox.width : baseBox.height
+      }
+    }
+
+    const doc = new jsPDF({ unit: 'pt', format: [pageW, pageH] })
+    // 将 canvas 缩放到页面宽度，保持宽高比
+    const scale = pageW / canvasPtW
+    const drawW = pageW
+    const drawH = canvasPtH * scale
+    doc.addImage(objectUrl, 0, 0, drawW, drawH)
     const pdfBlob = doc.output('blob')
     return [
       {

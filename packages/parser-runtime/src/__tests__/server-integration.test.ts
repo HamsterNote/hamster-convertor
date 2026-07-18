@@ -164,7 +164,7 @@ const createImageToPdfRequest = (requestId: string, overrides?: Record<string, u
   options: {
     imageToPdf: {
       marginPt: 24,
-      fit: 'contain',
+      fit: 'showAll',
       pageMode: 'single',
       rotationDeg: 0,
       scalePercent: 100,
@@ -393,7 +393,7 @@ describe('ProtocolServer integration', () => {
     )
   })
 
-  it('propagates user-provided fit and pageMode for image-to-PDF', async () => {
+  it('propagates user-provided placement and pageMode for image-to-PDF', async () => {
     port.dispatch(createImageToPdfRequest('img2pdf-options'))
 
     await waitFor(() => getResultIds(port).includes('img2pdf-options'))
@@ -404,7 +404,7 @@ describe('ProtocolServer integration', () => {
         targetFormat: 'pdf',
         options: expect.objectContaining({
           imageToPdf: expect.objectContaining({
-            fit: 'contain',
+            fit: 'showAll',
             pageMode: 'single'
           })
         })
@@ -412,7 +412,41 @@ describe('ProtocolServer integration', () => {
     )
   })
 
-  it('defaults fit to cover and pageMode to auto for invalid values', async () => {
+  it('propagates PDF page setup orientation for image-to-PDF', async () => {
+    port.dispatch({
+      ...createImageToPdfRequest('img2pdf-page-setup'),
+      options: {
+        imageToPdf: {
+          marginPt: 24,
+          fit: 'showAll',
+          pageMode: 'single',
+          rotationDeg: 0,
+          scalePercent: 100
+        },
+        pdfPageSetup: {
+          paperSize: 'A4',
+          orientation: 'portrait'
+        }
+      }
+    })
+
+    await waitFor(() => getResultIds(port).includes('img2pdf-page-setup'))
+
+    expect(conversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceFormat: 'image',
+        targetFormat: 'pdf',
+        options: expect.objectContaining({
+          pdfPageSetup: {
+            paperSize: 'A4',
+            orientation: 'portrait'
+          }
+        })
+      })
+    )
+  })
+
+  it('defaults fit to original and pageMode to auto for invalid values', async () => {
     port.dispatch(createImageToPdfRequest('img2pdf-invalid', { fit: 'stretch', pageMode: 'tiled' }))
 
     await waitFor(() => getResultIds(port).includes('img2pdf-invalid'))
@@ -421,7 +455,7 @@ describe('ProtocolServer integration', () => {
       expect.objectContaining({
         options: expect.objectContaining({
           imageToPdf: expect.objectContaining({
-            fit: 'cover',
+            fit: 'original',
             pageMode: 'auto'
           })
         })
@@ -429,7 +463,7 @@ describe('ProtocolServer integration', () => {
     )
   })
 
-  it('defaults fit to cover and pageMode to auto when missing', async () => {
+  it('defaults fit to original and pageMode to auto when missing', async () => {
     port.dispatch(
       createImageToPdfRequest('img2pdf-missing', { fit: undefined, pageMode: undefined })
     )
@@ -440,7 +474,7 @@ describe('ProtocolServer integration', () => {
       expect.objectContaining({
         options: expect.objectContaining({
           imageToPdf: expect.objectContaining({
-            fit: 'cover',
+            fit: 'original',
             pageMode: 'auto'
           })
         })

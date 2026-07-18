@@ -69,10 +69,14 @@ type ConversionOptions = {
   }
   imageToPdf?: {
     marginPt: number
-    fit: 'cover' | 'contain'
+    fit: 'original' | 'showAll'
     pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: number
+  }
+  pdfPageSetup?: {
+    paperSize: 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'B5' | 'auto'
+    orientation: 'portrait' | 'landscape' | 'auto'
   }
   txtImage?: TxtImageOptions
 }
@@ -90,10 +94,15 @@ const DEFAULT_IMAGE_OPTIONS: NonNullable<ConversionOptions['image']> = {
 
 const DEFAULT_IMAGE_TO_PDF_OPTIONS: Required<NonNullable<ConversionOptions['imageToPdf']>> = {
   marginPt: 24,
-  fit: 'cover',
+  fit: 'original',
   pageMode: 'auto',
   rotationDeg: 0,
   scalePercent: 100
+}
+
+const DEFAULT_PDF_PAGE_SETUP: Required<NonNullable<ConversionOptions['pdfPageSetup']>> = {
+  paperSize: 'A4',
+  orientation: 'auto'
 }
 
 const DEFAULT_TXT_IMAGE_OPTIONS: TxtImageOptions = {
@@ -643,6 +652,12 @@ function App() {
           }
         }
         conversionOptions.txtImage = next.txtImage ? { ...next.txtImage } : undefined
+        if (next.pdfPageSetup) {
+          conversionOptions.pdfPageSetup = {
+            paperSize: next.pdfPageSetup.paperSize ?? DEFAULT_PDF_PAGE_SETUP.paperSize,
+            orientation: next.pdfPageSetup.orientation ?? DEFAULT_PDF_PAGE_SETUP.orientation
+          }
+        }
         return { ...it, conversionOptions }
       })
     )
@@ -752,6 +767,7 @@ function App() {
         layout: current.conversionOptions.html?.htmlLayout,
         image: bridgeImageOptions,
         imageToPdf: imageToPdfOptions,
+        pdfPageSetup: current.conversionOptions.pdfPageSetup,
         txtImage: txtImageOptions
       })
       const results = Array.isArray(result) ? result : [result]
@@ -1051,6 +1067,13 @@ function App() {
             scalePercent: next.imageToPdf.scalePercent ?? DEFAULT_IMAGE_TO_PDF_OPTIONS.scalePercent
           }
         }
+      } else if (sectionId === 'pdfPageSetup' && next.pdfPageSetup) {
+        sectionOptions = {
+          pdfPageSetup: {
+            paperSize: next.pdfPageSetup.paperSize ?? DEFAULT_PDF_PAGE_SETUP.paperSize,
+            orientation: next.pdfPageSetup.orientation ?? DEFAULT_PDF_PAGE_SETUP.orientation
+          }
+        }
       }
 
       updatedMembers = applyGroupSectionOptionsToApplicableMembers(
@@ -1113,6 +1136,12 @@ function App() {
           pageMode: group.conversionOptions.imageToPdf.pageMode,
           rotationDeg: group.conversionOptions.imageToPdf.rotationDeg,
           scalePercent: group.conversionOptions.imageToPdf.scalePercent
+        }
+      : undefined,
+    pdfPageSetup: group.conversionOptions.pdfPageSetup
+      ? {
+          paperSize: group.conversionOptions.pdfPageSetup.paperSize,
+          orientation: group.conversionOptions.pdfPageSetup.orientation
         }
       : undefined
   })

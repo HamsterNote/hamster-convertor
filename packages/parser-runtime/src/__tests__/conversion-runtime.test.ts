@@ -1186,7 +1186,7 @@ describe('Runtime conversion', () => {
       options: {
         imageToPdf: {
           marginPt: 24,
-          fit: 'contain',
+          fit: 'showAll',
           pageMode: 'multi',
           rotationDeg: 270,
           scalePercent: 150
@@ -1194,7 +1194,7 @@ describe('Runtime conversion', () => {
       }
     }
     expect(request.options?.imageToPdf?.marginPt).toBe(24)
-    expect(request.options?.imageToPdf?.fit).toBe('contain')
+    expect(request.options?.imageToPdf?.fit).toBe('showAll')
     expect(request.options?.imageToPdf?.pageMode).toBe('multi')
     expect(request.options?.imageToPdf?.rotationDeg).toBe(270)
     expect(request.options?.imageToPdf?.scalePercent).toBe(150)
@@ -1232,21 +1232,17 @@ describe('Image-to-PDF A4 sizing', () => {
     return call as [string, number, number, number, number, string | undefined, unknown, number]
   }
 
-  const expectWithinUsableBounds = (usableWidth: number, usableHeight: number) => {
+  const expectDrawBox = (expected: {
+    drawHeight: number
+    drawWidth: number
+    x?: number
+    y?: number
+  }) => {
     const [, x, y, drawWidth, drawHeight] = getLastAddImageCall()
-    expect(drawWidth).toBeLessThanOrEqual(usableWidth)
-    expect(drawHeight).toBeLessThanOrEqual(usableHeight)
-    expect(x).toBeGreaterThanOrEqual(marginPt)
-    expect(y).toBeGreaterThanOrEqual(marginPt)
-    expect(x + drawWidth).toBeLessThanOrEqual(marginPt + usableWidth)
-    expect(y + drawHeight).toBeLessThanOrEqual(marginPt + usableHeight)
-  }
-
-  const expectContainAtTopLeftWithinBounds = (usableWidth: number, usableHeight: number) => {
-    const [, x, y] = getLastAddImageCall()
-    expect(x).toBe(marginPt)
-    expect(y).toBe(marginPt)
-    expectWithinUsableBounds(usableWidth, usableHeight)
+    expect(x).toBeCloseTo(expected.x ?? marginPt)
+    expect(y).toBeCloseTo(expected.y ?? marginPt)
+    expect(drawWidth).toBeCloseTo(expected.drawWidth)
+    expect(drawHeight).toBeCloseTo(expected.drawHeight)
   }
 
   const convertImageToPdf = (
@@ -1290,6 +1286,7 @@ describe('Image-to-PDF A4 sizing', () => {
     })
 
     expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
       unit: 'pt',
       format: [a4Landscape.width, a4Landscape.height]
     })
@@ -1297,8 +1294,8 @@ describe('Image-to-PDF A4 sizing', () => {
       'blob:mock-image',
       0,
       0,
-      a4Landscape.width,
-      a4Landscape.height,
+      32,
+      16,
       undefined,
       undefined,
       0
@@ -1308,122 +1305,82 @@ describe('Image-to-PDF A4 sizing', () => {
     expect(result?.targetFormat).toBe('pdf')
   })
 
-  it.each(['contain', 'cover'] as const)(
-    'keeps a large landscape image inside usable page width for %s fit',
-    async fit => {
-      mockImageWidth = 4000
-      mockImageHeight = 3000
-
-      await convertRuntime({
-        filename: 'large.jpg',
-        sourceFormat: 'image',
-        targetFormat: 'pdf',
-        buffer: createBuffer('jpg-bytes'),
-        mimeType: 'image/jpeg',
-        options: {
-          imageToPdf: {
-            marginPt,
-            fit,
-            pageMode: 'auto',
-            rotationDeg: 0,
-            scalePercent: 100
-          }
-        }
-      })
-
-      expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
-        unit: 'pt',
-        format: [a4Landscape.width, a4Landscape.height]
-      })
-      expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
-    }
-  )
-
-  it('draws width-dominant contain images from the top-left margin', async () => {
+  it('places original-size images at their direct size from the top-left margin', async () => {
     mockImageWidth = 4000
     mockImageHeight = 1000
 
     await convertImageToPdf({
       marginPt,
-      fit: 'contain',
+      fit: 'original',
       pageMode: 'auto',
       rotationDeg: 0,
       scalePercent: 100
     })
 
     expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
       unit: 'pt',
       format: [a4Landscape.width, a4Landscape.height]
     })
-    expectContainAtTopLeftWithinBounds(
-      a4Landscape.width - marginPt * 2,
-      a4Landscape.height - marginPt * 2
-    )
+    expectDrawBox({ drawWidth: 4000, drawHeight: 1000 })
   })
 
-  it('draws height-dominant contain images from the top-left margin', async () => {
-    mockImageWidth = 1000
-    mockImageHeight = 4000
+  it('keeps show-all images at original size when width fits inside page margins', async () => {
+    mockImageWidth = 320
+    mockImageHeight = 240
 
     await convertImageToPdf({
       marginPt,
-      fit: 'contain',
+      fit: 'showAll',
       pageMode: 'auto',
       rotationDeg: 0,
       scalePercent: 100
     })
 
     expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
       unit: 'pt',
-      format: [a4Portrait.width, a4Portrait.height]
+      format: [a4Landscape.width, a4Landscape.height]
     })
-    expectContainAtTopLeftWithinBounds(
-      a4Portrait.width - marginPt * 2,
-      a4Portrait.height - marginPt * 2
-    )
+    expectDrawBox({ drawWidth: 320, drawHeight: 240 })
   })
 
-  it('draws square contain images from the top-left margin', async () => {
-    mockImageWidth = 2000
-    mockImageHeight = 2000
-
-    await convertImageToPdf({
-      marginPt,
-      fit: 'contain',
-      pageMode: 'auto',
-      rotationDeg: 0,
-      scalePercent: 100
-    })
-    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
-      unit: 'pt',
-      format: [a4Portrait.width, a4Portrait.height]
-    })
-    expectContainAtTopLeftWithinBounds(
-      a4Portrait.width - marginPt * 2,
-      a4Portrait.height - marginPt * 2
-    )
-  })
-
-  it('keeps cover images centered when scale leaves drawable whitespace', async () => {
+  it('scales show-all images down to page width after margins when image is wider', async () => {
     mockImageWidth = 4000
     mockImageHeight = 1000
 
     await convertImageToPdf({
       marginPt,
-      fit: 'cover',
-      pageMode: 'single',
+      fit: 'showAll',
+      pageMode: 'auto',
       rotationDeg: 0,
-      scalePercent: 50
+      scalePercent: 100
     })
 
-    const [, x, y, drawWidth, drawHeight] = getLastAddImageCall()
-    const usableWidth = a4Portrait.width - marginPt * 2
-    const usableHeight = a4Portrait.height - marginPt * 2
-    expect(x).toBeCloseTo(marginPt + (usableWidth - drawWidth) / 2)
-    expect(y).toBeCloseTo(marginPt + (usableHeight - drawHeight) / 2)
-    expect(x).toBeGreaterThan(marginPt)
-    expect(y).toBeGreaterThan(marginPt)
-    expectWithinUsableBounds(usableWidth, usableHeight)
+    const usableWidth = a4Landscape.width - marginPt * 2
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: [a4Landscape.width, a4Landscape.height]
+    })
+    expectDrawBox({ drawWidth: usableWidth, drawHeight: usableWidth / 4 })
+  })
+
+  it('applies scale on top of the show-all base width', async () => {
+    mockImageWidth = 4000
+    mockImageHeight = 1000
+
+    await convertImageToPdf({
+      marginPt,
+      fit: 'showAll',
+      pageMode: 'auto',
+      rotationDeg: 0,
+      scalePercent: 150
+    })
+
+    const usableWidth = a4Landscape.width - marginPt * 2
+    expect(jsPdfMocks.addImage).toHaveBeenCalledTimes(1)
+    expectDrawBox({ drawWidth: usableWidth * 1.5, drawHeight: (usableWidth / 4) * 1.5 })
   })
 
   it.each([90, 270] as const)(
@@ -1441,7 +1398,7 @@ describe('Image-to-PDF A4 sizing', () => {
         options: {
           imageToPdf: {
             marginPt,
-            fit: 'contain',
+            fit: 'showAll',
             pageMode: 'auto',
             rotationDeg,
             scalePercent: 100
@@ -1450,11 +1407,15 @@ describe('Image-to-PDF A4 sizing', () => {
       })
 
       expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+        orientation: 'portrait',
         unit: 'pt',
         format: [a4Portrait.width, a4Portrait.height]
       })
       expect(getLastAddImageCall()[7]).toBe(rotationDeg)
-      expectWithinUsableBounds(a4Portrait.width - marginPt * 2, a4Portrait.height - marginPt * 2)
+      expectDrawBox({
+        drawWidth: a4Portrait.width - marginPt * 2,
+        drawHeight: ((a4Portrait.width - marginPt * 2) * 4000) / 3000
+      })
     }
   )
 
@@ -1471,7 +1432,7 @@ describe('Image-to-PDF A4 sizing', () => {
       options: {
         imageToPdf: {
           marginPt,
-          fit: 'cover',
+          fit: 'showAll',
           pageMode: 'single',
           rotationDeg: 0,
           scalePercent: 100
@@ -1480,10 +1441,14 @@ describe('Image-to-PDF A4 sizing', () => {
     })
 
     expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'portrait',
       unit: 'pt',
       format: [a4Portrait.width, a4Portrait.height]
     })
-    expectWithinUsableBounds(a4Portrait.width - marginPt * 2, a4Portrait.height - marginPt * 2)
+    expectDrawBox({
+      drawWidth: a4Portrait.width - marginPt * 2,
+      drawHeight: ((a4Portrait.width - marginPt * 2) * 3000) / 4000
+    })
   })
 
   it('multi page mode behaves like auto without adding tiling', async () => {
@@ -1499,7 +1464,7 @@ describe('Image-to-PDF A4 sizing', () => {
       options: {
         imageToPdf: {
           marginPt,
-          fit: 'contain',
+          fit: 'showAll',
           pageMode: 'multi',
           rotationDeg: 0,
           scalePercent: 100
@@ -1508,13 +1473,14 @@ describe('Image-to-PDF A4 sizing', () => {
     })
 
     expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
       unit: 'pt',
       format: [a4Landscape.width, a4Landscape.height]
     })
     expect(jsPdfMocks.addImage).toHaveBeenCalledTimes(1)
   })
 
-  it('clamps scale 300 on wide images to usable page bounds', async () => {
+  it('allows scale 300 to enlarge the show-all base width', async () => {
     mockImageWidth = 4000
     mockImageHeight = 1000
 
@@ -1527,7 +1493,7 @@ describe('Image-to-PDF A4 sizing', () => {
       options: {
         imageToPdf: {
           marginPt,
-          fit: 'contain',
+          fit: 'showAll',
           pageMode: 'auto',
           rotationDeg: 0,
           scalePercent: 300
@@ -1535,11 +1501,12 @@ describe('Image-to-PDF A4 sizing', () => {
       }
     })
 
-    expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
+    const usableWidth = a4Landscape.width - marginPt * 2
+    expectDrawBox({ drawWidth: usableWidth * 3, drawHeight: (usableWidth / 4) * 3 })
     expect(jsPdfMocks.addImage).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps rotated and scaled images inside A4 bounds', async () => {
+  it('applies scale after rotated show-all sizing', async () => {
     mockImageWidth = 1200
     mockImageHeight = 2400
 
@@ -1552,7 +1519,7 @@ describe('Image-to-PDF A4 sizing', () => {
       options: {
         imageToPdf: {
           marginPt,
-          fit: 'contain',
+          fit: 'showAll',
           pageMode: 'auto',
           rotationDeg: 90,
           scalePercent: 150
@@ -1561,11 +1528,15 @@ describe('Image-to-PDF A4 sizing', () => {
     })
 
     expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
       unit: 'pt',
       format: [a4Landscape.width, a4Landscape.height]
     })
     expect(getLastAddImageCall()[7]).toBe(90)
-    expectWithinUsableBounds(a4Landscape.width - marginPt * 2, a4Landscape.height - marginPt * 2)
+    expectDrawBox({
+      drawWidth: (a4Landscape.width - marginPt * 2) * 1.5,
+      drawHeight: ((a4Landscape.width - marginPt * 2) / 2) * 1.5
+    })
   })
 
   it('revokes object URL after A4 sizing', async () => {
@@ -1578,7 +1549,7 @@ describe('Image-to-PDF A4 sizing', () => {
       options: {
         imageToPdf: {
           marginPt,
-          fit: 'cover',
+          fit: 'original',
           pageMode: 'auto',
           rotationDeg: 0,
           scalePercent: 100
@@ -1587,6 +1558,151 @@ describe('Image-to-PDF A4 sizing', () => {
     })
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-image')
+  })
+
+  it('produces portrait PDF when portrait orientation is set for a landscape image (A4)', async () => {
+    mockImageWidth = 1200
+    mockImageHeight = 600
+
+    await convertRuntime({
+      filename: 'landscape.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'original',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 100
+        },
+        pdfPageSetup: { paperSize: 'A4', orientation: 'portrait' }
+      }
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: [a4Portrait.width, a4Portrait.height]
+    })
+  })
+
+  it('produces landscape PDF when landscape orientation is set for a portrait image (A4)', async () => {
+    mockImageWidth = 600
+    mockImageHeight = 1200
+
+    await convertRuntime({
+      filename: 'portrait.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'original',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 100
+        },
+        pdfPageSetup: { paperSize: 'A4', orientation: 'landscape' }
+      }
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: [a4Landscape.width, a4Landscape.height]
+    })
+  })
+
+  it('respects portrait orientation with auto paper size for a landscape image', async () => {
+    mockImageWidth = 2000
+    mockImageHeight = 1000
+
+    await convertRuntime({
+      filename: 'wide.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'original',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 100
+        },
+        pdfPageSetup: { paperSize: 'auto', orientation: 'portrait' }
+      }
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: [1000, 2000]
+    })
+  })
+
+  it('respects landscape orientation with auto paper size for a portrait image', async () => {
+    mockImageWidth = 1000
+    mockImageHeight = 2000
+
+    await convertRuntime({
+      filename: 'tall.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'original',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 100
+        },
+        pdfPageSetup: { paperSize: 'auto', orientation: 'landscape' }
+      }
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: [2000, 1000]
+    })
+  })
+
+  it('keeps auto orientation with auto paper size matching image aspect ratio', async () => {
+    mockImageWidth = 2000
+    mockImageHeight = 1000
+
+    await convertRuntime({
+      filename: 'wide.jpg',
+      sourceFormat: 'image',
+      targetFormat: 'pdf',
+      buffer: createBuffer('jpg-bytes'),
+      mimeType: 'image/jpeg',
+      options: {
+        imageToPdf: {
+          marginPt,
+          fit: 'original',
+          pageMode: 'auto',
+          rotationDeg: 0,
+          scalePercent: 100
+        },
+        pdfPageSetup: { paperSize: 'auto', orientation: 'auto' }
+      }
+    })
+
+    expect(jsPdfMocks.constructor).toHaveBeenCalledWith({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: [2000, 1000]
+    })
   })
 })
 

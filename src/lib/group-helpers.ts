@@ -61,10 +61,14 @@ export type ConversionOptions = {
   }
   imageToPdf?: {
     marginPt: number
-    fit: 'cover' | 'contain'
+    fit: 'original' | 'showAll'
     pageMode: 'auto' | 'single' | 'multi'
     rotationDeg: 0 | 90 | 180 | 270
     scalePercent: number
+  }
+  pdfPageSetup?: {
+    paperSize: 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'B5' | 'auto'
+    orientation: 'portrait' | 'landscape' | 'auto'
   }
   txtImage?: TxtImageOptions
   markdown?: {
@@ -82,6 +86,7 @@ export type SettingsSection =
   | 'imageTarget'
   | 'txtImage'
   | 'imageToPdf'
+  | 'pdfPageSetup'
   | 'markdown'
 
 /** Group item stored in app state. References file IDs; never duplicates FileItem data. */
@@ -134,6 +139,7 @@ const SECTION_META: Record<
     applicable: (s, t) => s === 'txt' && ['png', 'jpg', 'webp'].includes(t)
   },
   imageToPdf: { targetRelated: true, applicable: (s, t) => s === 'image' && t === 'pdf' },
+  pdfPageSetup: { targetRelated: true, applicable: (_s, t) => t === 'pdf' },
   markdown: { targetRelated: false, applicable: (s, t) => s === 'markdown' && t === 'txt' }
 }
 
@@ -146,6 +152,7 @@ const ALL_SECTIONS: SettingsSection[] = [
   'imageTarget',
   'txtImage',
   'imageToPdf',
+  'pdfPageSetup',
   'markdown'
 ]
 
@@ -238,6 +245,10 @@ export const pickTargetRelatedOptions = (
 
   if (target === 'pdf' && source === 'image') {
     result.imageToPdf = options.imageToPdf
+  }
+
+  if (target === 'pdf') {
+    result.pdfPageSetup = options.pdfPageSetup
   }
 
   return result

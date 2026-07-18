@@ -51,10 +51,20 @@ export type ImageOptions = {
 
 export type ImageToPdfOptions = {
   marginPt: number
-  fit: 'cover' | 'contain'
+  fit: 'original' | 'showAll'
   pageMode: 'auto' | 'single' | 'multi'
   rotationDeg: 0 | 90 | 180 | 270
   scalePercent: number
+}
+
+/** 单位: pt, 1pt = 1/72 inch */
+export type PaperSize = 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'B5' | 'auto'
+
+export type PageOrientation = 'portrait' | 'landscape' | 'auto'
+
+export type PdfPageSetupOptions = {
+  paperSize: PaperSize
+  orientation: PageOrientation
 }
 
 export type TxtImageOptions = {
@@ -77,6 +87,7 @@ export type ConversionOptions = {
   layout?: HtmlLayoutOptions
   image?: ImageOptions
   imageToPdf?: ImageToPdfOptions
+  pdfPageSetup?: PdfPageSetupOptions
   txtImage?: TxtImageOptions
   markdown?: {
     txtMode?: 'raw' | 'plain'

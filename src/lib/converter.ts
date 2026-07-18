@@ -71,6 +71,15 @@ export type ConversionResult = {
   warnings?: ConversionWarning[]
 }
 
+export type PaperSize = 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'B5' | 'auto'
+
+export type PageOrientation = 'portrait' | 'landscape' | 'auto'
+
+export type PdfPageSetupOptions = {
+  paperSize: PaperSize
+  orientation: PageOrientation
+}
+
 export type ConversionRequest = {
   file: File
   source: SourceFormat
@@ -96,11 +105,12 @@ export type ConversionRequest = {
     }
     imageToPdf?: {
       marginPt: number
-      fit: 'cover' | 'contain'
+      fit: 'original' | 'showAll'
       pageMode: 'auto' | 'single' | 'multi'
       rotationDeg: 0 | 90 | 180 | 270
       scalePercent: number
     }
+    pdfPageSetup?: PdfPageSetupOptions
     txtImage?: TxtImageOptions
   }
 }
