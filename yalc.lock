@@ -1,9 +1,0 @@
-{
-  "version": "v1",
-  "packages": {
-    "@hamster-note/markdown-parser": {
-      "signature": "91be8c773b0f951b3d944f65b737ac83",
-      "file": true
-    }
-  }
-}

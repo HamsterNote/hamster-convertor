@@ -458,8 +458,10 @@
     "@hamster-note/types" "0.8.0"
     "@paddleocr/paddleocr-js" "0.3.2"
 
-"@hamster-note/markdown-parser@file:.yalc/@hamster-note/markdown-parser":
-  version "0.1.2-beta.1"
+"@hamster-note/markdown-parser@0.1.2-beta.2":
+  version "0.1.2-beta.2"
+  resolved "https://registry.yarnpkg.com/@hamster-note/markdown-parser/-/markdown-parser-0.1.2-beta.2.tgz#f2e54aa93f6dd5034b8794b4ff11655e951a9d54"
+  integrity sha512-F169kkxG7tbBXVPfeVI2mMAFWpVfEYNiz2nh4ALJ/A0N32/aUH2lSY4mOgd1JlRLaBunk8mdLx6on/079bGHxQ==
   dependencies:
     "@hamster-note/document-parser" "^0.3.1"
     "@hamster-note/types" "0.8.0"
