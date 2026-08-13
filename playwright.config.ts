@@ -35,19 +35,22 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: localBaseUrl,
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    launchOptions: {
+      args: ['--enable-logging', '--v=1']
+    }
   },
   webServer: process.env.CI
     ? {
-        command: `npx vite preview --host 127.0.0.1 --port ${e2ePort} --strictPort`,
+        command: `yarn build && npx vite preview --host 127.0.0.1 --port ${e2ePort} --strictPort`,
         url: localBaseUrl,
-        reuseExistingServer: false,
+        reuseExistingServer: true,
         timeout: 180000
       }
     : {
         command: `npx vite --host 127.0.0.1 --port ${e2ePort} --strictPort`,
         url: localBaseUrl,
-        reuseExistingServer: false,
+        reuseExistingServer: true,
         timeout: 180000
       },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]

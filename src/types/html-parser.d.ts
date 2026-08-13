@@ -1,15 +1,38 @@
 declare module '@hamster-note/html-parser' {
-  import { IntermediateDocument } from '@hamster-note/types'
+  import { IntermediateDocument, Number2 } from '@hamster-note/types'
+
+  export type ParserInput = ArrayBuffer | ArrayBufferView | Blob
+
+  export type DecodeOptions = {
+    textControl?: {
+      fontSize?: number
+      lineHeight?: number
+      fontWeight?: number
+      italic?: boolean
+      color?: string
+      fontFamily?: string
+      vertical?: string
+      dir?: string
+    }
+    background?: {
+      includeBackground?: boolean
+      backgroundQuality?: number
+    }
+  }
 
   export interface RenderOptions {
     scale?: number
     views?: ('TEXT' | 'THUMBNAIL')[]
   }
 
+  export type IframeHostDocument = Pick<Document, 'createElement' | 'body' | 'documentElement'>
+
+  export function setIframeHostDocument(documentOverride: IframeHostDocument | null): void
+
   export class HtmlPage {
-    constructor(intermediateDocument: IntermediateDocument)
+    constructor(intermediatePage: IntermediateDocument)
     getNumber(): number
-    getSize(scale: number): [number, number]
+    getSize(scale: number): Number2
     getPureText(): string
     render(container: HTMLDivElement, options?: RenderOptions): Promise<void>
   }
@@ -25,19 +48,25 @@ declare module '@hamster-note/html-parser' {
     getIntermediateDocument(): IntermediateDocument
   }
 
-  export class HtmlParser {
+  export class HtmlParser extends DocumentParser {
     static readonly exts: readonly ['html']
     static readonly ext: 'html'
 
-    static encode(fileOrBuffer: File | ArrayBuffer): Promise<HtmlDocument>
+    static encode(fileOrBuffer: ParserInput): Promise<HtmlDocument>
 
-    static decodeToHtml(intermediateDocument: IntermediateDocument): Promise<string>
+    static decodeToHtml(
+      intermediateDocument: IntermediateDocument,
+      options?: DecodeOptions
+    ): Promise<string>
 
-    static decode(intermediateDocument: IntermediateDocument): Promise<File | ArrayBuffer>
+    static decode(
+      intermediateDocument: IntermediateDocument,
+      options?: DecodeOptions
+    ): Promise<File | ArrayBuffer>
 
-    encode(input: File | ArrayBuffer): Promise<IntermediateDocument>
+    encode(input: ParserInput): Promise<IntermediateDocument>
 
-    decode(intermediateDocument: IntermediateDocument): Promise<File | ArrayBuffer | undefined>
+    decode(intermediateDocument: IntermediateDocument): Promise<ParserInput>
   }
 
   export { HtmlParser }

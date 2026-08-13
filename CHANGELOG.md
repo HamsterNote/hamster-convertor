@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- 新增 Markdown 文件支持（`.md` / `.markdown`），新增源格式 `markdown` 与目标格式 `md`（使用 `@hamster-note/markdown-parser`，通过 yalc 本地链接）
+  - md → html、md → txt（支持 `raw` 保留原文 / `plain` 提取纯文本两种模式）、md → png/jpg/webp、md → pdf
+  - html → md
+  - 设置弹窗新增 “Markdown Options” 段，允许在 md → txt 时选择输出模式
+  - 三语言（en / zh-CN / zh-TW）同步新增对应文案
+  - 新增 vitest 单元测试与 Playwright e2e 用例覆盖以上路径
 - 集成 PDF 到 HTML 转换功能（使用 @hamster-note/pdf-parser 和 @hamster-note/html-parser）
 - 支持下载转换后的单个 HTML 文件
 - 支持下载多个 HTML 文件的归档包
@@ -20,6 +26,9 @@ All notable changes to this project will be documented in this file.
 - 改进用户界面，转换完成后的文件可单独下载
 - 更新多语言文本，添加错误和警告相关的翻译
 - 转换按钮行为优化，避免重复触发
+- 升级 `@hamster-note/pdf-parser` 至 `^0.6.0`：`PdfParser.encode/decode` 新增可选 `options`（`maxPages`、`pageLoadTimeoutMs`）和 `onProgress` 进度回调参数；现有单参数调用保持兼容
+- 升级 `@hamster-note/html-parser` 至 `^0.6.0`：HTML 解析改为基于隐藏 iframe 的真实 DOM 测量（替换原 DOMParser 启发式估算），并新增 `setIframeHostDocument` 用于注入宿主文档
+- 同步更新 `src/types/{pdf,html}-parser.d.ts` 类型声明以匹配新签名
 
 ### Fixed
 

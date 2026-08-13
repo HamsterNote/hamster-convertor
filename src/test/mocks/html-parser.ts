@@ -16,10 +16,83 @@ const html = `<!doctype html>
 </html>
 `
 
-export class HtmlParser {
-  static readonly exts = ['html'] as const
+class MockHtmlPage {
+  private number: number
+  private pureText: string
 
-  static async decodeToHtml(_intermediateDocument: IntermediateDocument): Promise<string> {
+  constructor(pageNumber: number, pureText: string) {
+    this.number = pageNumber
+    this.pureText = pureText
+  }
+
+  getNumber(): number {
+    return this.number
+  }
+
+  // getSize 返回类型从 [number, number] 改为 Number2 ({x, y})
+  getSize(_scale: number): { x: number; y: number } {
+    return { x: 595, y: 842 }
+  }
+
+  getPureText(): string {
+    return this.pureText
+  }
+}
+
+class MockHtmlDocument {
+  private pages: MockHtmlPage[]
+
+  constructor(pageTexts: string[]) {
+    this.pages = pageTexts.map((text, index) => new MockHtmlPage(index + 1, text))
+  }
+
+  getPages(): Promise<MockHtmlPage[]> {
+    return Promise.resolve(this.pages)
+  }
+
+  getPage(pageNumber: number): Promise<MockHtmlPage | undefined> {
+    return Promise.resolve(this.pages.find(p => p.getNumber() === pageNumber))
+  }
+
+  getOutline(): Promise<IntermediateDocument['outline']> {
+    return Promise.resolve(undefined)
+  }
+
+  getCover(): Promise<HTMLCanvasElement | HTMLImageElement> {
+    return Promise.resolve({} as HTMLCanvasElement)
+  }
+
+  getTitle(): string {
+    return 'Sample Document'
+  }
+
+  getId(): string {
+    return 'mock-html-doc-id'
+  }
+
+  getIntermediateDocument(): IntermediateDocument {
+    return { outline: undefined }
+  }
+}
+
+export const HtmlParser = {
+  exts: ['html'] as const,
+  ext: 'html' as const,
+
+  async encode(_input: File | ArrayBuffer, _options?: unknown): Promise<MockHtmlDocument> {
+    const pageTexts = ['Page 1: Hamster Note Sample', 'Page 2: Nested Content with Script']
+    return new MockHtmlDocument(pageTexts)
+  },
+
+  async decode(_intermediateDocument: IntermediateDocument, _options?: unknown): Promise<File> {
+    const file = new File([html], 'converted.html', { type: 'text/html' })
+    return file
+  },
+
+  async decodeToHtml(
+    _intermediateDocument: IntermediateDocument,
+    _options?: unknown
+  ): Promise<string> {
     return html
   }
 }

@@ -1,0 +1,55 @@
+yarn run v1.22.22
+$ vitest run
+
+ RUN  v2.1.9 /home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers
+
+ ✓ src/__tests__/converter.txt-adapter.test.ts (3 tests) 9ms
+ ✓ src/__tests__/converter.contract.test.ts (12 tests) 20ms
+ ✓ src/__tests__/converter.download.test.ts (3 tests) 19ms
+ ✓ src/__tests__/converter.image-adapters.test.ts (3 tests) 21ms
+ ✓ src/__tests__/converter.error.test.ts (2 tests) 8ms
+ ✓ src/__tests__/converter.pdf-adapters.test.ts (7 tests) 32ms
+ ✓ src/__tests__/FullscreenLoading.test.tsx (3 tests) 102ms
+ ✓ src/__tests__/convert.integration.test.ts (9 tests) 100ms
+stderr | src/__tests__/app.upload.test.tsx > app upload feedback > failed row select remains enabled
+Conversion failed {
+  id: 'notes.pdf-5-1777558316250-148e993f-aff9-45e7-ac2f-58669dcf4a45',
+  fileName: 'notes.pdf',
+  error: Error: conversion failed
+      at /home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/src/__tests__/app.upload.test.tsx:234:46
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at processTimers (node:internal/timers:538:9)
+      at file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:533:5
+      at runTest (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1056:11)
+      at runSuite (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1205:15)
+      at runSuite (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1205:15)
+      at runFiles (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1262:5)
+      at startTests (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1271:3)
+      at file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+}
+
+stderr | src/__tests__/app.upload.test.tsx > app upload feedback > shows full-screen loading during convert-all and hides on failure
+Conversion failed {
+  id: 'notes.txt-5-1777558316418-c0e5b62a-47ba-4789-b503-b359bc9eb795',
+  fileName: 'notes.txt',
+  error: Error: conversion failed
+      at /home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/src/__tests__/app.upload.test.tsx:391:24
+      at file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:533:5
+      at runTest (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1056:11)
+      at runSuite (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1205:15)
+      at runSuite (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1205:15)
+      at runFiles (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1262:5)
+      at startTests (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/@vitest/runner/dist/index.js:1271:3)
+      at file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+      at withEnv (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)
+      at run (file:///home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:112:3)
+}
+
+ ✓ src/__tests__/app.upload.test.tsx (19 tests) 740ms
+
+ Test Files  9 passed (9)
+      Tests  61 passed (61)
+   Start at  22:11:54
+   Duration  1.92s (transform 591ms, setup 544ms, collect 1.50s, tests 1.05s, environment 4.24s, prepare 672ms)
+
+Done in 2.22s.

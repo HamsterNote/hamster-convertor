@@ -1,0 +1,2 @@
+=== dangerouslySetInnerHTML Search ===
+No dangerouslySetInnerHTML found - PASS

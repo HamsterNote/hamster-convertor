@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'yarn'
           cache-dependency-path: yarn.lock
           registry-url: 'https://registry.npmjs.org'
@@ -40,8 +40,11 @@ jobs:
             sleep 10
           done
 
-      - name: Build project
+      - name: Build host and parser runtime
         run: yarn build
+
+      - name: Verify parser runtime artifact
+        run: test -f dist/parser-runtime/index.html
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps

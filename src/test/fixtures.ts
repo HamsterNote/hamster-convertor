@@ -9,3 +9,9 @@ export const loadPdfFixture = async (name: string): Promise<Uint8Array> => {
   const buffer = await readFile(fixturePath)
   return new Uint8Array(buffer)
 }
+
+export const loadHtmlFixture = async (name: string): Promise<string> => {
+  const fixturePath = join(currentDir, 'fixtures', name)
+  const buffer = await readFile(fixturePath)
+  return buffer.toString('utf-8')
+}

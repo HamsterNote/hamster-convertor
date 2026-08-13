@@ -1,0 +1,15 @@
+yarn run v1.22.22
+$ /home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers/node_modules/.bin/vitest run src/__tests__/converter.contract.test.ts src/__tests__/converter.txt-adapter.test.ts src/__tests__/convert.integration.test.ts
+
+ RUN  v2.1.9 /home/zhangxiao/.local/share/opencode/worktree/bef1a59b415ea9bff88afa4f9053efb78b062a73/feature-add-parsers
+
+ ✓ src/__tests__/converter.txt-adapter.test.ts (5 tests) 14ms
+ ✓ src/__tests__/converter.contract.test.ts (16 tests) 20ms
+ ✓ src/__tests__/convert.integration.test.ts (10 tests) 62ms
+
+ Test Files  3 passed (3)
+      Tests  31 passed (31)
+   Start at  21:26:52
+   Duration  885ms (transform 184ms, setup 151ms, collect 314ms, tests 95ms, environment 906ms, prepare 185ms)
+
+Done in 1.19s.

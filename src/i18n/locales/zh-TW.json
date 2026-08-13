@@ -13,14 +13,36 @@
   "formats": {
     "from": "來源格式",
     "to": "目標格式",
-    "supported": "支援的格式"
+    "supported": "支援的格式",
+    "targets": {
+      "txt": "TXT",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
+      "pdf": "PDF",
+      "html": "HTML",
+      "md": "Markdown"
+    }
   },
   "actions": {
     "addFiles": "新增檔案",
     "convertAll": "全部轉換",
     "clearAll": "清空",
     "download": "下載",
-    "remove": "刪除"
+    "downloadAll": "下載全部",
+    "preview": "預覽",
+    "remove": "刪除",
+    "selectPages": "選擇頁數",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "done": "完成",
+    "cancel": "取消",
+    "viewOptions": "檢視選項",
+    "htmlConvertOptions": "HTML 轉換選項",
+    "continue": "繼續",
+    "settings": "設定",
+    "copy": "複製",
+    "previewUnsupported": "該格式不支援預覽"
   },
   "table": {
     "fileName": "檔名",
@@ -36,12 +58,161 @@
     "done": "完成",
     "failed": "失敗"
   },
+  "loading": {
+    "converting": "轉換中...",
+    "convertingWithProgress": "轉換中（{{processed}} / {{total}}）",
+    "preparingDownload": "準備下載中..."
+  },
   "errors": {
-    "unsupportedFormat": "僅支援 PDF 檔案",
-    "conversionFailed": "轉換失敗，請重試"
+    "unsupportedFormat": "不支援該檔案類型。目前支援格式：{{formats}}。",
+    "unsupportedConversion": "不支援的轉換方向",
+    "conversionFailed": "轉換失敗，請重試",
+    "ocrRequired": "掃描版 PDF 需要 OCR；無法提取文字層",
+    "emptyOcr": "圖片中未偵測到文字",
+    "noPagesSelected": "未選擇轉換頁面"
   },
   "warnings": {
-    "conversionWarning": "轉換完成，但包含警告"
+    "conversionWarning": "轉換完成，但包含警告",
+    "parserFallback": "使用了備用解析器；結果可能有所不同"
+  },
+  "options": {
+    "ocr": "是否進行 OCR",
+    "htmlBackground": "HTML 背景選項",
+    "includeBackground": "包含背景",
+    "backgroundQuality": "背景品質",
+    "textControls": "文字控制",
+    "htmlTextControls": "HTML 文字控制",
+    "textControlsDefault": "預設文字",
+    "textControlsSelected": "已設定 {{count}} 項",
+    "textControlConfigured": "文字控制已設定",
+    "confirmTextControl": "確認文字控制",
+    "backgroundQualityLow": "低",
+    "backgroundQualityMedium": "中",
+    "backgroundQualityHigh": "高",
+    "backgroundQualityUltra": "極高",
+    "fontSize": "字型大小",
+    "lineHeight": "行高",
+    "fontWeight": "字重",
+    "italic": "斜體",
+    "color": "顏色",
+    "fontFamily": "字型家族",
+    "vertical": "直書方式",
+    "dir": "文字方向",
+    "defaultValue": "預設",
+    "htmlLayout": "HTML 佈局",
+    "paginated": "分頁",
+    "continuous": "不分頁",
+    "actualWidth": "實際寬度",
+    "fitWidth": "撐滿寬度",
+    "htmlWidthMode": "寬度模式",
+    "pdfPages": {
+      "title": "選擇 PDF 頁面",
+      "selectedCount": "已選擇 {{count}} 頁",
+      "previewLoading": "正在載入預覽...",
+      "previewError": "無法載入 PDF 預覽",
+      "noPagesSelected": "請至少選擇一頁"
+    }
+  },
+  "output": {
+    "count": "{{count}} 個輸出",
+    "count_one": "1 個輸出"
+  },
+  "preview": {
+    "title": "預覽：{{filename}}",
+    "close": "關閉預覽",
+    "loading": "正在載入預覽..."
+  },
+  "pdfPageSelector": {
+    "title": "選擇頁面",
+    "loading": "正在載入預覽...",
+    "loadError": "載入 PDF 失敗",
+    "page": "第",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "cancel": "取消",
+    "done": "完成"
+  },
+  "htmlOptionsModal": {
+    "title": "HTML 轉換選項",
+    "viewTitle": "HTML 轉換選項（唯讀）",
+    "backgroundSection": "背景選項",
+    "textControlSection": "文字控制",
+    "layoutSection": "佈局選項",
+    "widthSection": "寬度模式"
+  },
+  "settingsModal": {
+    "title": "設定",
+    "viewTitle": "設定（唯讀）",
+    "pdfPagesTitle": "PDF 頁面",
+    "pdfOcrTitle": "PDF OCR",
+    "htmlOptionsTitle": "HTML 選項",
+    "htmlEncodeOptionsTitle": "HTML 輸入選項",
+    "imageOptionsTitle": "圖片選項",
+    "txtImageOptionsTitle": "TXT 圖片選項",
+    "imageToPdfTitle": "圖片轉 PDF 選項",
+    "pdfPageSetupTitle": "頁面設定",
+    "paperSize": "紙張尺寸",
+    "paperSizeA4": "A4",
+    "paperSizeA3": "A3",
+    "paperSizeA5": "A5",
+    "paperSizeLetter": "Letter",
+    "paperSizeLegal": "Legal",
+    "paperSizeB5": "B5",
+    "paperSizeAuto": "自動（依內容）",
+    "orientation": "方向",
+    "orientationPortrait": "縱向",
+    "orientationLandscape": "橫向",
+    "orientationAuto": "自動",
+    "txtImageTextColor": "文字顏色",
+    "txtImageBackgroundColor": "背景顏色",
+    "txtImageFontSize": "字型大小 (px)",
+    "txtImageWidth": "圖片寬度 (px)",
+    "txtImagePadding": "內邊距 (px)",
+    "txtImageLineHeight": "行高 (px)",
+    "txtImageHelp": "僅用於 TXT 轉 PNG、JPG 或 WebP；這些值會獨立儲存，不會寫入通用圖片選項。",
+    "maxWidth": "最大寬度",
+    "maxHeight": "最大高度",
+    "keepAspectRatio": "保持寬高比",
+    "quality": "品質",
+    "margin": "邊距 (pt)",
+    "fit": "圖片放置方式",
+    "fitOriginal": "原尺寸",
+    "fitShowAll": "盡量展示全部圖片",
+    "pageMode": "頁面模式",
+    "pageModeAuto": "自動",
+    "pageModeSingle": "單頁",
+    "pageModeMulti": "多頁",
+    "estimate": "估算",
+    "reset": "重設",
+    "heuristicEstimate": "啟發式估算：實際輸出大小可能因內容而異",
+    "removeExif": "移除 EXIF 元資料",
+    "removeExifHelp": "選擇要從圖片輸出中移除的元資料分組。",
+    "exifCategories": "EXIF 分類",
+    "exifCategory": {
+      "all": "全部元資料",
+      "geolocation": "地理位置",
+      "camera": "相機與鏡頭",
+      "datetime": "日期與時間",
+      "software": "軟體資訊",
+      "authorCopyright": "作者與版權"
+    },
+    "rotation": "旋轉",
+    "rotationDegrees": "{{degrees}}°",
+    "scale": "縮放 (%)",
+    "imageToPdfTransformHelp": "原尺寸會直接按圖片尺寸放置；盡量展示全部圖片會在圖片寬度超過扣除邊距後的頁面寬度時等比縮小。縮放會在所選方式的基礎上疊加，範圍為 10% 到 300%。",
+    "markdownTitle": "Markdown 選項",
+    "markdownTxtMode": "TXT 輸出模式",
+    "markdownTxtModeRaw": "保留原始 Markdown",
+    "markdownTxtModePlain": "擷取純文字",
+    "markdownTxtModeHelp": "「保留原始」直接輸出 Markdown 語法（標題、列表等）；「擷取純文字」會先解析文件再擷取純文字內容。",
+    "excludeSelectors": "排除選擇器",
+    "excludeSelectorsHelp": "多個 CSS 選擇器可用逗號或換行分隔，編碼 HTML 輸入時會跳過符合元素。",
+    "snapshotWidth": "快照寬度",
+    "snapshotWidthHelp": "設定 HTML 輸入快照寬度；留空時使用解析器預設值。"
+  },
+  "confirmations": {
+    "title": "請確認",
+    "pdfTooManyPages": "檔案「{{fileName}}」有 {{pageCount}} 頁，轉換的持續時間可能很長，建議選擇部分頁數轉換，仍要繼續嗎？"
   },
   "footer": {
     "copyright": "© {{year}} 倉鼠文件轉換",
@@ -51,5 +222,25 @@
     "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
     "feedback": " 問題反饋",
     "feedbackUrl": "https://github.com/HamsterNote/hamster-convertor/issues"
+  },
+  "multiSelect": {
+    "toggle": "多選",
+    "cancel": "取消選擇",
+    "selectedCount": "已選擇 {{count}} 個",
+    "bulkDelete": "刪除所選",
+    "bulkTarget": "設定目標格式",
+    "noCommonTarget": "所選檔案沒有共同的目標格式",
+    "selectionUnavailable": "無法選擇已轉換或轉換中的檔案"
+  },
+  "group": {
+    "create": "建立群組",
+    "title": "群組 {{index}} · {{count}} 個檔案",
+    "expand": "展開群組",
+    "collapse": "收起群組",
+    "settings": "群組設定",
+    "convert": "轉換群組",
+    "selectAll": "全選群組內檔案",
+    "noSettingsForTarget": "該目標格式沒有可用設定",
+    "alreadyInGroup": "無法將已在群組中的檔案建立新群組"
   }
 }

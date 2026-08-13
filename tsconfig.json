@@ -2,15 +2,17 @@
   "extends": "@system-ui-js/development-base/tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": ["react/experimental", "react-dom/experimental"],
+    "types": ["vite/client", "react/experimental", "react-dom/experimental"],
     "paths": {
       "@/*": ["./src/*"],
       "@hamster-note/pdf-parser": ["../PdfParser/dist/index.js"],
       "@hamster-note/html-parser": ["../HtmlParser/dist/index.js"],
       "@hamster-note/document-parser": ["../DocumentParser/dist/index.js"],
-      "@hamster-note/types": ["./src/types/hamster-note-types.d.ts"]
+      "@hamster-note/types": ["./src/types/hamster-note-types.d.ts"],
+      "@hamster-note/parser-protocol": ["./packages/parser-protocol/src/index.ts"]
     }
   },
   "include": ["src", "e2e"],
-  "files": ["src/types/pdf-parser-deps.d.ts"]
+  "files": ["src/types/pdf-parser-deps.d.ts"],
+  "references": [{ "path": "./packages/parser-protocol" }]
 }

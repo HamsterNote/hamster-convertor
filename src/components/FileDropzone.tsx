@@ -55,10 +55,10 @@ function FileDropzone({ accept, onFiles }: Props) {
       </button>
       <input
         accept={accept}
+        className="file-input--hidden"
         multiple
         onChange={handleBrowse}
         ref={inputRef}
-        style={{ display: 'none' }}
         type="file"
       />
     </>

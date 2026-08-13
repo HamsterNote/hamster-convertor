@@ -10,13 +10,39 @@
     "or": "or",
     "browse": "browse"
   },
-  "formats": { "from": "From", "to": "To", "supported": "Supported formats" },
+  "formats": {
+    "from": "From",
+    "to": "To",
+    "supported": "Supported formats",
+    "targets": {
+      "txt": "TXT",
+      "png": "PNG",
+      "jpg": "JPG",
+      "webp": "WEBP",
+      "pdf": "PDF",
+      "html": "HTML",
+      "md": "Markdown"
+    }
+  },
   "actions": {
     "addFiles": "Add files",
     "convertAll": "Convert all",
     "clearAll": "Clear all",
     "download": "Download",
-    "remove": "Remove"
+    "downloadAll": "Download all",
+    "preview": "Preview",
+    "remove": "Remove",
+    "selectPages": "Select pages",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "done": "Done",
+    "cancel": "Cancel",
+    "viewOptions": "View options",
+    "htmlConvertOptions": "HTML conversion options",
+    "continue": "Continue",
+    "settings": "Settings",
+    "copy": "Copy",
+    "previewUnsupported": "Preview not available for this format"
   },
   "table": {
     "fileName": "File name",
@@ -32,12 +58,161 @@
     "done": "Done",
     "failed": "Failed"
   },
+  "loading": {
+    "converting": "Converting...",
+    "convertingWithProgress": "Converting ({{processed}} / {{total}})",
+    "preparingDownload": "Preparing download..."
+  },
   "errors": {
-    "unsupportedFormat": "Only PDF files are supported",
-    "conversionFailed": "Conversion failed, please retry"
+    "unsupportedFormat": "Unsupported file type. Supported formats: {{formats}}.",
+    "unsupportedConversion": "Unsupported conversion direction",
+    "conversionFailed": "Conversion failed, please retry",
+    "ocrRequired": "Scanned PDF requires OCR; text-layer extraction not available",
+    "emptyOcr": "No text detected in image",
+    "noPagesSelected": "No pages selected for conversion"
   },
   "warnings": {
-    "conversionWarning": "Conversion completed with warnings"
+    "conversionWarning": "Conversion completed with warnings",
+    "parserFallback": "Used fallback parser; results may vary"
+  },
+  "options": {
+    "ocr": "OCR",
+    "htmlBackground": "HTML Background Options",
+    "includeBackground": "Include Background",
+    "backgroundQuality": "Background Quality",
+    "textControls": "Text Controls",
+    "htmlTextControls": "HTML Text Controls",
+    "textControlsDefault": "Default text",
+    "textControlsSelected": "{{count}} controls set",
+    "textControlConfigured": "Text control configured",
+    "confirmTextControl": "Confirm text control",
+    "backgroundQualityLow": "Low",
+    "backgroundQualityMedium": "Medium",
+    "backgroundQualityHigh": "High",
+    "backgroundQualityUltra": "Ultra",
+    "fontSize": "Font Size",
+    "lineHeight": "Line Height",
+    "fontWeight": "Font Weight",
+    "italic": "Italic",
+    "color": "Color",
+    "fontFamily": "Font Family",
+    "vertical": "Vertical Writing",
+    "dir": "Text Direction",
+    "defaultValue": "Default",
+    "htmlLayout": "HTML Layout",
+    "paginated": "Paginated",
+    "continuous": "Continuous",
+    "actualWidth": "Actual Width",
+    "fitWidth": "Fit Width",
+    "htmlWidthMode": "Width Mode",
+    "pdfPages": {
+      "title": "Select PDF pages",
+      "selectedCount": "{{count}} pages selected",
+      "previewLoading": "Loading previews...",
+      "previewError": "Failed to load PDF preview",
+      "noPagesSelected": "Please select at least one page"
+    }
+  },
+  "output": {
+    "count": "{{count}} outputs",
+    "count_one": "1 output"
+  },
+  "preview": {
+    "title": "Preview: {{filename}}",
+    "close": "Close preview",
+    "loading": "Loading preview..."
+  },
+  "pdfPageSelector": {
+    "title": "Select Pages",
+    "loading": "Loading previews...",
+    "loadError": "Failed to load PDF",
+    "page": "Page",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "cancel": "Cancel",
+    "done": "Done"
+  },
+  "htmlOptionsModal": {
+    "title": "HTML conversion options",
+    "viewTitle": "HTML conversion options (read-only)",
+    "backgroundSection": "Background options",
+    "textControlSection": "Text controls",
+    "layoutSection": "Layout options",
+    "widthSection": "Width mode"
+  },
+  "settingsModal": {
+    "title": "Settings",
+    "viewTitle": "Settings (read-only)",
+    "pdfPagesTitle": "PDF Pages",
+    "pdfOcrTitle": "PDF OCR",
+    "htmlOptionsTitle": "HTML Options",
+    "htmlEncodeOptionsTitle": "HTML Input Options",
+    "imageOptionsTitle": "Image Options",
+    "txtImageOptionsTitle": "TXT Image Options",
+    "imageToPdfTitle": "Image to PDF Options",
+    "pdfPageSetupTitle": "Page Setup",
+    "paperSize": "Paper Size",
+    "paperSizeA4": "A4",
+    "paperSizeA3": "A3",
+    "paperSizeA5": "A5",
+    "paperSizeLetter": "Letter",
+    "paperSizeLegal": "Legal",
+    "paperSizeB5": "B5",
+    "paperSizeAuto": "Auto (by content)",
+    "orientation": "Orientation",
+    "orientationPortrait": "Portrait",
+    "orientationLandscape": "Landscape",
+    "orientationAuto": "Auto",
+    "txtImageTextColor": "Text color",
+    "txtImageBackgroundColor": "Background color",
+    "txtImageFontSize": "Font size (px)",
+    "txtImageWidth": "Image width (px)",
+    "txtImagePadding": "Padding (px)",
+    "txtImageLineHeight": "Line height (px)",
+    "txtImageHelp": "Applies only to TXT converted into PNG, JPG, or WebP. These values are saved separately from general image options.",
+    "maxWidth": "Max width",
+    "maxHeight": "Max height",
+    "keepAspectRatio": "Keep aspect ratio",
+    "quality": "Quality",
+    "margin": "Margin (pt)",
+    "fit": "Image placement",
+    "fitOriginal": "Original size",
+    "fitShowAll": "Show as much as possible",
+    "pageMode": "Page mode",
+    "pageModeAuto": "Auto",
+    "pageModeSingle": "Single",
+    "pageModeMulti": "Multi",
+    "estimate": "Estimate",
+    "reset": "Reset",
+    "heuristicEstimate": "Heuristic estimate: actual output size may vary based on content",
+    "removeExif": "Remove EXIF metadata",
+    "removeExifHelp": "Choose which metadata groups to remove from image outputs.",
+    "exifCategories": "EXIF categories",
+    "exifCategory": {
+      "all": "All metadata",
+      "geolocation": "Geolocation",
+      "camera": "Camera and lens",
+      "datetime": "Date and time",
+      "software": "Software",
+      "authorCopyright": "Author and copyright"
+    },
+    "rotation": "Rotation",
+    "rotationDegrees": "{{degrees}}°",
+    "scale": "Scale (%)",
+    "imageToPdfTransformHelp": "Original size places the image at its direct size. Show as much as possible only scales down when image width exceeds page width after margins. Scale is applied on top of the selected placement, from 10% to 300%.",
+    "markdownTitle": "Markdown Options",
+    "markdownTxtMode": "TXT output mode",
+    "markdownTxtModeRaw": "Keep raw Markdown",
+    "markdownTxtModePlain": "Extract plain text",
+    "markdownTxtModeHelp": "Raw mode keeps Markdown syntax (headings, lists). Plain mode parses the document and extracts text only.",
+    "excludeSelectors": "Exclude selectors",
+    "excludeSelectorsHelp": "Separate CSS selectors with commas or new lines. Matching elements are skipped while encoding HTML input.",
+    "snapshotWidth": "Snapshot width",
+    "snapshotWidthHelp": "Set the HTML input snapshot width. Leave empty to use the parser default."
+  },
+  "confirmations": {
+    "title": "Please confirm",
+    "pdfTooManyPages": "\"{{fileName}}\" has {{pageCount}} pages. Conversion may take a long time. We recommend selecting a subset of pages. Continue anyway?"
   },
   "footer": {
     "copyright": "© {{year}} Hamster Document Converter",
@@ -47,5 +222,25 @@
     "githubIssuesUrl": "https://github.com/HamsterNote/hamster-convertor/issues",
     "feedback": "Feedback",
     "feedbackUrl": "https://github.com/HamsterNote/hamster-convertor/issues"
+  },
+  "multiSelect": {
+    "toggle": "Multi-select",
+    "cancel": "Cancel selection",
+    "selectedCount": "{{count}} selected",
+    "bulkDelete": "Delete selected",
+    "bulkTarget": "Set target format",
+    "noCommonTarget": "No common target format for selected files",
+    "selectionUnavailable": "Cannot select converted or converting files"
+  },
+  "group": {
+    "create": "Create Group",
+    "title": "Group {{index}} · {{count}} files",
+    "expand": "Expand group",
+    "collapse": "Collapse group",
+    "settings": "Group settings",
+    "convert": "Convert Group",
+    "selectAll": "Select all in group",
+    "noSettingsForTarget": "No settings available for this target format",
+    "alreadyInGroup": "Cannot create a Group from files that are already in a Group"
   }
 }

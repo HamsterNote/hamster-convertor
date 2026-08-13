@@ -43,5 +43,18 @@ test-results/
 .opencode/
 .specify/
 
+# OpenCode 工作流产出（计划、证据、笔记等）
+.omo/
+
+# Yalc 本地包管理产物仅供开发机临时联调，正式依赖使用注册表版本。
+.yalc/
+yalc.lock
+
 # ts 增量编译
 *.tsbuildinfo
+
+# CodeGraph 索引缓存（工具内部状态）
+.codegraph/
+
+# Codemap 状态文件（工具内部状态）
+.slim/

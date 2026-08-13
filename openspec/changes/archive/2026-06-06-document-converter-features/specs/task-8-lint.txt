@@ -1,0 +1,3 @@
+yarn run v1.22.22
+$ eslint . --max-warnings=0
+Done in 3.97s.
