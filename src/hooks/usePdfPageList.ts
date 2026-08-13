@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type PageShell = {
   pageNumber: number
@@ -133,7 +133,7 @@ export function usePdfPageList(file: File): {
   pageShells: PageShell[]
   loading: boolean
   error: string | null
-  gridRef: React.RefObject<HTMLDivElement | null>
+  gridRef: React.RefObject<HTMLDivElement>
 } {
   const [pageShells, setPageShells] = useState<PageShell[]>([])
   const [pdfDocument, setPdfDocument] = useState<PdfDocument | null>(null)
@@ -267,7 +267,9 @@ export function usePdfPageList(file: File): {
     )
 
     const cards = grid.querySelectorAll('[data-page-number]')
-    cards.forEach(card => observer.observe(card))
+    cards.forEach(card => {
+      observer.observe(card)
+    })
     observerRef.current = observer
 
     return () => {

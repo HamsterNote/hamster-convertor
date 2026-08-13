@@ -1,6 +1,8 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import type { Plugin } from 'vite'
+import { defineConfig } from 'vite'
+import { rewritePdfjsImport } from './src/lib/pdfjs-import-rewrite'
 
 // 条件化别名：仅在本地开发时且路径存在时使用 sibling 目录。
 // 这里复用根 Vite 配置的 parser alias 规则，但路径从 packages/parser-runtime 反推到仓库外层。
@@ -32,20 +34,14 @@ if (existsSync(typesPath)) {
 
 const pdfParserStandardFontsExpression = 'new URL("./standard_fonts/", import.meta.url).href'
 
-// 拦截 pdf-parser 中的 import("pdfjs-dist") 调用，替换为 runtime 内部包装模块。
-// 解决中文乱码问题：pdf.js 需要 CMap 数据才能正确解码 CJK 文本。
 const interceptPdfjsImportPlugin = (): Plugin => ({
   name: 'intercept-pdfjs-import',
   enforce: 'pre',
   transform(code, id) {
-    // 只处理 pdf-parser 模块，避免影响 runtime 或其他第三方依赖的 pdfjs 使用方式。
-    const isPdfParserModule = id.includes('@hamster-note/pdf-parser') || id.includes('/PdfParser/')
-    if (!isPdfParserModule || !code.includes('import("pdfjs-dist")')) {
+    const modifiedCode = rewritePdfjsImport(code, id)
+    if (modifiedCode === null) {
       return null
     }
-
-    // 将 import("pdfjs-dist") 替换为 runtime 自己的包装模块。
-    const modifiedCode = code.replace('import("pdfjs-dist")', 'import("/src/lib/pdfjs-wrapper.ts")')
 
     return {
       code: modifiedCode,

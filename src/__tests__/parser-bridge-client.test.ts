@@ -11,10 +11,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createBridgeClient,
+  type BridgeClient,
   BridgeError,
   BridgeErrorCode,
-  type BridgeClient
+  createBridgeClient
 } from '../lib/parser-bridge/client'
 
 type MessageListener = (event: MessageEvent<unknown>) => void
@@ -133,6 +133,9 @@ describe('createBridgeClient', () => {
     port.dispatch(makeResult('req-ok'))
 
     const result = await promise
+    if (Array.isArray(result)) {
+      throw new Error('Expected one conversion result')
+    }
     expect(result.filename).toBe('req-ok.html')
     expect(result.mimeType).toBe('text/html;charset=utf-8')
   })
@@ -220,6 +223,9 @@ describe('createBridgeClient', () => {
     // 第一次请求仍然正常
     port.dispatch(makeResult('req-dup'))
     const result = await firstPromise
+    if (Array.isArray(result)) {
+      throw new Error('Expected one conversion result')
+    }
     expect(result.filename).toBe('req-dup.html')
   })
 
@@ -341,6 +347,9 @@ describe('createBridgeClient', () => {
     // 正确的 result 应该仍然能工作
     port.dispatch(makeResult('req-known'))
     const result = await promise
+    if (Array.isArray(result)) {
+      throw new Error('Expected one conversion result')
+    }
     expect(result.filename).toBe('req-known.html')
   })
 

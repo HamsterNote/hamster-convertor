@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, cleanup } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
+import { createRef, type RefObject } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ParserIframeBridge, type ParserIframeBridgeRef } from '../components/ParserIframeBridge'
-import { createRef } from 'react'
 
 type MockPort = {
   postMessage: (data: unknown) => void
@@ -35,13 +35,25 @@ function createMockMessageChannel() {
   const port2 = createMockPort()
 
   port1.postMessage = (data: unknown) => {
-    port2._handlers.forEach(h => h(new MessageEvent('message', { data })))
+    port2._handlers.forEach(handler => {
+      handler(new MessageEvent('message', { data }))
+    })
   }
   port2.postMessage = (data: unknown) => {
-    port1._handlers.forEach(h => h(new MessageEvent('message', { data })))
+    port1._handlers.forEach(handler => {
+      handler(new MessageEvent('message', { data }))
+    })
   }
 
   return { port1, port2 }
+}
+
+const getBridge = (ref: RefObject<ParserIframeBridgeRef | null>): ParserIframeBridgeRef => {
+  const bridge = ref.current
+  if (!bridge) {
+    throw new Error('Parser iframe bridge ref was not initialized')
+  }
+  return bridge
 }
 
 describe('ParserIframeBridge', () => {
@@ -99,11 +111,43 @@ describe('ParserIframeBridge', () => {
     expect(typeof ref.current?.cancel).toBe('function')
   })
 
-  it('rejects convert when bridge not ready', async () => {
+  it('waits for the bridge handshake before converting', async () => {
     const ref = createRef<ParserIframeBridgeRef>()
     render(<ParserIframeBridge ref={ref} />)
+
+    const bridge = getBridge(ref)
+
+    const postMessageSpy = vi.spyOn(mockChannel.port1, 'postMessage')
     const request = makeConvertRequest('req-001')
-    await expect(ref.current!.convert(request)).rejects.toThrow('Bridge not ready')
+    const settlement = bridge.convert(request).then(
+      result => ({ kind: 'result' as const, result }),
+      (error: unknown) => ({ kind: 'error' as const, error })
+    )
+
+    expect(postMessageSpy).not.toHaveBeenCalled()
+
+    const iframe = document.querySelector('iframe')
+    simulateReady(iframe)
+    await Promise.resolve()
+
+    expect(postMessageSpy).toHaveBeenCalledWith(request)
+
+    mockChannel.port2.postMessage({
+      requestId: 'req-001',
+      type: 'convert:result',
+      payload: {
+        filename: 'test.html',
+        mimeType: 'text/html',
+        targetFormat: 'html',
+        buffer: new ArrayBuffer(4)
+      }
+    })
+
+    const settled = await settlement
+    if (settled.kind === 'error') {
+      throw settled.error
+    }
+    expect(Array.isArray(settled.result)).toBe(false)
   })
 
   it('completes ready handshake and makes convert available', async () => {
@@ -114,7 +158,7 @@ describe('ParserIframeBridge', () => {
     simulateReady(iframe)
 
     const request = makeConvertRequest('req-handshake')
-    const convertPromise = ref.current!.convert(request)
+    const convertPromise = getBridge(ref).convert(request)
 
     mockChannel.port2.postMessage({
       requestId: 'req-handshake',
@@ -128,6 +172,9 @@ describe('ParserIframeBridge', () => {
     })
 
     const result = await convertPromise
+    if (Array.isArray(result)) {
+      throw new Error('Expected one conversion result')
+    }
     expect(result.filename).toBe('test.html')
   })
 
@@ -141,7 +188,7 @@ describe('ParserIframeBridge', () => {
     const postMessageSpy = vi.spyOn(mockChannel.port1, 'postMessage')
 
     const request = makeConvertRequest('req-port')
-    const convertPromise = ref.current!.convert(request)
+    const convertPromise = getBridge(ref).convert(request)
 
     expect(postMessageSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -174,7 +221,8 @@ describe('ParserIframeBridge', () => {
     simulateReady(iframe)
 
     const request = makeConvertRequest('req-progress')
-    const convertPromise = ref.current!.convert(request)
+    const bridge = getBridge(ref)
+    const convertPromise = bridge.convert(request)
 
     mockChannel.port2.postMessage({
       requestId: 'req-progress',
@@ -187,7 +235,7 @@ describe('ParserIframeBridge', () => {
       }
     })
 
-    const progress = ref.current!.getProgress()
+    const progress = bridge.getProgress()
     expect(progress).not.toBeNull()
     expect(progress?.phase).toBe('reading')
     expect(progress?.percent).toBe(25)
@@ -214,11 +262,42 @@ describe('ParserIframeBridge', () => {
     simulateReady(iframe)
 
     const request = makeConvertRequest('req-cancel')
-    const convertPromise = ref.current!.convert(request)
+    const bridge = getBridge(ref)
+    const convertPromise = bridge.convert(request)
 
-    await ref.current!.cancel('req-cancel')
+    await bridge.cancel('req-cancel')
 
     await expect(convertPromise).rejects.toThrow('cancelled')
+  })
+
+  it('cancels a conversion queued before the bridge handshake', async () => {
+    const ref = createRef<ParserIframeBridgeRef>()
+    render(<ParserIframeBridge ref={ref} />)
+
+    const bridge = getBridge(ref)
+    const request = makeConvertRequest('req-loading-cancel')
+    const convertPromise = bridge.convert(request)
+    const postMessageSpy = vi.spyOn(mockChannel.port1, 'postMessage')
+
+    await bridge.cancel(request.requestId)
+    await expect(convertPromise).rejects.toThrow('cancelled')
+
+    simulateReady(document.querySelector('iframe'))
+    await Promise.resolve()
+
+    expect(postMessageSpy).not.toHaveBeenCalledWith(request)
+  })
+
+  it('rejects conversions requested through a stale handle after unmount', async () => {
+    const ref = createRef<ParserIframeBridgeRef>()
+    const { unmount } = render(<ParserIframeBridge ref={ref} />)
+    const bridge = getBridge(ref)
+
+    unmount()
+
+    await expect(bridge.convert(makeConvertRequest('req-after-unmount'))).rejects.toMatchObject({
+      code: 'BRIDGE_DISPOSED'
+    })
   })
 
   it('unmount rejects pending with BRIDGE_DISPOSED and cleans up listeners', async () => {
@@ -229,7 +308,7 @@ describe('ParserIframeBridge', () => {
     simulateReady(iframe)
 
     const request = makeConvertRequest('req-unmount')
-    const convertPromise = ref.current!.convert(request)
+    const convertPromise = getBridge(ref).convert(request)
 
     const closeSpy = vi.spyOn(mockChannel.port1, 'close')
 

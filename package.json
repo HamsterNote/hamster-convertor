@@ -7,7 +7,7 @@
   "license": "GPL v3.0",
   "scripts": {
     "build:parser-runtime": "cd packages/parser-runtime && yarn build",
-    "build": "yarn build:parser-runtime && vite build",
+    "build": "tsc -b && yarn build:parser-runtime && vite build",
     "dev": "vite --host 0.0.0.0",
     "preview": "vite preview --host 0.0.0.0",
     "preview:build": "yarn build && yarn preview --port 5073",
@@ -16,7 +16,7 @@
     "format:check": "prettier --check .",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:integration": "vitest run src/__tests__/convert.integration.test.ts",
+    "test:integration": "vitest run src/__tests__/parser-bridge-integration.test.tsx",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",
     "test:e2e:headed": "npx playwright test --headed",

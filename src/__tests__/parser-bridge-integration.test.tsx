@@ -10,9 +10,9 @@
  * - 多文件并发生成唯一 requestId
  */
 
-import { describe, expect, it, vi, afterEach } from 'vitest'
-import { convertViaBridge } from '../lib/parser-bridge/proxy'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ParserIframeBridgeRef } from '../components/ParserIframeBridge'
+import { convertViaBridge } from '../lib/parser-bridge/proxy'
 
 const createTestFile = (name: string, content: string): File => {
   const buffer = new TextEncoder().encode(content)
@@ -155,6 +155,23 @@ describe('convertViaBridge integration', () => {
     const [result] = await convertViaBridge(bridge, file, 'pdf', 'html')
 
     expect(result.warnings).toEqual(['OCR quality low', 'Missing font fallback'])
+  })
+
+  it('accepts Markdown output returned by the runtime', async () => {
+    const bridge = createSimpleMockBridge(() => ({
+      filename: 'converted.md',
+      mimeType: 'text/markdown;charset=utf-8',
+      targetFormat: 'md',
+      buffer: new TextEncoder().encode('# Converted').buffer
+    }))
+
+    const file = new File(['<h1>Converted</h1>'], 'converted.html', { type: 'text/html' })
+    const [result] = await convertViaBridge(bridge, file, 'html', 'md')
+
+    expect(result.targetFormat).toBe('md')
+    expect(result.filename).toBe('converted.md')
+    expect(result.blob.type).toBe('text/markdown;charset=utf-8')
+    expect(result.blob.size).toBe(new TextEncoder().encode('# Converted').byteLength)
   })
 
   it('rejects unsupported target format from bridge result', async () => {

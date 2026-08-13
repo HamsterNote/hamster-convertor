@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
-import { ParserIframeBridge, type ParserIframeBridgeRef } from '../components/ParserIframeBridge'
 import { createRef } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ParserIframeBridge, type ParserIframeBridgeRef } from '../components/ParserIframeBridge'
 
 describe('ParserIframeBridge load timeout', () => {
   beforeEach(() => {
@@ -18,8 +18,6 @@ describe('ParserIframeBridge load timeout', () => {
       <ParserIframeBridge ref={ref} src="/__missing-parser-runtime__/index.html" timeout={1000} />
     )
 
-    vi.advanceTimersByTime(1500)
-
     const request = {
       requestId: 'req-001',
       type: 'convert' as const,
@@ -29,7 +27,15 @@ describe('ParserIframeBridge load timeout', () => {
       buffer: new ArrayBuffer(8)
     }
 
-    await expect(ref.current!.convert(request)).rejects.toMatchObject({
+    const bridge = ref.current
+    if (!bridge) {
+      throw new Error('Parser iframe bridge ref was not initialized')
+    }
+    const convertPromise = bridge.convert(request)
+
+    vi.advanceTimersByTime(1500)
+
+    await expect(convertPromise).rejects.toMatchObject({
       code: 'IFRAME_LOAD_TIMEOUT'
     })
   })

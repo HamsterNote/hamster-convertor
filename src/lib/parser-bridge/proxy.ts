@@ -12,7 +12,7 @@ export type ConversionResult = {
 }
 
 const isTargetFormat = (value: string): value is TargetFormat =>
-  ['html', 'txt', 'png', 'jpg', 'webp', 'pdf'].includes(value)
+  ['html', 'txt', 'md', 'png', 'jpg', 'webp', 'pdf'].includes(value)
 
 const readFileAsArrayBuffer = async (file: File): Promise<ArrayBuffer> => {
   if (file.arrayBuffer) {
